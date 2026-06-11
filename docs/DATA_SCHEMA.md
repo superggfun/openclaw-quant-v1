@@ -153,6 +153,88 @@ Top-level keys:
 - `warnings`: missing data or weighting fallback warnings.
 - `targets_path`: optional target allocation JSON path.
 
+## reports/factor_eval_*.json
+
+Factor evaluation reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `factor`: evaluated factor name.
+- `start_date`, `end_date`: optional inclusive signal-date range.
+- `forward_days`: future-return horizon used for the main evaluation.
+- `universe`: requested symbol universe.
+- `no_lookahead`: true for the framework design.
+- `ic_mean`, `ic_std`, `ic_positive_rate`, `ic_count`: Pearson IC summary.
+- `rank_ic_mean`, `rank_ic_std`, `rank_ic_positive_rate`, `rank_ic_count`: Spearman Rank IC summary.
+- `icir`: `ic_mean / ic_std` when available.
+- `quintiles`: average future returns for `q1` through `q5`.
+- `spread_return`: `q5 - q1`.
+- `decay`: IC and Rank IC for 1, 5, 10, 20, and 60 day forward windows.
+- `observations`: per-symbol signal-date observations with factor value and future return.
+- `excluded_symbols`: symbols without valid factor and future-return pairs.
+- `exclusion_reasons`: per-symbol exclusion reason.
+- `warnings`: non-blocking data quality warnings.
+- `pipeline_config`: optional factor pipeline config used before evaluation metrics.
+
+## reports/factor_pipeline_*.json
+
+Factor pipeline reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `factor`: factor processed by the pipeline.
+- `as_of_date`: signal date for the cross-section.
+- `raw_factor_values`: raw per-symbol factor values.
+- `cleaned_factor_values`: cleaned per-symbol factor values after preprocessing.
+- `excluded_symbols`: symbols removed during missing-value handling.
+- `exclusion_reasons`: per-symbol exclusion reason.
+- `preprocessing_steps_applied`: ordered list of preprocessing steps applied.
+- `before_summary_statistics`: count, missing count, mean, standard deviation, min, and max before preprocessing.
+- `after_summary_statistics`: count, missing count, mean, standard deviation, min, and max after preprocessing.
+- `sector_neutralization_result`: per-sector mean before, mean after, and count when enabled.
+- `warnings`: non-blocking warnings such as unknown sector or placeholder beta neutralization.
+- `no_lookahead`: true for the framework design.
+
+## reports/factor_backtest_*.json
+
+Long-short factor backtest reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `factor`: evaluated factor name.
+- `start_date`, `end_date`: optional inclusive signal-date range.
+- `holding_period`: forward-return horizon in stored price rows.
+- `quantiles`: number of factor buckets.
+- `long_quantile`: quantile used for the long leg.
+- `short_quantile`: quantile used for the short leg.
+- `observations`: processed symbol-date observations.
+- `rebalance_dates`: signal dates where the long-short spread is formed.
+- `quantile_returns`: average future return by quantile.
+- `top_quantile_return`: average future return for the configured long quantile.
+- `bottom_quantile_return`: average future return for the configured short quantile.
+- `long_symbols_by_date`: long symbols for each signal date.
+- `short_symbols_by_date`: short symbols for each signal date.
+- `long_leg_return`: compounded long-leg return.
+- `short_leg_return`: compounded short-leg return.
+- `long_short_return`: compounded long-short return stream.
+- `annual_return`, `long_short_annual_return`: annualized long-short return.
+- `volatility`, `long_short_volatility`: annualized long-short volatility.
+- `sharpe`, `long_short_sharpe`: annualized long-short Sharpe ratio.
+- `max_drawdown`: drawdown of the compounded long-short return stream.
+- `hit_rate`: share of positive long-short periods.
+- `turnover`: average long-short weight turnover between signal dates.
+- `gross_exposure`: average gross long-short exposure.
+- `net_exposure`: average net long-short exposure.
+- `ic_mean`, `rank_ic_mean`, `icir`: cross-sectional factor diagnostics.
+- `excluded_symbols`, `exclusion_reasons`: skipped symbols and reasons.
+- `no_lookahead`: true for the framework design.
+- `signal_execution_lag`: signal/forward-return timing description.
+- `pipeline_enabled`: whether Factor Pipeline preprocessing was applied.
+- `pipeline_config_path`: config path supplied from the CLI when available.
+- `pipeline_config`: optional Factor Pipeline config applied before quantile grouping.
+- `periods`: per-signal-date long symbols, short symbols, weights, exposures, quantile returns, long-short return, and turnover.
+- `warnings`: non-blocking data quality warnings.
+
 ## reports/cost_*.json
 
 Cost reports are generated files, not database tables. They are ignored by git.

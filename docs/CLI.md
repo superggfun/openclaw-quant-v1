@@ -15,6 +15,12 @@ python -m quant.cli allocation
 python -m quant.cli rebalance --targets examples/targets.json
 python -m quant.cli risk
 python -m quant.cli alpha
+python -m quant.cli alpha --pipeline examples/factor_pipeline_config.json
+python -m quant.cli factor-pipeline --factor momentum_20d
+python -m quant.cli factor-eval --factor momentum_20d
+python -m quant.cli factor-eval --factor momentum_20d --pipeline examples/factor_pipeline_config.json
+python -m quant.cli factor-backtest --factor momentum_20d
+python -m quant.cli factor-backtest --factor momentum_20d --pipeline examples/factor_pipeline_config.json
 python -m quant.cli optimize
 python -m quant.cli cost
 python -m quant.cli rebalance --targets examples/optimized_targets.json --with-costs

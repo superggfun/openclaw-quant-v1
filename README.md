@@ -1,12 +1,12 @@
 # openclaw-quant-v1
 
-`openclaw-quant-v1` is an early OpenClaw-oriented quant system skeleton. It currently includes a market data layer, a simulated portfolio state module, an alpha engine, a portfolio backtest engine, a portfolio rebalance engine, a risk engine, a portfolio optimizer, a cost engine, and an execution simulator. It does not make AI decisions, place live orders, connect to brokers, or perform automated trading.
+`openclaw-quant-v1` is an early OpenClaw-oriented quant system skeleton. It currently includes a market data layer, a simulated portfolio state module, an alpha engine, a factor pipeline, a factor evaluation framework, a long-short factor backtest, a portfolio backtest engine, a portfolio rebalance engine, a risk engine, a portfolio optimizer, a cost engine, and an execution simulator. It does not make AI decisions, place live orders, connect to brokers, or perform automated trading.
 
 This project is for research and simulation only. It is not investment advice.
 
 ## Current Version
 
-`v0.9.0-alpha-engine`
+`v1.3.0-long-short-factor-backtest`
 
 This release includes:
 
@@ -15,14 +15,17 @@ This release includes:
 - Simulated account state.
 - Simulated positions and trade history.
 - Alpha factor generation from stored historical prices.
+- Reusable factor preprocessing pipeline for cleaning and neutralization.
+- No-lookahead factor evaluation with IC, Rank IC, ICIR, quintile, and decay metrics.
+- No-lookahead long-short factor backtest for single-factor profitability checks.
 - Daily portfolio backtest engine using stored prices, optimizer targets, rebalance logic, and costs.
 - Portfolio allocation and rebalance calculation engine.
 - Portfolio risk metrics and risk score.
 - Portfolio optimizer that generates target allocations.
 - Transaction cost estimation for rebalance suggestions.
 - Simulated execution of rebalance suggestions with immediate, next-day open, TWAP, and partial-fill modes.
-- JSON research, rebalance, cost, backtest, and execution reports under `reports/`.
-- CLI commands for data, portfolio, alpha, backtest, allocation, rebalance, risk, optimizer, cost, and execution workflows.
+- JSON research, factor pipeline, factor evaluation, factor backtest, rebalance, cost, backtest, and execution reports under `reports/`.
+- CLI commands for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, backtest, allocation, rebalance, risk, optimizer, cost, and execution workflows.
 - pytest coverage for core state transitions.
 
 ## Scope
@@ -32,7 +35,7 @@ This release includes:
 - SQLite storage at `data/quant.db`
 - Idempotent price updates using `(symbol, date)` as the primary key
 - Simulated account, position, and trade tracking in SQLite
-- Pure calculation alpha, backtest, rebalance, risk, optimizer, cost, and execution modules
+- Pure calculation alpha, factor pipeline, factor evaluation, factor backtest, backtest, rebalance, risk, optimizer, cost, and execution modules
 - Reserved OpenClaw integration boundary with no live execution code
 
 Default symbols:
@@ -57,6 +60,9 @@ openclaw-quant-v1/
 |  |- backtest/
 |  |- cost/
 |  |- execution/
+|  |- factor_backtest/
+|  |- factor_eval/
+|  |- factor_pipeline/
 |  |- optimizer/
 |  |- rebalance/
 |  |  `- rebalance_engine.py
@@ -85,6 +91,9 @@ Key modules:
 
 - `quant/cli.py`: command line entry point.
 - `quant/alpha/alpha_engine.py`: factor calculation and target weight generation.
+- `quant/factor_backtest/factor_backtest.py`: long-short factor return backtest.
+- `quant/factor_pipeline/factor_pipeline.py`: factor preprocessing, standardization, and neutralization.
+- `quant/factor_eval/factor_evaluation.py`: no-lookahead factor evaluation metrics.
 - `quant/services/price_service.py`: price update orchestration.
 - `quant/services/portfolio_service.py`: simulated portfolio rules and valuation.
 - `quant/services/backtest_service.py`: SMA crossover backtest engine.
@@ -247,6 +256,7 @@ Run:
 
 ```bash
 python -m quant.cli alpha
+python -m quant.cli alpha --pipeline examples/factor_pipeline_config.json
 python -m quant.cli alpha --output-targets examples/alpha_targets.json
 python -m quant.cli rebalance --targets examples/alpha_targets.json --with-costs
 ```
@@ -264,6 +274,90 @@ reports/alpha_YYYYMMDD_HHMMSS.json
 ```
 
 See `docs/ALPHA.md` for details.
+
+## Factor Pipeline
+
+The factor pipeline preprocesses same-date cross-sectional factor values before Alpha Engine ranking or Factor Evaluation metrics.
+
+Supported preprocessing:
+
+- missing value handling
+- winsorization
+- z-score standardization
+- rank normalization
+- sector neutralization
+- market/beta neutralization placeholder
+
+Run:
+
+```bash
+python -m quant.cli factor-pipeline --factor momentum_20d
+python -m quant.cli factor-eval --factor momentum_20d --pipeline examples/factor_pipeline_config.json
+python -m quant.cli alpha --pipeline examples/factor_pipeline_config.json
+```
+
+Reports:
+
+```text
+reports/factor_pipeline_YYYYMMDD_HHMMSS.json
+```
+
+See `docs/FACTOR_PIPELINE.md` for details.
+
+## Factor Evaluation Framework
+
+The factor evaluation framework measures whether an alpha factor has useful cross-sectional predictive power.
+
+It follows the same no-lookahead constraint as the Alpha Engine:
+
+- factor values use only `signal_date` and earlier prices
+- future returns use a later stored price row
+- IC and Rank IC are calculated across symbols on each signal date
+
+Supported factors:
+
+- `momentum_20d`
+- `momentum_60d`
+- `volatility_20d`
+- `risk_adjusted_momentum`
+
+Run:
+
+```bash
+python -m quant.cli factor-eval --factor momentum_20d
+python -m quant.cli factor-eval --factor momentum_20d --pipeline examples/factor_pipeline_config.json
+python -m quant.cli factor-eval --factor risk_adjusted_momentum
+python -m quant.cli factor-eval --factor momentum_60d --start 2024-01-01 --end 2024-12-31 --forward-days 20
+```
+
+Reports:
+
+```text
+reports/factor_eval_YYYYMMDD_HHMMSS.json
+```
+
+See `docs/FACTOR_EVALUATION.md` for details.
+
+## Long-Short Factor Backtest
+
+The long-short factor backtest checks whether one factor can produce a plausible equal-weight long-short return stream.
+
+It is not Strategy Evaluation and not Performance Attribution. Those are future roadmap items.
+
+Run:
+
+```bash
+python -m quant.cli factor-backtest --factor momentum_20d
+python -m quant.cli factor-backtest --factor momentum_20d --pipeline examples/factor_pipeline_config.json
+```
+
+Reports:
+
+```text
+reports/factor_backtest_YYYYMMDD_HHMMSS.json
+```
+
+See `docs/FACTOR_BACKTEST.md` for details.
 
 ## Cost Engine
 
@@ -379,6 +473,9 @@ export OPENCLAW_QUANT_DB_PATH=/tmp/openclaw-quant.db
 - `reports/rebalance_*.json`: generated rebalance reports, ignored by git
 - `reports/risk_*.json`: generated risk reports, ignored by git
 - `reports/alpha_*.json`: generated alpha reports, ignored by git
+- `reports/factor_pipeline_*.json`: generated factor pipeline reports, ignored by git
+- `reports/factor_eval_*.json`: generated factor evaluation reports, ignored by git
+- `reports/factor_backtest_*.json`: generated long-short factor backtest reports, ignored by git
 - `reports/optimize_*.json`: generated optimizer reports, ignored by git
 - `reports/cost_*.json`: generated cost reports, ignored by git
 - `reports/execution_*.json`: generated execution simulation reports, ignored by git
@@ -395,6 +492,9 @@ Near-term work:
 - Add configurable sector maps and risk thresholds.
 - Add optimizer modes that use return estimates and risk budgets.
 - Add more alpha factors and signal combination rules.
+- Add richer factor evaluation diagnostics and benchmark comparisons.
+- Add richer neutralization methods and factor pipeline audit views.
+- Add Strategy Evaluation / Performance Attribution in V1.4 or later.
 - Add richer execution assumptions and market calendar support.
 
 Out of scope until explicitly designed:
@@ -419,6 +519,9 @@ Important docs:
 - `docs/REBALANCE.md`
 - `docs/RISK.md`
 - `docs/ALPHA.md`
+- `docs/FACTOR_PIPELINE.md`
+- `docs/FACTOR_EVALUATION.md`
+- `docs/FACTOR_BACKTEST.md`
 - `docs/OPTIMIZER.md`
 - `docs/COST.md`
 - `docs/EXECUTION.md`

@@ -33,6 +33,10 @@ python -m quant.cli allocation
 python -m quant.cli rebalance --targets examples/targets.json
 python -m quant.cli risk
 python -m quant.cli alpha
+python -m quant.cli alpha --pipeline examples/factor_pipeline_config.json
+python -m quant.cli factor-pipeline --factor momentum_20d
+python -m quant.cli factor-eval --factor momentum_20d
+python -m quant.cli factor-backtest --factor momentum_20d
 python -m quant.cli optimize
 python -m quant.cli cost
 python -m quant.cli execute-sim --targets examples/optimized_targets.json
@@ -73,11 +77,46 @@ The risk command calculates concentration, cash exposure, Top 5 holdings concent
 
 ```bash
 python -m quant.cli alpha
+python -m quant.cli alpha --pipeline examples/factor_pipeline_config.json
 python -m quant.cli alpha --output-targets examples/alpha_targets.json
 python -m quant.cli rebalance --targets examples/alpha_targets.json --with-costs
 ```
 
 The alpha command reads `examples/alpha_config.json` by default, calculates momentum, volatility, and risk-adjusted momentum factors, ranks symbols, selects Top N, and generates target weights. It writes a JSON report and does not modify the simulated account. Alpha uses only rows at or before `as_of_date`; generated targets should be executed or backtested on the next trading day.
+
+When `--pipeline` is supplied, Alpha Engine uses cleaned pipeline scores for ranking and score-weighted target generation.
+
+## Factor Pipeline
+
+```bash
+python -m quant.cli factor-pipeline --factor momentum_20d
+python -m quant.cli factor-pipeline --factor risk_adjusted_momentum --config examples/factor_pipeline_config.json
+```
+
+The factor pipeline command reads stored prices up to `--as-of-date` when provided, calculates raw factor values, applies preprocessing, and writes `reports/factor_pipeline_*.json`.
+
+## Factor Evaluation
+
+```bash
+python -m quant.cli factor-eval --factor momentum_20d
+python -m quant.cli factor-eval --factor momentum_20d --pipeline examples/factor_pipeline_config.json
+python -m quant.cli factor-eval --factor risk_adjusted_momentum
+python -m quant.cli factor-eval --factor volatility_20d --start 2024-01-01 --end 2024-12-31 --forward-days 20
+```
+
+The factor evaluation command reads stored prices, calculates factor values using signal-date-and-earlier data, then compares them with future returns. It prints IC, Rank IC, ICIR, quintile returns, spread, and decay metrics, and writes `reports/factor_eval_*.json`.
+
+## Long-Short Factor Backtest
+
+```bash
+python -m quant.cli factor-backtest --factor momentum_20d
+python -m quant.cli factor-backtest --factor momentum_20d --pipeline examples/factor_pipeline_config.json
+python -m quant.cli factor-backtest --factor risk_adjusted_momentum --start 2024-01-01 --end 2024-12-31 --holding-period 20 --quantiles 5
+```
+
+The factor-backtest command ranks each no-lookahead signal-date cross-section, longs the configured top quantile, shorts the configured bottom quantile, and prints long-short return metrics. It writes `reports/factor_backtest_*.json` and does not modify portfolio state.
+
+This is not Strategy Evaluation or Performance Attribution.
 
 ## Optimize
 
@@ -162,6 +201,9 @@ The alpha strategy path records `signal_date` and `execution_date` and executes 
 - Rebalance requires latest prices for target symbols and held symbols.
 - Risk requires latest prices for held symbols.
 - Alpha requires enough stored price history for at least one symbol in the universe.
+- Factor pipeline requires stored price history for symbols whose raw factor values should be calculated.
+- Factor evaluation requires enough stored price history and future-return windows for at least one symbol.
+- Factor backtest requires enough stored price history and future-return windows for at least one long-short cross-section.
 - Optimize requires at least one symbol in the optimizer universe with stored price data.
 - Cost requires a target allocation that can produce rebalance suggestions.
 - Execution simulation requires an initialized account, target allocation, and latest prices for target and held symbols.

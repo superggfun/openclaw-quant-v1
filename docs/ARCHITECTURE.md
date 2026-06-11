@@ -21,6 +21,9 @@ SQLite / External APIs
 - `quant.services.portfolio_service`: Applies simulated account, buy, sell, and valuation rules.
 - `quant.services.backtest_service`: Runs SMA crossover backtests from stored prices and writes JSON reports.
 - `quant.alpha.alpha_engine`: Calculates alpha factors, ranks symbols, and generates target weights.
+- `quant.factor_backtest.factor_backtest`: Runs no-lookahead equal-weight long-short factor return backtests.
+- `quant.factor_pipeline.factor_pipeline`: Preprocesses same-date factor cross-sections before alpha generation or evaluation.
+- `quant.factor_eval.factor_evaluation`: Evaluates factor predictive quality with no-lookahead IC, Rank IC, quintile, and decay metrics.
 - `quant.backtest.backtest_engine`: Runs daily portfolio backtests from stored prices, optimizer targets, rebalance logic, and costs.
 - `quant.rebalance.rebalance_engine`: Calculates current allocation and rebalance suggestions from account, position, and price state.
 - `quant.risk.risk_engine`: Calculates portfolio concentration, cash, Top 5, industry, and risk score metrics.
@@ -86,10 +89,36 @@ The optimizer is side-effect free for portfolio state. It generates target alloc
 Alpha flow:
 
 ```text
-CLI alpha -> AlphaEngine -> SQLitePriceStore -> examples/alpha_targets.json -> reports/alpha_*.json
+CLI alpha -> AlphaEngine -> optional FactorPipeline -> SQLitePriceStore -> examples/alpha_targets.json -> reports/alpha_*.json
 ```
 
 The alpha engine is side-effect free for portfolio state. It reads stored prices, calculates factors and ranks, and generates target weights for downstream rebalance workflows.
+
+Factor pipeline flow:
+
+```text
+CLI factor-pipeline -> FactorPipeline -> reports/factor_pipeline_*.json
+CLI alpha --pipeline -> AlphaEngine -> FactorPipeline -> reports/factor_pipeline_*.json
+CLI factor-eval --pipeline -> FactorEvaluation -> FactorPipeline -> reports/factor_eval_*.json
+```
+
+The factor pipeline is side-effect free for portfolio state. It transforms factor values that were already calculated for one signal date and does not read future prices or returns.
+
+Factor evaluation flow:
+
+```text
+CLI factor-eval -> FactorEvaluation -> optional FactorPipeline -> SQLitePriceStore -> reports/factor_eval_*.json
+```
+
+The factor evaluation framework is side-effect free for portfolio state. It calculates factor values with signal-date-and-earlier data, then compares them to future returns.
+
+Long-short factor backtest flow:
+
+```text
+CLI factor-backtest -> FactorBacktest -> optional FactorPipeline -> SQLitePriceStore -> reports/factor_backtest_*.json
+```
+
+The long-short factor backtest is side-effect free for portfolio state. It ranks each signal-date cross-section, longs the configured top quantile, shorts the configured bottom quantile, and measures factor returns only.
 
 Cost flow:
 
@@ -131,6 +160,9 @@ The execution simulator is side-effect free for portfolio state. It models fills
 - `quant/openclaw`: future OpenClaw integration boundary.
 - `quant/portfolio`: reserved for domain objects if the portfolio module grows beyond services and storage.
 - `quant/alpha`: stable signal and target-weight boundary for future research callers.
+- `quant/factor_backtest`: stable single-factor long-short return research boundary.
+- `quant/factor_pipeline`: stable factor preprocessing boundary for future alpha and evaluation callers.
+- `quant/factor_eval`: stable research diagnostics boundary for future factor and alpha research callers.
 - `quant/rebalance`: stable calculation boundary for future Risk Engine, OpenClaw, and AI research callers.
 - `quant/risk`: stable calculation boundary for future OpenClaw Risk Agent callers.
 - `quant/optimizer`: stable target-allocation boundary for future research and OpenClaw callers.

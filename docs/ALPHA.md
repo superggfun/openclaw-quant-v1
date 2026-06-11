@@ -66,6 +66,7 @@ Generated target weights are validated before they are written:
 
 ```bash
 python -m quant.cli alpha
+python -m quant.cli alpha --pipeline examples/factor_pipeline_config.json
 python -m quant.cli alpha --output-targets examples/alpha_targets.json
 python -m quant.cli rebalance --targets examples/alpha_targets.json --with-costs
 ```
@@ -83,6 +84,7 @@ The CLI prints:
 - excluded symbols and reasons
 - selected symbols
 - target weights
+- optional factor pipeline report path
 
 Reports are written as:
 
@@ -99,3 +101,7 @@ python -m quant.cli rebalance --targets <file>
 ## Boundary
 
 The Alpha Engine creates research signals and target weights only. The Rebalance Engine turns target weights into suggested trades. Cost Engine, Execution Simulator, and Backtest Engine consume downstream trade or simulation outputs.
+
+Use `docs/FACTOR_PIPELINE.md` and `python -m quant.cli alpha --pipeline examples/factor_pipeline_config.json` to clean or neutralize same-date factor scores before ranking.
+
+Use `docs/FACTOR_EVALUATION.md` and `python -m quant.cli factor-eval` to evaluate factor predictive quality before promoting a factor into target generation rules.

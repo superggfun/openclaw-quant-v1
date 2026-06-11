@@ -4,7 +4,7 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v0.9.0-alpha-engine`
+`v1.3.0-long-short-factor-backtest`
 
 The project currently includes:
 
@@ -12,6 +12,9 @@ The project currently includes:
 - SQLite storage for normalized price data.
 - A simulated portfolio state module with accounts, positions, and trades.
 - An alpha engine that calculates deterministic factors and target weights from stored prices.
+- A factor pipeline that preprocesses same-date factor cross-sections before alpha generation or evaluation.
+- A factor evaluation framework that calculates no-lookahead IC, Rank IC, ICIR, quintile, and decay metrics.
+- A long-short factor backtest that checks single-factor return streams without modifying portfolio state.
 - A minimal SMA crossover backtest engine that uses stored prices.
 - A portfolio rebalance engine that calculates allocation drift and suggested trades.
 - A risk engine that calculates portfolio concentration, cash exposure, Top 5 holdings exposure, and a 0-100 risk score.
@@ -19,7 +22,7 @@ The project currently includes:
 - A cost engine that estimates fixed, linear, combined, and slippage costs for suggested trades.
 - A deterministic daily portfolio backtest engine that combines stored prices, optimizer targets, rebalance logic, and costs.
 - An execution simulator that models intended, executed, and unfilled trades with costs.
-- CLI commands for price updates, price inspection, account initialization, simulated buys and sells, portfolio snapshots, trade history, alpha, backtests, allocation, rebalance plans, cost estimates, optimization, risk, and execution simulation.
+- CLI commands for price updates, price inspection, account initialization, simulated buys and sells, portfolio snapshots, trade history, alpha, factor pipeline, factor evaluation, factor backtest, backtests, allocation, rebalance plans, cost estimates, optimization, risk, and execution simulation.
 
 The project intentionally does not include:
 
@@ -46,6 +49,9 @@ The project intentionally does not include:
 - Future Risk Engine, OpenClaw, and AI research agents should call the Rebalance Engine rather than duplicate allocation logic.
 - Alpha features must avoid lookahead bias: factor calculations may use only rows at or before `as_of_date`, and generated targets are next-trading-day signals.
 - Alpha backtest features must keep `signal_date < execution_date`; do not use the same close to create a signal and execute a trade.
+- Factor evaluation features must keep factor values and future returns separate: factor values use signal-date-and-earlier data, while returns come from later stored price rows.
+- Factor pipeline features must transform one signal-date cross-section at a time and must not read future prices, future returns, or future metadata.
+- Factor backtest features must remain no-lookahead and must not be described as Strategy Evaluation or Performance Attribution until those modules are explicitly designed.
 
 ## Important Files
 
@@ -57,6 +63,9 @@ The project intentionally does not include:
 - `quant/services/portfolio_service.py`: simulated portfolio business rules.
 - `quant/services/backtest_service.py`: SMA crossover backtest engine and metrics.
 - `quant/alpha/alpha_engine.py`: pure factor and target-weight engine.
+- `quant/factor_backtest/factor_backtest.py`: pure long-short factor backtest engine.
+- `quant/factor_pipeline/factor_pipeline.py`: pure factor preprocessing pipeline.
+- `quant/factor_eval/factor_evaluation.py`: pure no-lookahead factor evaluation framework.
 - `quant/backtest/backtest_engine.py`: deterministic daily portfolio backtest engine.
 - `quant/rebalance/rebalance_engine.py`: pure allocation and rebalance calculation engine.
 - `quant/risk/risk_engine.py`: pure portfolio risk calculation engine.
@@ -64,7 +73,7 @@ The project intentionally does not include:
 - `quant/cost/cost_engine.py`: pure transaction cost estimator.
 - `quant/execution/execution_engine.py`: pure simulated execution engine.
 - `quant/cli.py`: command line interface.
-- `tests/`: pytest coverage for data, portfolio, alpha, backtest, rebalance, optimizer, risk, cost, and execution behavior.
+- `tests/`: pytest coverage for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, backtest, rebalance, optimizer, risk, cost, and execution behavior.
 
 ## Recommended Workflow
 
@@ -78,6 +87,8 @@ The project intentionally does not include:
 
 ## Boundaries
 
-Future work may add strategy research and OpenClaw integration. Those modules should consume data, alpha targets, portfolio state, rebalance plans, risk reports, optimizer targets, cost estimates, and execution simulation reports through service or engine boundaries rather than reaching directly into unrelated internals.
+Future work may add strategy research and OpenClaw integration. Those modules should consume data, alpha targets, factor pipeline reports, factor evaluation reports, factor backtest reports, portfolio state, rebalance plans, risk reports, optimizer targets, cost estimates, and execution simulation reports through service or engine boundaries rather than reaching directly into unrelated internals.
+
+Strategy Evaluation and Performance Attribution are not implemented as of V1.3.
 
 Broker APIs, credentials, live execution, OpenClaw, Claude, GPT, and automatic trading must stay out of this repo until explicitly requested and designed.

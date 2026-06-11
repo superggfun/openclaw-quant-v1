@@ -7,11 +7,16 @@ import json
 import sys
 from pathlib import Path
 
+import pandas as pd
+
 from quant.alpha.alpha_engine import AlphaEngine
 from quant.backtest.backtest_engine import PortfolioBacktestEngine
 from quant.config import DB_PATH, DEFAULT_SYMBOLS
 from quant.cost.cost_engine import CostEngine, TradeInput
 from quant.execution.execution_engine import ExecutionEngine
+from quant.factor_backtest.factor_backtest import FactorBacktest
+from quant.factor_eval.factor_evaluation import FactorEvaluation, SUPPORTED_FACTORS
+from quant.factor_pipeline.factor_pipeline import FactorPipeline
 from quant.optimizer.optimizer_engine import DEFAULT_CONSTRAINTS, OptimizerEngine
 from quant.rebalance.rebalance_engine import DEFAULT_COMMISSION_RATE, RebalanceEngine
 from quant.risk.risk_engine import RiskEngine
@@ -88,6 +93,31 @@ def build_parser() -> argparse.ArgumentParser:
     alpha = subparsers.add_parser("alpha", help="Generate alpha factors and target weights.")
     alpha.add_argument("--config", default="examples/alpha_config.json")
     alpha.add_argument("--output-targets", default=None)
+    alpha.add_argument("--pipeline", default=None, help="Optional factor pipeline config JSON.")
+
+    factor_eval = subparsers.add_parser("factor-eval", help="Evaluate alpha factor predictive quality.")
+    factor_eval.add_argument("--factor", choices=sorted(SUPPORTED_FACTORS), required=True)
+    factor_eval.add_argument("--start", default=None, help="Inclusive signal start date YYYY-MM-DD.")
+    factor_eval.add_argument("--end", default=None, help="Inclusive signal end date YYYY-MM-DD.")
+    factor_eval.add_argument("--forward-days", type=int, default=20)
+    factor_eval.add_argument("--pipeline", default=None, help="Optional factor pipeline config JSON.")
+
+    factor_backtest = subparsers.add_parser("factor-backtest", help="Run a long-short factor backtest.")
+    factor_backtest.add_argument("--factor", choices=sorted(SUPPORTED_FACTORS), required=True)
+    factor_backtest.add_argument("--start", default=None, help="Inclusive signal start date YYYY-MM-DD.")
+    factor_backtest.add_argument("--end", default=None, help="Inclusive signal end date YYYY-MM-DD.")
+    factor_backtest.add_argument("--holding-period", type=int, default=20)
+    factor_backtest.add_argument("--quantiles", type=int, default=5)
+    factor_backtest.add_argument("--long-quantile", type=int, default=None)
+    factor_backtest.add_argument("--short-quantile", type=int, default=1)
+    factor_backtest.add_argument("--pipeline", default=None, help="Optional factor pipeline config JSON.")
+    factor_backtest.add_argument("--report", action="store_true", help="Write JSON report. Reports are written by default.")
+
+    factor_pipeline = subparsers.add_parser("factor-pipeline", help="Run factor preprocessing for one signal date.")
+    factor_pipeline.add_argument("--factor", choices=sorted(SUPPORTED_FACTORS), required=True)
+    factor_pipeline.add_argument("--config", default="examples/factor_pipeline_config.json")
+    factor_pipeline.add_argument("--as-of-date", default=None)
+    factor_pipeline.add_argument("--symbols", nargs="+", default=list(DEFAULT_SYMBOLS))
 
     cost = subparsers.add_parser("cost", help="Estimate transaction costs for rebalance suggestions.")
     cost.add_argument("--targets", default="examples/optimized_targets.json")
@@ -143,6 +173,8 @@ def main(argv: list[str] | None = None) -> int:
     optimizer_engine = OptimizerEngine(price_store, portfolio_store)
     execution_engine = ExecutionEngine(price_store, portfolio_store)
     alpha_engine = AlphaEngine(price_store)
+    factor_evaluation = FactorEvaluation(price_store)
+    factor_backtest_engine = FactorBacktest(price_store)
 
     if args.command == "update-prices":
         results = price_service.update_prices(args.symbols, start=args.start, end=args.end)
@@ -333,7 +365,12 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "alpha":
             config = _load_alpha_config(Path(args.config))
-            result = alpha_engine.generate(config=config, output_targets=args.output_targets)
+            pipeline_config = _load_factor_pipeline_config(Path(args.pipeline)) if args.pipeline else None
+            result = alpha_engine.generate(
+                config=config,
+                output_targets=args.output_targets,
+                pipeline_config=pipeline_config,
+            )
             print("Alpha Summary")
             print(f"as_of_date: {result.as_of_date or 'latest'}")
             print(f"data_start_date: {result.data_start_date or 'N/A'}")
@@ -365,8 +402,97 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{symbol:<6} {weight * 100:>8.2f}%")
             for warning in result.warnings:
                 print(f"warning: {warning}", file=sys.stderr)
+            if result.pipeline_report_path:
+                print(f"pipeline_report: {result.pipeline_report_path}")
             if result.targets_path:
                 print(f"targets: {result.targets_path}")
+            print(f"report: {result.report_path}")
+            return 0
+
+        if args.command == "factor-pipeline":
+            pipeline_config = _load_factor_pipeline_config(Path(args.config))
+            raw_values = _factor_values_for_pipeline(
+                price_store=price_store,
+                factor=args.factor,
+                symbols=args.symbols,
+                as_of_date=args.as_of_date,
+            )
+            result = FactorPipeline(pipeline_config).run(
+                raw_values,
+                factor=args.factor,
+                as_of_date=args.as_of_date or "latest",
+            )
+            print("Factor Pipeline Summary")
+            print(f"factor: {result.factor}")
+            print(f"as_of_date: {result.as_of_date}")
+            print(f"no_lookahead: {str(result.no_lookahead).lower()}")
+            print(f"preprocessing_steps_applied: {', '.join(result.preprocessing_steps_applied)}")
+            print("raw_factor_values:")
+            for symbol, value in sorted(result.raw_factor_values.items()):
+                print(f"{symbol:<6} {_format_optional_number(value)}")
+            print("cleaned_factor_values:")
+            for symbol, value in sorted(result.cleaned_factor_values.items()):
+                print(f"{symbol:<6} {value:.6f}")
+            print(f"before_summary_statistics: {json.dumps(result.before_summary_statistics, sort_keys=True)}")
+            print(f"after_summary_statistics: {json.dumps(result.after_summary_statistics, sort_keys=True)}")
+            if result.sector_neutralization_result:
+                print("sector_neutralization_result:")
+                for sector, metrics in sorted(result.sector_neutralization_result.items()):
+                    print(f"{sector}: {json.dumps(metrics, sort_keys=True)}")
+            if result.excluded_symbols:
+                print("excluded_symbols:")
+                for symbol in result.excluded_symbols:
+                    print(f"{symbol}: {result.exclusion_reasons[symbol]}")
+            for warning in result.warnings:
+                print(f"warning: {warning}", file=sys.stderr)
+            print(f"report: {result.report_path}")
+            return 0
+
+        if args.command == "factor-backtest":
+            result = factor_backtest_engine.run(
+                factor=args.factor,
+                start=args.start,
+                end=args.end,
+                holding_period=args.holding_period,
+                quantiles=args.quantiles,
+                long_quantile=args.long_quantile,
+                short_quantile=args.short_quantile,
+                pipeline_config=_load_factor_pipeline_config(Path(args.pipeline)) if args.pipeline else None,
+                pipeline_config_path=args.pipeline,
+            )
+            print("Factor Backtest Summary")
+            print(f"factor: {result.factor}")
+            print(f"period: {result.start_date or 'earliest'} to {result.end_date or 'latest'}")
+            print(f"holding_period: {result.holding_period}")
+            print(f"quantiles: {result.quantiles}")
+            print(f"long_quantile: {result.long_quantile}")
+            print(f"short_quantile: {result.short_quantile}")
+            print(f"no_lookahead: {str(result.no_lookahead).lower()}")
+            print(f"signal_execution_lag: {result.signal_execution_lag}")
+            print(f"observations: {result.observations}")
+            print("quantile_returns:")
+            for quantile, value in result.quantile_returns.items():
+                print(f"{quantile}: {_format_optional_number(value)}")
+            print(f"top_quantile_return: {_format_optional_number(result.top_quantile_return)}")
+            print(f"bottom_quantile_return: {_format_optional_number(result.bottom_quantile_return)}")
+            print(f"long_short_return: {_format_optional_number(result.long_short_return)}")
+            print(f"long_short_annual_return: {_format_optional_number(result.long_short_annual_return)}")
+            print(f"long_short_volatility: {_format_optional_number(result.long_short_volatility)}")
+            print(f"long_short_sharpe: {_format_optional_number(result.long_short_sharpe)}")
+            print(f"max_drawdown: {_format_optional_number(result.max_drawdown)}")
+            print(f"hit_rate: {_format_optional_pct(result.hit_rate)}")
+            print(f"turnover: {_format_optional_number(result.turnover)}")
+            print(f"gross_exposure: {_format_optional_number(result.gross_exposure)}")
+            print(f"net_exposure: {_format_optional_number(result.net_exposure)}")
+            print(f"ic_mean: {_format_optional_number(result.ic_mean)}")
+            print(f"rank_ic_mean: {_format_optional_number(result.rank_ic_mean)}")
+            print(f"icir: {_format_optional_number(result.icir)}")
+            if result.excluded_symbols:
+                print("excluded_symbols:")
+                for symbol in result.excluded_symbols:
+                    print(f"{symbol}: {result.exclusion_reasons[symbol]}")
+            for warning in result.warnings:
+                print(f"warning: {warning}", file=sys.stderr)
             print(f"report: {result.report_path}")
             return 0
 
@@ -377,6 +503,48 @@ def main(argv: list[str] | None = None) -> int:
             _apply_cost_overrides(cost_config, args)
             cost_report = CostEngine(cost_config).estimate(_trades_from_rebalance_plan(plan))
             _print_cost_report(cost_report)
+            return 0
+
+        if args.command == "factor-eval":
+            result = factor_evaluation.evaluate(
+                factor=args.factor,
+                start=args.start,
+                end=args.end,
+                forward_days=args.forward_days,
+                pipeline_config=_load_factor_pipeline_config(Path(args.pipeline)) if args.pipeline else None,
+            )
+            print("Factor Evaluation Summary")
+            print(f"factor: {result.factor}")
+            print(f"period: {result.start_date or 'earliest'} to {result.end_date or 'latest'}")
+            print(f"forward_days: {result.forward_days}")
+            print(f"no_lookahead: {str(result.no_lookahead).lower()}")
+            print(f"observations: {len(result.observations)}")
+            print(f"ic_mean: {_format_optional_number(result.ic_mean)}")
+            print(f"ic_std: {_format_optional_number(result.ic_std)}")
+            print(f"ic_positive_rate: {_format_optional_pct(result.ic_positive_rate)}")
+            print(f"ic_count: {result.ic_count}")
+            print(f"rank_ic_mean: {_format_optional_number(result.rank_ic_mean)}")
+            print(f"rank_ic_std: {_format_optional_number(result.rank_ic_std)}")
+            print(f"rank_ic_positive_rate: {_format_optional_pct(result.rank_ic_positive_rate)}")
+            print(f"icir: {_format_optional_number(result.icir)}")
+            print("quintiles:")
+            for quintile in ["q1", "q2", "q3", "q4", "q5"]:
+                print(f"{quintile}: {_format_optional_number(result.quintiles.get(quintile))}")
+            print(f"spread_return: {_format_optional_number(result.spread_return)}")
+            print("decay:")
+            for horizon, metrics in result.decay.items():
+                print(
+                    f"{horizon}: ic={_format_optional_number(metrics['ic'])} "
+                    f"rank_ic={_format_optional_number(metrics['rank_ic'])} "
+                    f"ic_count={metrics['ic_count']}"
+                )
+            if result.excluded_symbols:
+                print("excluded_symbols:")
+                for symbol in result.excluded_symbols:
+                    print(f"{symbol}: {result.exclusion_reasons[symbol]}")
+            for warning in result.warnings:
+                print(f"warning: {warning}", file=sys.stderr)
+            print(f"report: {result.report_path}")
             return 0
 
         if args.command == "execute-sim":
@@ -493,6 +661,10 @@ def _format_optional_number(value: float | None) -> str:
     return "N/A" if value is None else f"{value:.6f}"
 
 
+def _format_optional_pct(value: float | None) -> str:
+    return "N/A" if value is None else f"{value * 100:.2f}%"
+
+
 def _format_optional_rank(value: int | None) -> str:
     return "N/A" if value is None else str(value)
 
@@ -603,6 +775,39 @@ def _load_alpha_config(path: Path) -> dict:
     if not isinstance(config, dict):
         raise ValueError("alpha config must contain a JSON object")
     return config
+
+
+def _load_factor_pipeline_config(path: Path) -> dict:
+    try:
+        with path.open("r", encoding="utf-8") as file:
+            config = json.load(file)
+    except FileNotFoundError as exc:
+        raise ValueError(f"factor pipeline config file not found: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"factor pipeline config is not valid JSON: {path}") from exc
+
+    if not isinstance(config, dict):
+        raise ValueError("factor pipeline config must contain a JSON object")
+    return config
+
+
+def _factor_values_for_pipeline(
+    price_store: SQLitePriceStore,
+    factor: str,
+    symbols: list[str],
+    as_of_date: str | None,
+) -> dict[str, float | None]:
+    values: dict[str, float | None] = {}
+    for symbol in symbols:
+        ticker = symbol.upper().strip()
+        history = price_store.get_price_history(ticker, end=as_of_date)
+        if history.empty:
+            values[ticker] = None
+            continue
+        history = history.sort_values("date")
+        closes = pd.to_numeric(history["close"], errors="coerce").dropna()
+        values[ticker] = FactorEvaluation._factor_value(closes, factor)
+    return values
 
 
 if __name__ == "__main__":

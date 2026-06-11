@@ -102,6 +102,41 @@
 - Reports include `no_lookahead`, `signal_execution_lag`, `alpha_config`, and excluded symbols per rebalance.
 - Legacy simple portfolio modes remain available but are documented as same-day-close smoke modes.
 
+## v1.1.0-factor-evaluation
+
+- Factor Evaluation Framework module.
+- No-lookahead IC and Rank IC evaluation.
+- ICIR calculation.
+- Quintile return and spread analysis.
+- Factor decay curve for 1, 5, 10, 20, and 60 day forward windows.
+- JSON factor evaluation reports under `reports/`.
+- CLI command: `python -m quant.cli factor-eval --factor momentum_20d`.
+- Tests for IC, Rank IC, ICIR, quintiles, decay, missing prices, empty samples, no-lookahead, and single-symbol behavior.
+
+## v1.2.0-factor-pipeline
+
+- Factor Pipeline module.
+- Missing value handling, winsorization, z-score standardization, rank normalization, and sector neutralization.
+- Market/beta neutralization placeholder.
+- Alpha Engine integration through `--pipeline`.
+- Factor Evaluation integration through `--pipeline`.
+- JSON factor pipeline reports under `reports/`.
+- CLI command: `python -m quant.cli factor-pipeline --factor momentum_20d`.
+- Tests for preprocessing steps, alpha compatibility, factor-eval compatibility, and no-lookahead behavior.
+
+## v1.3.0-long-short-factor-backtest
+
+- Long-Short Factor Backtest module.
+- No-lookahead single-factor return testing.
+- Equal-weight long top quantile and short bottom quantile.
+- Optional Factor Pipeline preprocessing before quantile grouping.
+- Outputs quantile returns, long-short return, annual return, volatility, Sharpe, max drawdown, hit rate, turnover, IC, Rank IC, and ICIR.
+- JSON factor backtest reports under `reports/`.
+- CLI command: `python -m quant.cli factor-backtest --factor momentum_20d`.
+- Tests for no-lookahead behavior, quantile grouping, long-short return calculation, pipeline integration, exclusions, zero-volatility handling, and CLI smoke.
+
+Strategy Evaluation / Performance Attribution is not implemented in V1.3. It is intentionally left for V1.4 or later.
+
 ## Next
 
 - Add richer portfolio reporting.
@@ -115,6 +150,9 @@
 - Add optimizer modes based on expected returns, volatility budgets, and drawdown constraints.
 - Add benchmark comparisons and richer backtest attribution.
 - Add alpha factor normalization, factor blending, and signal stability checks.
+- Add factor turnover, coverage, stability, and per-sector diagnostics.
+- Add regression-based beta neutralization once benchmark return inputs are explicitly modeled.
+- Add Strategy Evaluation / Performance Attribution in V1.4 or later.
 - Add richer execution assumptions and market calendar support.
 - Add CSV export for prices, trades, allocation snapshots, and rebalance plans.
 

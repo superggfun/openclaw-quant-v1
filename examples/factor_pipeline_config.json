@@ -1,0 +1,30 @@
+{
+  "missing": "drop",
+  "fill_value": 0.0,
+  "winsorization": {
+    "enabled": true,
+    "lower_quantile": 0.05,
+    "upper_quantile": 0.95
+  },
+  "zscore": true,
+  "rank_normalization": false,
+  "sector_neutralization": {
+    "enabled": true,
+    "sector_map": {
+      "AAPL": "Technology",
+      "AMD": "Technology",
+      "GLD": "Commodity ETF",
+      "GOOGL": "Communication Services",
+      "META": "Communication Services",
+      "MSFT": "Technology",
+      "NVDA": "Technology",
+      "QQQ": "Equity ETF",
+      "SPY": "Equity ETF",
+      "TLT": "Bond ETF",
+      "TSLA": "Consumer Discretionary"
+    }
+  },
+  "market_beta_neutralization": {
+    "enabled": false
+  }
+}

@@ -11,6 +11,7 @@ from typing import Mapping
 import pandas as pd
 
 from quant.config import DEFAULT_SYMBOLS
+from quant.factor_pipeline.factor_pipeline import FactorPipeline
 from quant.storage.sqlite_store import SQLitePriceStore
 
 
@@ -56,6 +57,8 @@ class AlphaResult:
     excluded_symbols: list[str]
     exclusion_reasons: dict[str, str]
     suggested_execution_date: str | None
+    pipeline_config: dict | None
+    pipeline_report_path: str | None
     warnings: list[str]
     report_path: str
     targets_path: str | None
@@ -73,6 +76,8 @@ class AlphaResult:
             "excluded_symbols": self.excluded_symbols,
             "exclusion_reasons": self.exclusion_reasons,
             "suggested_execution_date": self.suggested_execution_date,
+            "pipeline_config": self.pipeline_config,
+            "pipeline_report_path": self.pipeline_report_path,
             "warnings": self.warnings,
             "targets_path": self.targets_path,
         }
@@ -93,16 +98,41 @@ class AlphaEngine:
         self,
         config: Mapping | None = None,
         output_targets: str | Path | None = None,
+        pipeline_config: Mapping | None = None,
     ) -> AlphaResult:
         normalized_config = self._normalize_config(config or {})
         warnings: list[str] = []
         lookback_used = self._lookback_used(normalized_config)
+        pipeline_score_by_symbol: dict[str, float] | None = None
+        pipeline_report_path: str | None = None
+        pipeline_factor = "risk_adjusted_momentum"
+        normalized_pipeline_config = None
 
         factor_rows = [
             self._factor_row(symbol, normalized_config, warnings)
             for symbol in normalized_config["universe"]
         ]
-        ranked_rows = self._rank_rows(factor_rows)
+        if pipeline_config is not None:
+            normalized_pipeline_config = FactorPipeline.normalize_config(pipeline_config)
+            pipeline_factor = str(dict(pipeline_config).get("factor", pipeline_factor)).strip().lower()
+            raw_values = {
+                row.symbol: self._row_factor_value(row, pipeline_factor)
+                for row in factor_rows
+            }
+            pipeline_result = FactorPipeline(normalized_pipeline_config, report_dir=self.report_dir).run(
+                raw_values,
+                factor=pipeline_factor,
+                as_of_date=self._max_date(row.data_end_date for row in factor_rows),
+            )
+            pipeline_score_by_symbol = pipeline_result.cleaned_factor_values
+            pipeline_report_path = pipeline_result.report_path
+            warnings.extend(pipeline_result.warnings)
+
+        ranked_rows = self._rank_rows(
+            factor_rows,
+            ranking_factor=pipeline_factor,
+            score_by_symbol=pipeline_score_by_symbol,
+        )
         selected_symbols = [
             row.symbol
             for row in sorted(
@@ -124,6 +154,7 @@ class AlphaEngine:
             normalized_config["min_cash_weight"],
             normalized_config["max_position_weight"],
             warnings,
+            score_by_symbol=pipeline_score_by_symbol,
         )
         self._validate_targets(target_weights, normalized_config)
         excluded_symbols = [row.symbol for row in ranked_rows if row.excluded]
@@ -150,6 +181,8 @@ class AlphaEngine:
             excluded_symbols=excluded_symbols,
             exclusion_reasons=exclusion_reasons,
             suggested_execution_date=suggested_execution_date,
+            pipeline_config=normalized_pipeline_config,
+            pipeline_report_path=pipeline_report_path,
             warnings=warnings,
             report_path="",
             targets_path=str(target_output) if target_output else None,
@@ -167,6 +200,8 @@ class AlphaEngine:
             excluded_symbols=result.excluded_symbols,
             exclusion_reasons=result.exclusion_reasons,
             suggested_execution_date=result.suggested_execution_date,
+            pipeline_config=result.pipeline_config,
+            pipeline_report_path=result.pipeline_report_path,
             warnings=result.warnings,
             report_path=str(report_path),
             targets_path=result.targets_path,
@@ -228,10 +263,19 @@ class AlphaEngine:
         )
 
     @staticmethod
-    def _rank_rows(rows: list[AlphaFactorRow]) -> list[AlphaFactorRow]:
+    def _rank_rows(
+        rows: list[AlphaFactorRow],
+        ranking_factor: str = "risk_adjusted_momentum",
+        score_by_symbol: dict[str, float] | None = None,
+    ) -> list[AlphaFactorRow]:
         valid = sorted(
-            [row for row in rows if row.risk_adjusted_momentum is not None],
-            key=lambda row: (row.risk_adjusted_momentum, row.symbol),
+            [
+                row
+                for row in rows
+                if not row.excluded
+                and AlphaEngine._ranking_score(row, ranking_factor, score_by_symbol) is not None
+            ],
+            key=lambda row: (AlphaEngine._ranking_score(row, ranking_factor, score_by_symbol), row.symbol),
             reverse=True,
         )
         rank_by_symbol = {row.symbol: rank for rank, row in enumerate(valid, start=1)}
@@ -253,6 +297,16 @@ class AlphaEngine:
             )
             for row in rows
         ]
+
+    @staticmethod
+    def _ranking_score(
+        row: AlphaFactorRow,
+        ranking_factor: str,
+        score_by_symbol: dict[str, float] | None = None,
+    ) -> float | None:
+        if score_by_symbol is not None:
+            return score_by_symbol.get(row.symbol)
+        return AlphaEngine._row_factor_value(row, ranking_factor)
 
     @staticmethod
     def _mark_selected(rows: list[AlphaFactorRow], selected_symbols: list[str]) -> list[AlphaFactorRow]:
@@ -283,6 +337,7 @@ class AlphaEngine:
         min_cash_weight: float,
         max_position_weight: float,
         warnings: list[str],
+        score_by_symbol: dict[str, float] | None = None,
     ) -> dict[str, float]:
         investable_weight = max(1.0 - min_cash_weight, 0.0)
         if weighting_mode == "equal_weight":
@@ -292,7 +347,15 @@ class AlphaEngine:
             }
         else:
             positive_scores = {
-                row.symbol: max(row.risk_adjusted_momentum or 0.0, 0.0)
+                row.symbol: max(
+                    (
+                        score_by_symbol.get(row.symbol)
+                        if score_by_symbol is not None
+                        else row.risk_adjusted_momentum
+                    )
+                    or 0.0,
+                    0.0,
+                )
                 for row in selected_rows
             }
             total_score = sum(positive_scores.values())
@@ -328,6 +391,18 @@ class AlphaEngine:
         if returns.empty:
             return None
         return float(returns.std())
+
+    @staticmethod
+    def _row_factor_value(row: AlphaFactorRow, factor: str) -> float | None:
+        if factor == "momentum_20d":
+            return row.momentum_20d
+        if factor == "momentum_60d":
+            return row.momentum_60d
+        if factor == "volatility_20d":
+            return row.volatility_20d
+        if factor == "risk_adjusted_momentum":
+            return row.risk_adjusted_momentum
+        raise ValueError("pipeline factor must be one of: momentum_20d, momentum_60d, volatility_20d, risk_adjusted_momentum")
 
     def _excluded_row(
         self,
