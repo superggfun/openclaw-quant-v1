@@ -29,7 +29,32 @@ python -m quant.cli buy SPY --qty 10 --price 500
 python -m quant.cli sell SPY --qty 3 --price 510
 python -m quant.cli portfolio
 python -m quant.cli trades
+python -m quant.cli allocation
+python -m quant.cli rebalance --targets examples/targets.json
 ```
+
+## Rebalance
+
+Target files are JSON objects whose values sum to `1.0`:
+
+```json
+{
+  "SPY": 0.4,
+  "QQQ": 0.3,
+  "NVDA": 0.2,
+  "cash": 0.1
+}
+```
+
+Commands:
+
+```bash
+python -m quant.cli allocation
+python -m quant.cli rebalance --targets examples/targets.json
+python -m quant.cli rebalance --targets examples/targets.json --commission 0.001
+```
+
+The rebalance command calculates suggested trades and writes a JSON report. It does not modify the simulated account.
 
 ## Backtest
 
@@ -60,3 +85,6 @@ python -m quant.cli backtest \
 - Portfolio commands require an initialized account.
 - Backtest with no stored prices returns a non-zero exit code and a clear missing-data error.
 - Backtest rejects `short_window >= long_window`.
+- Rebalance rejects target weights that do not sum to `1.0`.
+- Rebalance requires latest prices for target symbols and held symbols.
+

@@ -4,7 +4,7 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v0.2.0-backtest-engine`
+`v0.3.0-rebalance-engine`
 
 The project currently includes:
 
@@ -12,7 +12,8 @@ The project currently includes:
 - SQLite storage for normalized price data.
 - A simulated portfolio state module with accounts, positions, and trades.
 - A minimal SMA crossover backtest engine that uses stored prices.
-- CLI commands for price updates, price inspection, account initialization, simulated buys and sells, portfolio snapshots, trade history, and backtests.
+- A portfolio rebalance engine that calculates allocation drift and suggested trades.
+- CLI commands for price updates, price inspection, account initialization, simulated buys and sells, portfolio snapshots, trade history, backtests, allocation, and rebalance plans.
 
 The project intentionally does not include:
 
@@ -20,20 +21,23 @@ The project intentionally does not include:
 - Automated trading.
 - Broker connectivity.
 - Live order execution.
+- OpenClaw integration.
+- Claude, GPT, or other LLM execution paths.
 
 ## Development Principles
 
+- Run `pytest` before starting later development and again before committing.
 - Keep modules small and explicit.
 - Preserve SQLite as the local source of truth until a later migration is intentionally planned.
 - Add tests for every state transition and failure path.
-- Run `pytest` before starting later development and again before committing.
 - Do not introduce live trading or broker integration without a separate design document and risk review.
-- Prefer deterministic service tests with temporary SQLite databases.
+- Prefer deterministic service and engine tests with temporary SQLite databases.
 - Keep CLI behavior backward compatible unless the README and tests are updated together.
-- Do not commit `.venv/`, `data/quant.db`, `__pycache__/`, `.pytest_cache/`, generated backtest JSON, or other cache files.
+- Do not commit `.venv/`, `data/quant.db`, `__pycache__/`, `.pytest_cache/`, generated reports, or other cache files.
 - New features must include both a stable CLI path and pytest coverage.
-- LLMs must not directly decide trade quantities. Trade quantities are computed by deterministic code from inputs such as cash, price, risk rules, and configuration.
+- LLMs must not directly decide trade quantities. Trade quantities are computed by deterministic code from inputs such as cash, price, risk rules, targets, and configuration.
 - Future OpenClaw integrations should call only stable CLI commands or explicitly designed API boundaries.
+- Future Risk Engine, OpenClaw, and AI research agents should call the Rebalance Engine rather than duplicate allocation logic.
 
 ## Important Files
 
@@ -44,20 +48,23 @@ The project intentionally does not include:
 - `quant/services/price_service.py`: price update orchestration.
 - `quant/services/portfolio_service.py`: simulated portfolio business rules.
 - `quant/services/backtest_service.py`: SMA crossover backtest engine and metrics.
+- `quant/rebalance/rebalance_engine.py`: pure allocation and rebalance calculation engine.
 - `quant/cli.py`: command line interface.
-- `tests/`: pytest coverage for data and portfolio behavior.
+- `tests/`: pytest coverage for data, portfolio, backtest, and rebalance behavior.
 
 ## Recommended Workflow
 
-1. Read `README.md`.
-2. Read `docs/ARCHITECTURE.md`.
-3. Inspect the relevant service and storage modules.
-4. Add or update tests before changing behavior.
-5. Run `pytest`.
-6. For CLI changes, run a temporary database smoke test with `--db-path /tmp/...`.
+1. Run `pytest`.
+2. Read `README.md`.
+3. Read `docs/ARCHITECTURE.md`.
+4. Inspect the relevant service, engine, and storage modules.
+5. Add or update tests before changing behavior.
+6. Run `pytest` again.
+7. For CLI changes, run a temporary database smoke test with `--db-path /tmp/...`.
 
 ## Boundaries
 
-Future work may add backtesting, risk, strategy research, and OpenClaw integration. Those modules should consume data and portfolio state through service boundaries rather than reaching directly into unrelated internals.
+Future work may add risk, strategy research, and OpenClaw integration. Those modules should consume data, portfolio state, and rebalance plans through service or engine boundaries rather than reaching directly into unrelated internals.
 
-Broker APIs, credentials, and live execution must stay out of this repo until explicitly requested and designed.
+Broker APIs, credentials, live execution, OpenClaw, Claude, GPT, and automatic trading must stay out of this repo until explicitly requested and designed.
+

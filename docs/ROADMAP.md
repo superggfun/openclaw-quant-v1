@@ -17,6 +17,16 @@
 - JSON reports under `reports/`.
 - Backtest tests for normal runs, signals, metrics, invalid inputs, and missing data.
 
+## v0.3.0-rebalance-engine
+
+- Current allocation command.
+- Portfolio rebalance engine.
+- Target allocation JSON input.
+- Integer-share buy and sell suggestions.
+- Configurable commission rate.
+- JSON rebalance reports under `reports/`.
+- Tests for target values, empty accounts, 100% single-symbol targets, multi-symbol rebalances, cash warnings, and commission calculation.
+
 ## Next
 
 - Add richer portfolio reporting.
@@ -24,8 +34,9 @@
 - Add basic performance metrics.
 - Add benchmark and buy-and-hold comparison metrics.
 - Add more backtest strategy templates.
+- Add Rebalance Engine constraints for minimum trade size, max position size, and cash buffers.
 - Add risk checks for max position size, cash usage, and symbol allowlists.
-- Add CSV export for prices, trades, and portfolio snapshots.
+- Add CSV export for prices, trades, allocation snapshots, and rebalance plans.
 
 ## Later
 
@@ -42,3 +53,4 @@
 - Automated order execution.
 - AI decision execution.
 - Credential storage.
+

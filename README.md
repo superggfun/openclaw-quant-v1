@@ -1,12 +1,12 @@
 # openclaw-quant-v1
 
-`openclaw-quant-v1` is an early OpenClaw-oriented quant system skeleton. It currently includes a market data layer, a simulated portfolio state module, and a minimal backtest engine. It does not make AI decisions, place live orders, connect to brokers, or perform automated trading.
+`openclaw-quant-v1` is an early OpenClaw-oriented quant system skeleton. It currently includes a market data layer, a simulated portfolio state module, a minimal backtest engine, and a portfolio rebalance engine. It does not make AI decisions, place live orders, connect to brokers, or perform automated trading.
 
 This project is for research and simulation only. It is not investment advice.
 
 ## Current Version
 
-`v0.2.0-backtest-engine`
+`v0.3.0-rebalance-engine`
 
 This release includes:
 
@@ -15,8 +15,9 @@ This release includes:
 - Simulated account state.
 - Simulated positions and trade history.
 - SMA crossover backtest engine using stored prices.
-- JSON backtest reports under `reports/`.
-- CLI commands for data and portfolio workflows.
+- Portfolio allocation and rebalance calculation engine.
+- JSON backtest and rebalance reports under `reports/`.
+- CLI commands for data, portfolio, backtest, allocation, and rebalance workflows.
 - pytest coverage for core state transitions.
 
 ## Scope
@@ -26,7 +27,8 @@ This release includes:
 - SQLite storage at `data/quant.db`
 - Idempotent price updates using `(symbol, date)` as the primary key
 - Simulated account, position, and trade tracking in SQLite
-- Empty extension packages for future backtesting, risk, and OpenClaw integration work
+- Pure calculation backtest and rebalance modules
+- Empty extension packages for future risk and OpenClaw integration work
 
 Default symbols:
 
@@ -40,21 +42,22 @@ SPY, QQQ, NVDA, AAPL, MSFT, TSLA, AMD, META, GOOGL, TLT, GLD
 openclaw-quant-v1/
 |- data/
 |  `- quant.db
+|- docs/
+|- examples/
+|  `- targets.json
 |- quant/
 |  |- config.py
 |  |- data_source/
-|  |  `- yfinance_client.py
-|  |- storage/
-|  |  |- sqlite_store.py
-|  |  `- portfolio_store.py
+|  |- rebalance/
+|  |  `- rebalance_engine.py
 |  |- services/
-|  |  |- price_service.py
-|  |  `- portfolio_service.py
+|  |- storage/
 |  |- backtesting/
 |  |- portfolio/
 |  |- risk/
 |  |- openclaw/
 |  `- cli.py
+|- reports/
 |- tests/
 |- requirements.txt
 `- README.md
@@ -65,7 +68,7 @@ openclaw-quant-v1/
 The project uses a small layered architecture:
 
 ```text
-CLI -> Services -> Storage / Data Sources -> SQLite / yfinance
+CLI -> Services / Engines -> Storage / Data Sources -> SQLite / yfinance
 ```
 
 Key modules:
@@ -74,6 +77,7 @@ Key modules:
 - `quant/services/price_service.py`: price update orchestration.
 - `quant/services/portfolio_service.py`: simulated portfolio rules and valuation.
 - `quant/services/backtest_service.py`: SMA crossover backtest engine.
+- `quant/rebalance/rebalance_engine.py`: allocation and rebalance calculations.
 - `quant/storage/sqlite_store.py`: price persistence.
 - `quant/storage/portfolio_store.py`: account, position, and trade persistence.
 - `quant/data_source/yfinance_client.py`: yfinance adapter.
@@ -94,61 +98,63 @@ pip install -r requirements.txt
 
 ## Market Data Commands
 
-Update the default symbol pool:
-
 ```bash
 python -m quant.cli update-prices
-```
-
-Update selected symbols:
-
-```bash
 python -m quant.cli update-prices --symbols SPY QQQ AAPL
-```
-
-Show recent prices:
-
-```bash
 python -m quant.cli show-prices SPY --limit 5
-```
-
-List configured and stored symbols:
-
-```bash
 python -m quant.cli list-symbols
 ```
 
 ## Simulated Portfolio Commands
 
-Initialize or reset the default simulated account:
-
 ```bash
 python -m quant.cli init-account --cash 100000
-```
-
-Record a simulated buy. The command checks that cash is sufficient before writing the trade:
-
-```bash
 python -m quant.cli buy SPY --qty 10 --price 500
-```
-
-Record a simulated sell. The command checks that the position is sufficient before writing the trade:
-
-```bash
 python -m quant.cli sell SPY --qty 3 --price 510
-```
-
-Show the portfolio. Current prices are read from the latest `close` in the existing `prices` table:
-
-```bash
 python -m quant.cli portfolio
-```
-
-Show trade history:
-
-```bash
 python -m quant.cli trades
 ```
+
+## Portfolio Rebalance Engine
+
+The rebalance engine reads the current simulated account, positions, and latest prices from SQLite. It calculates suggested trades only. It does not update positions, write trades, connect to brokers, or place orders.
+
+Create a target file:
+
+```json
+{
+  "SPY": 0.40,
+  "QQQ": 0.30,
+  "NVDA": 0.20,
+  "cash": 0.10
+}
+```
+
+Show current allocation:
+
+```bash
+python -m quant.cli allocation
+```
+
+Calculate a rebalance plan:
+
+```bash
+python -m quant.cli rebalance --targets examples/targets.json
+```
+
+Configure commission. The default is `0.001`, or 0.1%:
+
+```bash
+python -m quant.cli rebalance --targets examples/targets.json --commission 0.001
+```
+
+The rebalance report is written as:
+
+```text
+reports/rebalance_YYYYMMDD_HHMMSS.json
+```
+
+See `docs/REBALANCE.md` for details.
 
 ## Backtest Engine
 
@@ -207,6 +213,7 @@ export OPENCLAW_QUANT_DB_PATH=/tmp/openclaw-quant.db
 - `positions`: current simulated positions
 - `trades`: simulated trade ledger
 - `reports/backtest_*.json`: generated backtest reports, ignored by git
+- `reports/rebalance_*.json`: generated rebalance reports, ignored by git
 
 ## Roadmap
 
@@ -216,7 +223,7 @@ Near-term work:
 - Add realized PnL tracking.
 - Add basic performance metrics.
 - Add more backtest strategies and benchmark comparisons.
-- Add risk checks for max position size, cash usage, and symbol allowlists.
+- Add risk checks for max position size, cash usage, symbol allowlists, and rebalance suggestions.
 
 Out of scope until explicitly designed:
 
@@ -237,6 +244,7 @@ Important docs:
 - `docs/ARCHITECTURE.md`
 - `docs/ROADMAP.md`
 - `docs/DATA_SCHEMA.md`
+- `docs/REBALANCE.md`
 - `docs/CLI_COMMANDS.md`
 - `docs/DECISIONS.md`
 
@@ -251,3 +259,4 @@ pytest
 ```
 
 The core tests use temporary SQLite databases and a fake market data source, so they do not need network access.
+

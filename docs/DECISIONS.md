@@ -27,3 +27,15 @@ The V0.2 SMA crossover backtest uses deterministic code to calculate trade quant
 ## 2026-06-11: Generated Reports Stay Out of Git
 
 Backtest JSON reports are written under `reports/` and ignored by git. The repository keeps only `reports/.gitkeep`.
+
+## 2026-06-11: Rebalance Engine Is Pure Calculation
+
+The V0.3 rebalance engine calculates current allocation and suggested trades only. It does not update cash, positions, or trades. Future Risk Engine, OpenClaw, and AI research callers should use this boundary.
+
+## 2026-06-11: Rebalance Uses Integer Shares
+
+Suggested buy and sell quantities are integer shares calculated by deterministic code from target value differences, latest prices, cash, and commission.
+
+## 2026-06-11: Rebalance Commission Defaults to 0.1%
+
+The default rebalance commission rate is `0.001`. It is configurable from the CLI through `--commission`.

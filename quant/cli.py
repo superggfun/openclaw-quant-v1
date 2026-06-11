@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
 from quant.config import DB_PATH, DEFAULT_SYMBOLS
+from quant.rebalance.rebalance_engine import DEFAULT_COMMISSION_RATE, RebalanceEngine
 from quant.services.backtest_service import BacktestService
 from quant.services.portfolio_service import PortfolioService
 from quant.services.price_service import PriceService
@@ -59,6 +61,12 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("portfolio", help="Show simulated portfolio state.")
     subparsers.add_parser("trades", help="Show simulated trade history.")
 
+    subparsers.add_parser("allocation", help="Show current portfolio allocation.")
+
+    rebalance = subparsers.add_parser("rebalance", help="Calculate a portfolio rebalance plan.")
+    rebalance.add_argument("--targets", required=True, help="Path to target allocation JSON.")
+    rebalance.add_argument("--commission", type=float, default=DEFAULT_COMMISSION_RATE)
+
     backtest = subparsers.add_parser("backtest", help="Run an SMA crossover backtest.")
     backtest.add_argument("--symbol", required=True)
     backtest.add_argument("--start", required=True, help="Inclusive start date YYYY-MM-DD.")
@@ -76,8 +84,10 @@ def main(argv: list[str] | None = None) -> int:
     db_path = Path(args.db_path)
     price_store = SQLitePriceStore(db_path)
     price_service = PriceService(price_store)
-    portfolio_service = PortfolioService(SQLitePortfolioStore(db_path))
+    portfolio_store = SQLitePortfolioStore(db_path)
+    portfolio_service = PortfolioService(portfolio_store)
     backtest_service = BacktestService(price_store)
+    rebalance_engine = RebalanceEngine(portfolio_store)
 
     if args.command == "update-prices":
         results = price_service.update_prices(args.symbols, start=args.start, end=args.end)
@@ -161,6 +171,49 @@ def main(argv: list[str] | None = None) -> int:
                 )
             return 0
 
+        if args.command == "allocation":
+            snapshot = rebalance_engine.allocation()
+            print(f"total_assets: {snapshot.total_assets:.2f}")
+            print("symbol current_value current_weight_pct qty        price")
+            for item in snapshot.items:
+                print(
+                    f"{item.symbol:<6} {item.current_value:>13.2f} "
+                    f"{item.current_weight * 100:>18.2f} "
+                    f"{item.qty:>10.6g} {_format_optional_money(item.price):>10}"
+                )
+            return 0
+
+        if args.command == "rebalance":
+            targets = _load_targets(Path(args.targets))
+            plan = rebalance_engine.plan(targets, commission_rate=args.commission)
+            print("Rebalance Plan")
+            print(f"total_assets: {plan.total_assets:.2f}")
+            print(f"cash_before: {plan.cash_before:.2f}")
+            print(f"cash_after_rebalance: {plan.cash_after_rebalance:.2f}")
+            print(f"estimated_total_commission: {plan.estimated_total_commission:.2f}")
+            print(
+                "symbol current_value target_value difference "
+                "current_pct target_pct action qty est_trade_cost"
+            )
+            for item in plan.items:
+                print(
+                    f"{item.symbol:<6} {item.current_value:>13.2f} "
+                    f"{item.target_value:>12.2f} {item.difference:>10.2f} "
+                    f"{item.current_weight * 100:>11.2f} {item.target_weight * 100:>10.2f} "
+                    f"{item.action:<6} {item.qty:>5} {item.estimated_trade_cost:>14.2f}"
+                )
+            suggestions = [item for item in plan.items if item.action in {"BUY", "SELL"} and item.qty > 0]
+            if suggestions:
+                print("suggestions:")
+                for item in suggestions:
+                    print(f"{item.action} {item.symbol} {item.qty} shares")
+            else:
+                print("suggestions: no trades")
+            for warning in plan.warnings:
+                print(f"warning: {warning}", file=sys.stderr)
+            print(f"report: {plan.report_path}")
+            return 0
+
         if args.command == "backtest":
             result = backtest_service.run_sma_crossover(
                 symbol=args.symbol,
@@ -193,6 +246,20 @@ def main(argv: list[str] | None = None) -> int:
 
 def _format_optional_money(value: float | None) -> str:
     return "N/A" if value is None else f"{value:.2f}"
+
+
+def _load_targets(path: Path) -> dict:
+    try:
+        with path.open("r", encoding="utf-8") as file:
+            targets = json.load(file)
+    except FileNotFoundError as exc:
+        raise ValueError(f"targets file not found: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"targets file is not valid JSON: {path}") from exc
+
+    if not isinstance(targets, dict):
+        raise ValueError("targets file must contain a JSON object")
+    return targets
 
 
 if __name__ == "__main__":

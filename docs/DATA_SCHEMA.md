@@ -76,3 +76,17 @@ Top-level keys:
 - `metrics`: symbol, period, initial cash, final value, return, drawdown, Sharpe ratio, trade count, and win rate.
 - `trades`: deterministic simulated backtest executions.
 - `equity_curve`: daily cash, position, close, and equity values.
+
+## reports/rebalance_*.json
+
+Rebalance reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `total_assets`: current cash plus current market value of positions.
+- `cash_before`: current account cash.
+- `cash_after_rebalance`: estimated cash after suggested trades and commissions.
+- `commission_rate`: configured commission rate.
+- `estimated_total_commission`: estimated commission across suggested trades.
+- `items`: cash and per-symbol current/target values, differences, action, quantity, and estimated trade cost.
+- `warnings`: non-blocking warnings such as cash below target allocation.
