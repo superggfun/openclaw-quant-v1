@@ -1,12 +1,12 @@
 # openclaw-quant-v1
 
-`openclaw-quant-v1` is an early OpenClaw-oriented quant system skeleton. It currently includes a market data layer, a simulated portfolio state module, a minimal backtest engine, and a portfolio rebalance engine. It does not make AI decisions, place live orders, connect to brokers, or perform automated trading.
+`openclaw-quant-v1` is an early OpenClaw-oriented quant system skeleton. It currently includes a market data layer, a simulated portfolio state module, a minimal backtest engine, a portfolio rebalance engine, and a risk engine. It does not make AI decisions, place live orders, connect to brokers, or perform automated trading.
 
 This project is for research and simulation only. It is not investment advice.
 
 ## Current Version
 
-`v0.3.0-rebalance-engine`
+`v0.4.0-risk-engine`
 
 This release includes:
 
@@ -16,6 +16,7 @@ This release includes:
 - Simulated positions and trade history.
 - SMA crossover backtest engine using stored prices.
 - Portfolio allocation and rebalance calculation engine.
+- Portfolio risk metrics and risk score.
 - JSON backtest and rebalance reports under `reports/`.
 - CLI commands for data, portfolio, backtest, allocation, and rebalance workflows.
 - pytest coverage for core state transitions.
@@ -78,6 +79,7 @@ Key modules:
 - `quant/services/portfolio_service.py`: simulated portfolio rules and valuation.
 - `quant/services/backtest_service.py`: SMA crossover backtest engine.
 - `quant/rebalance/rebalance_engine.py`: allocation and rebalance calculations.
+- `quant/risk/risk_engine.py`: concentration, cash, Top 5, and risk score calculations.
 - `quant/storage/sqlite_store.py`: price persistence.
 - `quant/storage/portfolio_store.py`: account, position, and trade persistence.
 - `quant/data_source/yfinance_client.py`: yfinance adapter.
@@ -156,6 +158,30 @@ reports/rebalance_YYYYMMDD_HHMMSS.json
 
 See `docs/REBALANCE.md` for details.
 
+## Risk Engine
+
+The risk engine reads the simulated portfolio and latest prices, then calculates:
+
+- single-stock concentration
+- industry concentration
+- cash allocation
+- Top 5 holdings concentration
+- risk score from 0 to 100
+
+Run:
+
+```bash
+python -m quant.cli risk
+```
+
+The risk report is written as:
+
+```text
+reports/risk_YYYYMMDD_HHMMSS.json
+```
+
+The Risk Engine is a pure calculation source for future OpenClaw Risk Agent work. It does not call OpenClaw or any AI model.
+
 ## Backtest Engine
 
 The backtest engine reads historical prices from the existing `prices` table. It does not download data. Load price data first with `update-prices`.
@@ -214,6 +240,7 @@ export OPENCLAW_QUANT_DB_PATH=/tmp/openclaw-quant.db
 - `trades`: simulated trade ledger
 - `reports/backtest_*.json`: generated backtest reports, ignored by git
 - `reports/rebalance_*.json`: generated rebalance reports, ignored by git
+- `reports/risk_*.json`: generated risk reports, ignored by git
 
 ## Roadmap
 
@@ -224,6 +251,7 @@ Near-term work:
 - Add basic performance metrics.
 - Add more backtest strategies and benchmark comparisons.
 - Add risk checks for max position size, cash usage, symbol allowlists, and rebalance suggestions.
+- Add configurable sector maps and risk thresholds.
 
 Out of scope until explicitly designed:
 
@@ -245,6 +273,7 @@ Important docs:
 - `docs/ROADMAP.md`
 - `docs/DATA_SCHEMA.md`
 - `docs/REBALANCE.md`
+- `docs/RISK.md`
 - `docs/CLI_COMMANDS.md`
 - `docs/DECISIONS.md`
 
@@ -259,4 +288,3 @@ pytest
 ```
 
 The core tests use temporary SQLite databases and a fake market data source, so they do not need network access.
-

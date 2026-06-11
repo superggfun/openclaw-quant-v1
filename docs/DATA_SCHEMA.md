@@ -90,3 +90,20 @@ Top-level keys:
 - `estimated_total_commission`: estimated commission across suggested trades.
 - `items`: cash and per-symbol current/target values, differences, action, quantity, and estimated trade cost.
 - `warnings`: non-blocking warnings such as cash below target allocation.
+
+## reports/risk_*.json
+
+Risk reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `total_assets`: current cash plus current market value of positions.
+- `cash_value`: current account cash.
+- `cash_weight_pct`: cash as a percent of total assets.
+- `single_stock_concentration_pct`: largest single holding weight.
+- `industry_concentration_pct`: largest industry group weight.
+- `top_5_holdings_pct`: sum of the five largest holding weights.
+- `risk_score`: 0-100 score, where higher means more risk.
+- `holdings`: per-symbol value, weight, and industry.
+- `industries`: per-industry value and weight.
+- `warnings`: non-blocking warnings such as unknown industry mapping.

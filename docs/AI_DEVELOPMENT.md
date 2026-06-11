@@ -4,7 +4,7 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v0.3.0-rebalance-engine`
+`v0.4.0-risk-engine`
 
 The project currently includes:
 
@@ -13,6 +13,7 @@ The project currently includes:
 - A simulated portfolio state module with accounts, positions, and trades.
 - A minimal SMA crossover backtest engine that uses stored prices.
 - A portfolio rebalance engine that calculates allocation drift and suggested trades.
+- A risk engine that calculates portfolio concentration, cash exposure, Top 5 holdings exposure, and a 0-100 risk score.
 - CLI commands for price updates, price inspection, account initialization, simulated buys and sells, portfolio snapshots, trade history, backtests, allocation, and rebalance plans.
 
 The project intentionally does not include:
@@ -49,6 +50,7 @@ The project intentionally does not include:
 - `quant/services/portfolio_service.py`: simulated portfolio business rules.
 - `quant/services/backtest_service.py`: SMA crossover backtest engine and metrics.
 - `quant/rebalance/rebalance_engine.py`: pure allocation and rebalance calculation engine.
+- `quant/risk/risk_engine.py`: pure portfolio risk calculation engine.
 - `quant/cli.py`: command line interface.
 - `tests/`: pytest coverage for data, portfolio, backtest, and rebalance behavior.
 
@@ -64,7 +66,6 @@ The project intentionally does not include:
 
 ## Boundaries
 
-Future work may add risk, strategy research, and OpenClaw integration. Those modules should consume data, portfolio state, and rebalance plans through service or engine boundaries rather than reaching directly into unrelated internals.
+Future work may add strategy research and OpenClaw integration. Those modules should consume data, portfolio state, rebalance plans, and risk reports through service or engine boundaries rather than reaching directly into unrelated internals.
 
 Broker APIs, credentials, live execution, OpenClaw, Claude, GPT, and automatic trading must stay out of this repo until explicitly requested and designed.
-

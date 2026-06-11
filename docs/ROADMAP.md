@@ -27,6 +27,18 @@
 - JSON rebalance reports under `reports/`.
 - Tests for target values, empty accounts, 100% single-symbol targets, multi-symbol rebalances, cash warnings, and commission calculation.
 
+## v0.4.0-risk-engine
+
+- Risk Engine module.
+- Single-stock concentration.
+- Industry concentration.
+- Cash allocation.
+- Top 5 holdings concentration.
+- 0-100 risk score.
+- JSON risk reports under `reports/`.
+- CLI command: `python -m quant.cli risk`.
+- Tests for metrics, industry aggregation, cash-only accounts, unknown industries, and rebalance allocation integration.
+
 ## Next
 
 - Add richer portfolio reporting.
@@ -36,6 +48,7 @@
 - Add more backtest strategy templates.
 - Add Rebalance Engine constraints for minimum trade size, max position size, and cash buffers.
 - Add risk checks for max position size, cash usage, and symbol allowlists.
+- Add configurable industry maps and risk score thresholds.
 - Add CSV export for prices, trades, allocation snapshots, and rebalance plans.
 
 ## Later
@@ -53,4 +66,3 @@
 - Automated order execution.
 - AI decision execution.
 - Credential storage.
-

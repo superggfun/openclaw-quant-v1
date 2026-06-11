@@ -39,3 +39,11 @@ Suggested buy and sell quantities are integer shares calculated by deterministic
 ## 2026-06-11: Rebalance Commission Defaults to 0.1%
 
 The default rebalance commission rate is `0.001`. It is configurable from the CLI through `--commission`.
+
+## 2026-06-11: Risk Engine Uses Rebalance Allocation
+
+The V0.4 risk engine reuses the Rebalance Engine allocation source so portfolio value calculations stay consistent across allocation, rebalance, and risk commands.
+
+## 2026-06-11: Risk Score Is Deterministic
+
+Risk score is a deterministic 0-100 heuristic based on single-stock concentration, industry concentration, Top 5 holdings concentration, and cash exposure. It is not an AI judgment and is not investment advice.

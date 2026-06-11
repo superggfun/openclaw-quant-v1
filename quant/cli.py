@@ -9,6 +9,7 @@ from pathlib import Path
 
 from quant.config import DB_PATH, DEFAULT_SYMBOLS
 from quant.rebalance.rebalance_engine import DEFAULT_COMMISSION_RATE, RebalanceEngine
+from quant.risk.risk_engine import RiskEngine
 from quant.services.backtest_service import BacktestService
 from quant.services.portfolio_service import PortfolioService
 from quant.services.price_service import PriceService
@@ -67,6 +68,8 @@ def build_parser() -> argparse.ArgumentParser:
     rebalance.add_argument("--targets", required=True, help="Path to target allocation JSON.")
     rebalance.add_argument("--commission", type=float, default=DEFAULT_COMMISSION_RATE)
 
+    subparsers.add_parser("risk", help="Calculate portfolio risk metrics.")
+
     backtest = subparsers.add_parser("backtest", help="Run an SMA crossover backtest.")
     backtest.add_argument("--symbol", required=True)
     backtest.add_argument("--start", required=True, help="Inclusive start date YYYY-MM-DD.")
@@ -88,6 +91,7 @@ def main(argv: list[str] | None = None) -> int:
     portfolio_service = PortfolioService(portfolio_store)
     backtest_service = BacktestService(price_store)
     rebalance_engine = RebalanceEngine(portfolio_store)
+    risk_engine = RiskEngine(portfolio_store)
 
     if args.command == "update-prices":
         results = price_service.update_prices(args.symbols, start=args.start, end=args.end)
@@ -212,6 +216,32 @@ def main(argv: list[str] | None = None) -> int:
             for warning in plan.warnings:
                 print(f"warning: {warning}", file=sys.stderr)
             print(f"report: {plan.report_path}")
+            return 0
+
+        if args.command == "risk":
+            report = risk_engine.analyze()
+            print("Risk Summary")
+            print(f"total_assets: {report.total_assets:.2f}")
+            print(f"cash_weight_pct: {report.cash_weight_pct:.2f}")
+            print(f"single_stock_concentration_pct: {report.single_stock_concentration_pct:.2f}")
+            print(f"industry_concentration_pct: {report.industry_concentration_pct:.2f}")
+            print(f"top_5_holdings_pct: {report.top_5_holdings_pct:.2f}")
+            print(f"risk_score: {report.risk_score:.2f}")
+            print("holdings:")
+            for holding in report.holdings:
+                print(
+                    f"{holding.symbol:<6} {holding.industry:<24} "
+                    f"value={holding.value:.2f} weight_pct={holding.weight_pct:.2f}"
+                )
+            print("industries:")
+            for industry in report.industries:
+                print(
+                    f"{industry.industry:<24} value={industry.value:.2f} "
+                    f"weight_pct={industry.weight_pct:.2f}"
+                )
+            for warning in report.warnings:
+                print(f"warning: {warning}", file=sys.stderr)
+            print(f"report: {report.report_path}")
             return 0
 
         if args.command == "backtest":

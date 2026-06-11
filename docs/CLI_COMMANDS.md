@@ -31,6 +31,7 @@ python -m quant.cli portfolio
 python -m quant.cli trades
 python -m quant.cli allocation
 python -m quant.cli rebalance --targets examples/targets.json
+python -m quant.cli risk
 ```
 
 ## Rebalance
@@ -55,6 +56,14 @@ python -m quant.cli rebalance --targets examples/targets.json --commission 0.001
 ```
 
 The rebalance command calculates suggested trades and writes a JSON report. It does not modify the simulated account.
+
+## Risk
+
+```bash
+python -m quant.cli risk
+```
+
+The risk command calculates concentration, cash exposure, Top 5 holdings concentration, industry concentration, and a 0-100 risk score. It writes a JSON report and does not modify the simulated account.
 
 ## Backtest
 
@@ -87,4 +96,4 @@ python -m quant.cli backtest \
 - Backtest rejects `short_window >= long_window`.
 - Rebalance rejects target weights that do not sum to `1.0`.
 - Rebalance requires latest prices for target symbols and held symbols.
-
+- Risk requires latest prices for held symbols.
