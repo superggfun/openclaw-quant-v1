@@ -1,12 +1,12 @@
 # openclaw-quant-v1
 
-`openclaw-quant-v1` is an early OpenClaw-oriented quant system skeleton. It currently includes a market data layer, a simulated portfolio state module, a portfolio backtest engine, a portfolio rebalance engine, a risk engine, a portfolio optimizer, a cost engine, and an execution simulator. It does not make AI decisions, place live orders, connect to brokers, or perform automated trading.
+`openclaw-quant-v1` is an early OpenClaw-oriented quant system skeleton. It currently includes a market data layer, a simulated portfolio state module, an alpha engine, a portfolio backtest engine, a portfolio rebalance engine, a risk engine, a portfolio optimizer, a cost engine, and an execution simulator. It does not make AI decisions, place live orders, connect to brokers, or perform automated trading.
 
 This project is for research and simulation only. It is not investment advice.
 
 ## Current Version
 
-`v0.8.0-execution-simulator`
+`v0.9.0-alpha-engine`
 
 This release includes:
 
@@ -14,6 +14,7 @@ This release includes:
 - SQLite price storage with idempotent updates.
 - Simulated account state.
 - Simulated positions and trade history.
+- Alpha factor generation from stored historical prices.
 - Daily portfolio backtest engine using stored prices, optimizer targets, rebalance logic, and costs.
 - Portfolio allocation and rebalance calculation engine.
 - Portfolio risk metrics and risk score.
@@ -21,7 +22,7 @@ This release includes:
 - Transaction cost estimation for rebalance suggestions.
 - Simulated execution of rebalance suggestions with immediate, next-day open, TWAP, and partial-fill modes.
 - JSON research, rebalance, cost, backtest, and execution reports under `reports/`.
-- CLI commands for data, portfolio, backtest, allocation, and rebalance workflows.
+- CLI commands for data, portfolio, alpha, backtest, allocation, rebalance, risk, optimizer, cost, and execution workflows.
 - pytest coverage for core state transitions.
 
 ## Scope
@@ -31,7 +32,7 @@ This release includes:
 - SQLite storage at `data/quant.db`
 - Idempotent price updates using `(symbol, date)` as the primary key
 - Simulated account, position, and trade tracking in SQLite
-- Pure calculation backtest, rebalance, risk, optimizer, cost, and execution modules
+- Pure calculation alpha, backtest, rebalance, risk, optimizer, cost, and execution modules
 - Reserved OpenClaw integration boundary with no live execution code
 
 Default symbols:
@@ -51,6 +52,7 @@ openclaw-quant-v1/
 |  `- targets.json
 |- quant/
 |  |- config.py
+|  |- alpha/
 |  |- data_source/
 |  |- backtest/
 |  |- cost/
@@ -82,6 +84,7 @@ CLI -> Services / Engines -> Storage / Data Sources -> SQLite / yfinance
 Key modules:
 
 - `quant/cli.py`: command line entry point.
+- `quant/alpha/alpha_engine.py`: factor calculation and target weight generation.
 - `quant/services/price_service.py`: price update orchestration.
 - `quant/services/portfolio_service.py`: simulated portfolio rules and valuation.
 - `quant/services/backtest_service.py`: SMA crossover backtest engine.
@@ -227,6 +230,41 @@ reports/optimize_YYYYMMDD_HHMMSS.json
 
 See `docs/OPTIMIZER.md` for details.
 
+## Alpha Engine
+
+The alpha engine reads stored historical prices, calculates simple factors, ranks symbols, and generates target weights compatible with the Rebalance Engine.
+
+Alpha uses only rows at or before `as_of_date`. Generated targets are signal-date outputs and should be executed or backtested on the next trading day.
+
+Supported factors:
+
+- `momentum_20d`
+- `momentum_60d`
+- `volatility_20d`
+- `risk_adjusted_momentum`
+
+Run:
+
+```bash
+python -m quant.cli alpha
+python -m quant.cli alpha --output-targets examples/alpha_targets.json
+python -m quant.cli rebalance --targets examples/alpha_targets.json --with-costs
+```
+
+Default config:
+
+```text
+examples/alpha_config.json
+```
+
+Reports:
+
+```text
+reports/alpha_YYYYMMDD_HHMMSS.json
+```
+
+See `docs/ALPHA.md` for details.
+
 ## Cost Engine
 
 The cost engine estimates whether a rebalance is worth doing by calculating per-trade and total costs.
@@ -340,6 +378,7 @@ export OPENCLAW_QUANT_DB_PATH=/tmp/openclaw-quant.db
 - `reports/backtest_*.json`: generated backtest reports, ignored by git
 - `reports/rebalance_*.json`: generated rebalance reports, ignored by git
 - `reports/risk_*.json`: generated risk reports, ignored by git
+- `reports/alpha_*.json`: generated alpha reports, ignored by git
 - `reports/optimize_*.json`: generated optimizer reports, ignored by git
 - `reports/cost_*.json`: generated cost reports, ignored by git
 - `reports/execution_*.json`: generated execution simulation reports, ignored by git
@@ -355,6 +394,7 @@ Near-term work:
 - Add risk checks for max position size, cash usage, symbol allowlists, and rebalance suggestions.
 - Add configurable sector maps and risk thresholds.
 - Add optimizer modes that use return estimates and risk budgets.
+- Add more alpha factors and signal combination rules.
 - Add richer execution assumptions and market calendar support.
 
 Out of scope until explicitly designed:
@@ -378,6 +418,7 @@ Important docs:
 - `docs/DATA_SCHEMA.md`
 - `docs/REBALANCE.md`
 - `docs/RISK.md`
+- `docs/ALPHA.md`
 - `docs/OPTIMIZER.md`
 - `docs/COST.md`
 - `docs/EXECUTION.md`

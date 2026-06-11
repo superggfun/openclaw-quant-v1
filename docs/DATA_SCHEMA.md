@@ -128,6 +128,26 @@ Top-level keys:
 - `rationale`: human-readable explanation of the optimizer path.
 - `targets_path`: target allocation JSON path.
 
+## reports/alpha_*.json
+
+Alpha reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `config`: alpha config used for the run.
+- `as_of_date`: resolved signal date used for the selected symbols.
+- `data_start_date`: earliest selected data row used by the long lookback.
+- `data_end_date`: latest selected data row used by the signal.
+- `lookback_used`: factor lookback settings.
+- `factors`: per-symbol factor values, rank, and selected flag.
+- `selected_symbols`: selected ranked symbols.
+- `target_weights`: target weights compatible with `rebalance --targets`.
+- `excluded_symbols`: symbols excluded from ranking.
+- `exclusion_reasons`: per-symbol exclusion reason.
+- `suggested_execution_date`: next stored trading date after the signal date when available.
+- `warnings`: missing data or weighting fallback warnings.
+- `targets_path`: optional target allocation JSON path.
+
 ## reports/cost_*.json
 
 Cost reports are generated files, not database tables. They are ignored by git.

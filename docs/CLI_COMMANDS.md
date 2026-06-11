@@ -32,6 +32,7 @@ python -m quant.cli trades
 python -m quant.cli allocation
 python -m quant.cli rebalance --targets examples/targets.json
 python -m quant.cli risk
+python -m quant.cli alpha
 python -m quant.cli optimize
 python -m quant.cli cost
 python -m quant.cli execute-sim --targets examples/optimized_targets.json
@@ -67,6 +68,16 @@ python -m quant.cli risk
 ```
 
 The risk command calculates concentration, cash exposure, Top 5 holdings concentration, industry concentration, and a 0-100 risk score. It writes a JSON report and does not modify the simulated account.
+
+## Alpha
+
+```bash
+python -m quant.cli alpha
+python -m quant.cli alpha --output-targets examples/alpha_targets.json
+python -m quant.cli rebalance --targets examples/alpha_targets.json --with-costs
+```
+
+The alpha command reads `examples/alpha_config.json` by default, calculates momentum, volatility, and risk-adjusted momentum factors, ranks symbols, selects Top N, and generates target weights. It writes a JSON report and does not modify the simulated account. Alpha uses only rows at or before `as_of_date`; generated targets should be executed or backtested on the next trading day.
 
 ## Optimize
 
@@ -133,6 +144,7 @@ Legacy SMA single-symbol backtests remain available with `--symbol`.
 - Rebalance rejects target weights that do not sum to `1.0`.
 - Rebalance requires latest prices for target symbols and held symbols.
 - Risk requires latest prices for held symbols.
+- Alpha requires enough stored price history for at least one symbol in the universe.
 - Optimize requires at least one symbol in the optimizer universe with stored price data.
 - Cost requires a target allocation that can produce rebalance suggestions.
 - Execution simulation requires an initialized account, target allocation, and latest prices for target and held symbols.

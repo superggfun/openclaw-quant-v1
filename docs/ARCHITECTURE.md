@@ -20,6 +20,7 @@ SQLite / External APIs
 - `quant.services.price_service`: Coordinates daily price updates and reads.
 - `quant.services.portfolio_service`: Applies simulated account, buy, sell, and valuation rules.
 - `quant.services.backtest_service`: Runs SMA crossover backtests from stored prices and writes JSON reports.
+- `quant.alpha.alpha_engine`: Calculates alpha factors, ranks symbols, and generates target weights.
 - `quant.backtest.backtest_engine`: Runs daily portfolio backtests from stored prices, optimizer targets, rebalance logic, and costs.
 - `quant.rebalance.rebalance_engine`: Calculates current allocation and rebalance suggestions from account, position, and price state.
 - `quant.risk.risk_engine`: Calculates portfolio concentration, cash, Top 5, industry, and risk score metrics.
@@ -82,6 +83,14 @@ CLI optimize -> OptimizerEngine -> prices + allocation + risk -> examples/optimi
 
 The optimizer is side-effect free for portfolio state. It generates target allocations, not trades.
 
+Alpha flow:
+
+```text
+CLI alpha -> AlphaEngine -> SQLitePriceStore -> examples/alpha_targets.json -> reports/alpha_*.json
+```
+
+The alpha engine is side-effect free for portfolio state. It reads stored prices, calculates factors and ranks, and generates target weights for downstream rebalance workflows.
+
 Cost flow:
 
 ```text
@@ -113,6 +122,7 @@ The execution simulator is side-effect free for portfolio state. It models fills
 - `quant/risk`: future portfolio and strategy risk checks.
 - `quant/openclaw`: future OpenClaw integration boundary.
 - `quant/portfolio`: reserved for domain objects if the portfolio module grows beyond services and storage.
+- `quant/alpha`: stable signal and target-weight boundary for future research callers.
 - `quant/rebalance`: stable calculation boundary for future Risk Engine, OpenClaw, and AI research callers.
 - `quant/risk`: stable calculation boundary for future OpenClaw Risk Agent callers.
 - `quant/optimizer`: stable target-allocation boundary for future research and OpenClaw callers.

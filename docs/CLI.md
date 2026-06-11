@@ -14,6 +14,7 @@ python -m quant.cli trades
 python -m quant.cli allocation
 python -m quant.cli rebalance --targets examples/targets.json
 python -m quant.cli risk
+python -m quant.cli alpha
 python -m quant.cli optimize
 python -m quant.cli cost
 python -m quant.cli rebalance --targets examples/optimized_targets.json --with-costs

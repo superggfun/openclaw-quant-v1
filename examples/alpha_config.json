@@ -1,0 +1,22 @@
+{
+  "universe": [
+    "SPY",
+    "QQQ",
+    "NVDA",
+    "AAPL",
+    "MSFT",
+    "TSLA",
+    "AMD",
+    "META",
+    "GOOGL",
+    "TLT",
+    "GLD"
+  ],
+  "as_of_date": null,
+  "lookback_short": 20,
+  "lookback_long": 60,
+  "top_n": 5,
+  "weighting_mode": "equal_weight",
+  "min_cash_weight": 0.1,
+  "max_position_weight": 0.2
+}

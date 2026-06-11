@@ -7,6 +7,7 @@ import json
 import sys
 from pathlib import Path
 
+from quant.alpha.alpha_engine import AlphaEngine
 from quant.backtest.backtest_engine import PortfolioBacktestEngine
 from quant.config import DB_PATH, DEFAULT_SYMBOLS
 from quant.cost.cost_engine import CostEngine, TradeInput
@@ -84,6 +85,10 @@ def build_parser() -> argparse.ArgumentParser:
     optimize.add_argument("--min-cash-weight", type=float, default=None)
     optimize.add_argument("--max-sector-weight", type=float, default=None)
 
+    alpha = subparsers.add_parser("alpha", help="Generate alpha factors and target weights.")
+    alpha.add_argument("--config", default="examples/alpha_config.json")
+    alpha.add_argument("--output-targets", default=None)
+
     cost = subparsers.add_parser("cost", help="Estimate transaction costs for rebalance suggestions.")
     cost.add_argument("--targets", default="examples/optimized_targets.json")
     cost.add_argument("--config", default="examples/cost_config.json")
@@ -134,6 +139,7 @@ def main(argv: list[str] | None = None) -> int:
     risk_engine = RiskEngine(portfolio_store)
     optimizer_engine = OptimizerEngine(price_store, portfolio_store)
     execution_engine = ExecutionEngine(price_store, portfolio_store)
+    alpha_engine = AlphaEngine(price_store)
 
     if args.command == "update-prices":
         results = price_service.update_prices(args.symbols, start=args.start, end=args.end)
@@ -322,6 +328,45 @@ def main(argv: list[str] | None = None) -> int:
             print(f"report: {result.report_path}")
             return 0
 
+        if args.command == "alpha":
+            config = _load_alpha_config(Path(args.config))
+            result = alpha_engine.generate(config=config, output_targets=args.output_targets)
+            print("Alpha Summary")
+            print(f"as_of_date: {result.as_of_date or 'latest'}")
+            print(f"data_start_date: {result.data_start_date or 'N/A'}")
+            print(f"data_end_date: {result.data_end_date or 'N/A'}")
+            print(f"lookback_used: {json.dumps(result.lookback_used, sort_keys=True)}")
+            print(f"suggested_execution_date: {result.suggested_execution_date or 'next_available_session'}")
+            print(f"weighting_mode: {result.config['weighting_mode']}")
+            print("factors:")
+            print("symbol rank selected excluded momentum_20d momentum_60d volatility_20d risk_adjusted_momentum")
+            for row in result.factors:
+                print(
+                    f"{row.symbol:<6} {_format_optional_rank(row.rank):>4} "
+                    f"{str(row.selected):<8} "
+                    f"{str(row.excluded):<8} "
+                    f"{_format_optional_number(row.momentum_20d):>12} "
+                    f"{_format_optional_number(row.momentum_60d):>12} "
+                    f"{_format_optional_number(row.volatility_20d):>14} "
+                    f"{_format_optional_number(row.risk_adjusted_momentum):>23}"
+                )
+            if result.excluded_symbols:
+                print("excluded_symbols:")
+                for symbol in result.excluded_symbols:
+                    print(f"{symbol}: {result.exclusion_reasons[symbol]}")
+            print("selected_symbols:")
+            for symbol in result.selected_symbols:
+                print(symbol)
+            print("target_weights:")
+            for symbol, weight in result.target_weights.items():
+                print(f"{symbol:<6} {weight * 100:>8.2f}%")
+            for warning in result.warnings:
+                print(f"warning: {warning}", file=sys.stderr)
+            if result.targets_path:
+                print(f"targets: {result.targets_path}")
+            print(f"report: {result.report_path}")
+            return 0
+
         if args.command == "cost":
             targets = _load_targets(Path(args.targets))
             plan = rebalance_engine.plan(targets)
@@ -434,6 +479,14 @@ def _format_optional_money(value: float | None) -> str:
     return "N/A" if value is None else f"{value:.2f}"
 
 
+def _format_optional_number(value: float | None) -> str:
+    return "N/A" if value is None else f"{value:.6f}"
+
+
+def _format_optional_rank(value: int | None) -> str:
+    return "N/A" if value is None else str(value)
+
+
 def _trades_from_rebalance_plan(plan) -> list[TradeInput]:
     return [
         TradeInput(
@@ -524,6 +577,21 @@ def _load_optimizer_config(path: Path) -> dict:
 
     if not isinstance(config, dict):
         raise ValueError("optimizer config must contain a JSON object")
+    return config
+
+
+def _load_alpha_config(path: Path) -> dict:
+    if not path.exists():
+        return {}
+
+    try:
+        with path.open("r", encoding="utf-8") as file:
+            config = json.load(file)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"alpha config is not valid JSON: {path}") from exc
+
+    if not isinstance(config, dict):
+        raise ValueError("alpha config must contain a JSON object")
     return config
 
 

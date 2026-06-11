@@ -4,13 +4,14 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v0.8.0-execution-simulator`
+`v0.9.0-alpha-engine`
 
 The project currently includes:
 
 - A market data layer using `yfinance` for US stock and ETF daily OHLCV data.
 - SQLite storage for normalized price data.
 - A simulated portfolio state module with accounts, positions, and trades.
+- An alpha engine that calculates deterministic factors and target weights from stored prices.
 - A minimal SMA crossover backtest engine that uses stored prices.
 - A portfolio rebalance engine that calculates allocation drift and suggested trades.
 - A risk engine that calculates portfolio concentration, cash exposure, Top 5 holdings exposure, and a 0-100 risk score.
@@ -18,7 +19,7 @@ The project currently includes:
 - A cost engine that estimates fixed, linear, combined, and slippage costs for suggested trades.
 - A deterministic daily portfolio backtest engine that combines stored prices, optimizer targets, rebalance logic, and costs.
 - An execution simulator that models intended, executed, and unfilled trades with costs.
-- CLI commands for price updates, price inspection, account initialization, simulated buys and sells, portfolio snapshots, trade history, backtests, allocation, rebalance plans, cost estimates, optimization, risk, and execution simulation.
+- CLI commands for price updates, price inspection, account initialization, simulated buys and sells, portfolio snapshots, trade history, alpha, backtests, allocation, rebalance plans, cost estimates, optimization, risk, and execution simulation.
 
 The project intentionally does not include:
 
@@ -43,6 +44,7 @@ The project intentionally does not include:
 - LLMs must not directly decide trade quantities. Trade quantities are computed by deterministic code from inputs such as cash, price, risk rules, targets, and configuration.
 - Future OpenClaw integrations should call only stable CLI commands or explicitly designed API boundaries.
 - Future Risk Engine, OpenClaw, and AI research agents should call the Rebalance Engine rather than duplicate allocation logic.
+- Alpha features must avoid lookahead bias: factor calculations may use only rows at or before `as_of_date`, and generated targets are next-trading-day signals.
 
 ## Important Files
 
@@ -53,6 +55,7 @@ The project intentionally does not include:
 - `quant/services/price_service.py`: price update orchestration.
 - `quant/services/portfolio_service.py`: simulated portfolio business rules.
 - `quant/services/backtest_service.py`: SMA crossover backtest engine and metrics.
+- `quant/alpha/alpha_engine.py`: pure factor and target-weight engine.
 - `quant/backtest/backtest_engine.py`: deterministic daily portfolio backtest engine.
 - `quant/rebalance/rebalance_engine.py`: pure allocation and rebalance calculation engine.
 - `quant/risk/risk_engine.py`: pure portfolio risk calculation engine.
@@ -60,7 +63,7 @@ The project intentionally does not include:
 - `quant/cost/cost_engine.py`: pure transaction cost estimator.
 - `quant/execution/execution_engine.py`: pure simulated execution engine.
 - `quant/cli.py`: command line interface.
-- `tests/`: pytest coverage for data, portfolio, backtest, and rebalance behavior.
+- `tests/`: pytest coverage for data, portfolio, alpha, backtest, rebalance, optimizer, risk, cost, and execution behavior.
 
 ## Recommended Workflow
 
@@ -74,6 +77,6 @@ The project intentionally does not include:
 
 ## Boundaries
 
-Future work may add strategy research and OpenClaw integration. Those modules should consume data, portfolio state, rebalance plans, risk reports, optimizer targets, cost estimates, and execution simulation reports through service or engine boundaries rather than reaching directly into unrelated internals.
+Future work may add strategy research and OpenClaw integration. Those modules should consume data, alpha targets, portfolio state, rebalance plans, risk reports, optimizer targets, cost estimates, and execution simulation reports through service or engine boundaries rather than reaching directly into unrelated internals.
 
 Broker APIs, credentials, live execution, OpenClaw, Claude, GPT, and automatic trading must stay out of this repo until explicitly requested and designed.

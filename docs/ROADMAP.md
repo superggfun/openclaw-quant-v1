@@ -81,6 +81,17 @@
 - CLI command: `python -m quant.cli execute-sim --targets examples/optimized_targets.json`.
 - Tests for execution modes, partial fills, and cost accounting.
 
+## v0.9.0-alpha-engine
+
+- Alpha Engine module.
+- Momentum, volatility, and risk-adjusted momentum factors.
+- Symbol ranking and Top N selection.
+- Equal-weight and score-weighted target generation.
+- Alpha targets written to `examples/alpha_targets.json` when requested.
+- JSON alpha reports under `reports/`.
+- CLI command: `python -m quant.cli alpha`.
+- Tests for factor generation, target generation, rebalance compatibility, invalid config, and missing price data.
+
 ## Next
 
 - Add richer portfolio reporting.
@@ -93,6 +104,7 @@
 - Add configurable industry maps and risk score thresholds.
 - Add optimizer modes based on expected returns, volatility budgets, and drawdown constraints.
 - Add benchmark comparisons and richer backtest attribution.
+- Add alpha factor normalization, factor blending, and signal stability checks.
 - Add richer execution assumptions and market calendar support.
 - Add CSV export for prices, trades, allocation snapshots, and rebalance plans.
 

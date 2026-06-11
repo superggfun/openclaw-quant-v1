@@ -71,3 +71,11 @@ The V0.7 portfolio backtest engine simulates cash, positions, rebalance decision
 ## 2026-06-11: Execution Simulator Is Not Broker Execution
 
 The V0.8 execution simulator models fills from rebalance suggestions, including immediate, next-day open, TWAP, and partial-fill modes. It writes reports only and does not update persistent portfolio state, connect to brokers, or place orders.
+
+## 2026-06-11: Alpha Engine Generates Signals, Not Orders
+
+The V0.9 alpha engine calculates deterministic factors from stored prices and produces target weights. Rebalance Engine remains responsible for suggested trades, and no AI model directly decides quantities.
+
+## 2026-06-11: Alpha Uses Signal-Date Data Only
+
+Alpha factors use rows at or before `as_of_date`. Alpha targets are treated as next-session targets, and the report exposes `suggested_execution_date` when stored data can identify the following trading date.
