@@ -6,3 +6,4 @@ data/quant.db
 data/*.db
 data/*.db-*
 reports/*.json
+examples/portfolio_constructed_targets.json

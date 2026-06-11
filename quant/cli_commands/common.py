@@ -16,6 +16,7 @@ from quant.execution.execution_engine import ExecutionEngine
 from quant.factor_backtest.factor_backtest import FactorBacktest
 from quant.factor_eval.factor_evaluation import FactorEvaluation
 from quant.optimizer.optimizer_engine import OptimizerEngine
+from quant.portfolio_construction.portfolio_construction import PortfolioConstructionEngine
 from quant.rebalance.rebalance_engine import RebalanceEngine
 from quant.risk.risk_engine import RiskEngine
 from quant.services.backtest_service import BacktestService
@@ -38,6 +39,7 @@ class CLIContext:
     rebalance_engine: RebalanceEngine
     risk_engine: RiskEngine
     optimizer_engine: OptimizerEngine
+    portfolio_construction_engine: PortfolioConstructionEngine
     execution_engine: ExecutionEngine
     alpha_engine: AlphaEngine
     factor_evaluation: FactorEvaluation
@@ -59,6 +61,7 @@ def create_context(db_path: Path) -> CLIContext:
         rebalance_engine=RebalanceEngine(portfolio_store),
         risk_engine=RiskEngine(portfolio_store),
         optimizer_engine=OptimizerEngine(price_store, portfolio_store),
+        portfolio_construction_engine=PortfolioConstructionEngine(price_store),
         execution_engine=ExecutionEngine(price_store, portfolio_store),
         alpha_engine=AlphaEngine(price_store),
         factor_evaluation=FactorEvaluation(price_store),
@@ -246,4 +249,3 @@ def _load_json_object(path: Path, label: str) -> dict:
 
 def estimate_costs(config: dict, trades: list[TradeInput]):
     return CostEngine(config).estimate(trades)
-

@@ -17,6 +17,7 @@ from quant.cli_commands import (
     factor_pipeline,
     optimize,
     portfolio,
+    portfolio_construction,
     rebalance,
     risk,
     strategy_eval,
@@ -31,6 +32,7 @@ COMMAND_MODULES = [
     rebalance,
     risk,
     optimize,
+    portfolio_construction,
     alpha,
     factor_eval,
     factor_pipeline,
@@ -55,6 +57,7 @@ COMMAND_HANDLERS = {
     "rebalance": rebalance.handle,
     "risk": risk.handle,
     "optimize": optimize.handle,
+    "portfolio-construct": portfolio_construction.handle,
     "alpha": alpha.handle,
     "factor-eval": factor_eval.handle,
     "factor-pipeline": factor_pipeline.handle,
@@ -96,4 +99,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

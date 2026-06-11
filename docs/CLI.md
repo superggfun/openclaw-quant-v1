@@ -27,6 +27,7 @@ python -m quant.cli strategy-eval --factor-backtest-report reports/factor_backte
 python -m quant.cli strategy-eval --strategy factor_long_short --factor momentum_20d
 python -m quant.cli strategy-eval --strategy alpha --pipeline examples/factor_pipeline_config.json
 python -m quant.cli optimize
+python -m quant.cli portfolio-construct --method risk_parity --symbols SPY QQQ NVDA --output-targets examples/portfolio_constructed_targets.json
 python -m quant.cli cost
 python -m quant.cli rebalance --targets examples/optimized_targets.json --with-costs
 python -m quant.cli execute-sim --targets examples/optimized_targets.json

@@ -42,6 +42,7 @@ python -m quant.cli factor-backtest --factor momentum_20d
 python -m quant.cli strategy-eval --factor-backtest-report reports/factor_backtest_YYYYMMDD_HHMMSS.json
 python -m quant.cli strategy-eval --strategy factor_long_short --factor momentum_20d
 python -m quant.cli optimize
+python -m quant.cli portfolio-construct --method risk_parity --symbols SPY QQQ NVDA
 python -m quant.cli cost
 python -m quant.cli execute-sim --targets examples/optimized_targets.json
 ```
@@ -146,6 +147,18 @@ python -m quant.cli rebalance --targets examples/optimized_targets.json
 
 The optimize command reads `examples/optimizer_config.json` by default, writes `examples/optimized_targets.json`, and writes a JSON report. It does not modify the simulated account.
 
+## Portfolio Construction
+
+```bash
+python -m quant.cli portfolio-construct --method equal_weight --symbols SPY QQQ NVDA
+python -m quant.cli portfolio-construct --method inverse_volatility --symbols SPY QQQ NVDA --lookback 60
+python -m quant.cli portfolio-construct --method risk_parity --symbols SPY QQQ NVDA --output-targets examples/portfolio_constructed_targets.json
+python -m quant.cli portfolio-construct --method min_variance --symbols SPY QQQ NVDA --end 2025-01-01
+python -m quant.cli rebalance --targets examples/portfolio_constructed_targets.json --with-costs
+```
+
+The portfolio-construct command reads stored close prices, constructs long-only target weights, prints volatility and risk contribution diagnostics, and writes `reports/portfolio_construction_*.json`. It does not modify the simulated account. `examples/portfolio_constructed_targets.json` is treated as a generated local artifact and is ignored by git.
+
 ## Cost
 
 ```bash
@@ -223,5 +236,6 @@ The alpha strategy path records `signal_date` and `execution_date` and executes 
 - Factor backtest requires enough stored price history and future-return windows for at least one long-short cross-section.
 - Strategy evaluation requires a supported JSON report path or `--strategy alpha/factor_long_short`.
 - Optimize requires at least one symbol in the optimizer universe with stored price data.
+- Portfolio construction requires at least one requested symbol with sufficient stored return history.
 - Cost requires a target allocation that can produce rebalance suggestions.
 - Execution simulation requires an initialized account, target allocation, and latest prices for target and held symbols.

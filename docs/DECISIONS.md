@@ -107,3 +107,7 @@ Robustness diagnostics such as high turnover, high cost drag, symbol concentrati
 ## 2026-06-11: CLI Commands Are Split By Area
 
 The `v0.15.0` CLI refactor keeps `python -m quant.cli` as the public entry point while moving parser registration and command handlers into `quant/cli_commands/`. This is a maintainability change only: command names, arguments, output text, report schemas, and engine behavior should remain backward compatible.
+
+## 2026-06-11: Portfolio Construction Generates Targets Only
+
+The `v0.16.0` portfolio construction layer uses stored close prices to generate long-only target weights and risk contribution diagnostics. It does not update portfolio state, execute trades, call brokers, or make AI decisions. Rebalance and execution simulation remain separate downstream layers.

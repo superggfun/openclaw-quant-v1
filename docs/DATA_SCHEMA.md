@@ -252,6 +252,32 @@ Top-level keys:
 - `warnings`: warning objects with `code` and `reason`.
 - `interpretation_notes`: scope notes for offline interpretation.
 
+## reports/portfolio_construction_*.json
+
+Portfolio construction reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `method`: `equal_weight`, `inverse_volatility`, `risk_parity`, or `min_variance`.
+- `symbols_requested`: requested symbol list.
+- `symbols_used`: symbols with valid aligned return history.
+- `excluded_symbols`, `exclusion_reasons`: skipped symbols and reasons.
+- `start_date`, `end_date`: aligned return window used for calculation.
+- `lookback`: maximum number of stored price rows used before return calculation.
+- `no_lookahead`: true for the framework design.
+- `target_weights`: rebalance-compatible weights including `cash`.
+- `cash_weight`: final cash target weight.
+- `constraints`: min cash, max position, max sector, and long-only settings.
+- `volatility`: per-symbol realized return volatility over the calculation window.
+- `covariance_matrix`: return covariance matrix.
+- `correlation_matrix`: return correlation matrix.
+- `portfolio_volatility`: volatility implied by target asset weights.
+- `marginal_risk_contributions`: marginal contribution of each asset to portfolio volatility.
+- `risk_contributions`: total risk contribution by asset.
+- `risk_contribution_pct`: percentage contribution to total portfolio risk by asset.
+- `warnings`: constraint adjustments or fallback notes.
+- `output_targets_path`: optional target JSON path written by `--output-targets`.
+
 ## reports/cost_*.json
 
 Cost reports are generated files, not database tables. They are ignored by git.

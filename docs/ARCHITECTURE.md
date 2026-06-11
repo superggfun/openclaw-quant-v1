@@ -17,7 +17,7 @@ SQLite / External APIs
 ## Components
 
 - `quant.cli`: Main CLI entry point. It builds the top-level parser, creates shared context, and dispatches to command modules.
-- `quant.cli_commands`: Dedicated parser registration and command handlers for data, portfolio, rebalance, risk, optimizer, alpha, factor, strategy evaluation, cost, execution, and backtest commands.
+- `quant.cli_commands`: Dedicated parser registration and command handlers for data, portfolio, rebalance, risk, optimizer, portfolio construction, alpha, factor, strategy evaluation, cost, execution, and backtest commands.
 - `quant.services.price_service`: Coordinates daily price updates and reads.
 - `quant.services.portfolio_service`: Applies simulated account, buy, sell, and valuation rules.
 - `quant.services.backtest_service`: Runs SMA crossover backtests from stored prices and writes JSON reports.
@@ -30,6 +30,7 @@ SQLite / External APIs
 - `quant.rebalance.rebalance_engine`: Calculates current allocation and rebalance suggestions from account, position, and price state.
 - `quant.risk.risk_engine`: Calculates portfolio concentration, cash, Top 5, industry, and risk score metrics.
 - `quant.optimizer.optimizer_engine`: Generates target allocations for the Rebalance Engine.
+- `quant.portfolio_construction.portfolio_construction`: Builds target allocations from stored close prices, covariance, and risk contribution calculations.
 - `quant.cost.cost_engine`: Estimates transaction costs for suggested trades.
 - `quant.execution.execution_engine`: Simulates execution of rebalance suggestions and costs.
 - `quant.storage.sqlite_store`: Owns the `prices` table.
@@ -95,6 +96,14 @@ CLI optimize -> OptimizerEngine -> prices + allocation + risk -> examples/optimi
 ```
 
 The optimizer is side-effect free for portfolio state. It generates target allocations, not trades.
+
+Portfolio construction flow:
+
+```text
+CLI portfolio-construct -> PortfolioConstructionEngine -> SQLitePriceStore -> reports/portfolio_construction_*.json + optional target JSON
+```
+
+The portfolio construction engine is side-effect free for portfolio state. It uses stored close prices at or before the requested end/as-of date, computes return covariance/correlation and risk contributions, applies long-only constraints, and generates rebalance-compatible target allocations.
 
 Alpha flow:
 
@@ -185,6 +194,7 @@ The execution simulator is side-effect free for portfolio state. It models fills
 - `quant/rebalance`: stable calculation boundary for future Risk Engine, OpenClaw, and AI research callers.
 - `quant/risk`: stable calculation boundary for future OpenClaw Risk Agent callers.
 - `quant/optimizer`: stable target-allocation boundary for future research and OpenClaw callers.
+- `quant/portfolio_construction`: stable risk-aware target-construction boundary for future optimizer, backtest, and research callers.
 - `quant/cost`: stable cost-estimation boundary for future Backtest and Execution Engines.
 - `quant/backtest`: stable daily portfolio backtest boundary for future research callers.
 - `quant/execution`: stable simulated execution boundary for future OpenClaw Execution Agent callers.

@@ -148,6 +148,26 @@ Strategy Evaluation / Performance Attribution is not implemented in V1.3. It is 
 - CLI commands include `python -m quant.cli strategy-eval --factor-backtest-report reports/factor_backtest_*.json` and `python -m quant.cli strategy-eval --strategy factor_long_short --factor momentum_20d`.
 - Tests for summary metrics, Sortino, Calmar, benchmark information ratio, return attribution, cost attribution, concentration diagnostics, high turnover/cost warnings, benchmark warnings, no-lookahead compatibility, factor backtest compatibility, and backtest compatibility.
 
+## v0.15.0-cli-refactor
+
+- CLI parser registration and command execution split under `quant/cli_commands/`.
+- `quant/cli.py` remains the public `python -m quant.cli` entry point.
+- Shared CLI context centralizes service and engine initialization.
+- No command names, arguments, outputs, or report schemas intentionally changed.
+- Tests for parser registration, command coverage, representative smoke commands, unknown command behavior, and `--db-path`.
+
+## v0.16.0-portfolio-construction
+
+- Portfolio Construction module.
+- CLI command: `python -m quant.cli portfolio-construct`.
+- Methods: `equal_weight`, `inverse_volatility`, `risk_parity`, and `min_variance`.
+- Uses stored close prices only and respects the requested end/as-of date.
+- Computes volatility, covariance, correlation, portfolio volatility, marginal risk contribution, total risk contribution, and risk contribution percentage.
+- Applies long-only constraints for minimum cash, maximum position weight, and known-sector caps.
+- Writes rebalance-compatible target JSON when `--output-targets` is supplied.
+- JSON portfolio construction reports under `reports/`.
+- Tests for methods, constraints, no-lookahead behavior, data exclusions, rebalance compatibility, report schema, and CLI smoke.
+
 ## Next
 
 - Add richer portfolio reporting.
@@ -159,6 +179,7 @@ Strategy Evaluation / Performance Attribution is not implemented in V1.3. It is 
 - Add risk checks for max position size, cash usage, and symbol allowlists.
 - Add configurable industry maps and risk score thresholds.
 - Add optimizer modes based on expected returns, volatility budgets, and drawdown constraints.
+- Add richer portfolio construction methods, explicit risk budgets, and configurable sector maps.
 - Add benchmark comparisons and richer backtest attribution.
 - Add alpha factor normalization, factor blending, and signal stability checks.
 - Add factor turnover, coverage, stability, and per-sector diagnostics.

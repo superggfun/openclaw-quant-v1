@@ -22,6 +22,7 @@ EXPECTED_COMMANDS = {
     "rebalance",
     "risk",
     "optimize",
+    "portfolio-construct",
     "alpha",
     "factor-eval",
     "factor-pipeline",
@@ -112,4 +113,3 @@ def test_unknown_command_behavior_unchanged(capsys: pytest.CaptureFixture[str]) 
 
     assert exc.value.code == 2
     assert "invalid choice" in capsys.readouterr().err
-

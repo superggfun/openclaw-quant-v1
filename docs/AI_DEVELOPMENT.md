@@ -4,7 +4,7 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v0.15.0-cli-refactor`
+`v0.16.0-portfolio-construction`
 
 The project currently includes:
 
@@ -20,11 +20,12 @@ The project currently includes:
 - A portfolio rebalance engine that calculates allocation drift and suggested trades.
 - A risk engine that calculates portfolio concentration, cash exposure, Top 5 holdings exposure, and a 0-100 risk score.
 - A portfolio optimizer that generates target allocations for the Rebalance Engine.
+- A portfolio construction layer that generates equal weight, inverse volatility, risk parity, and minimum variance target weights.
 - A cost engine that estimates fixed, linear, combined, and slippage costs for suggested trades.
 - A deterministic daily portfolio backtest engine that combines stored prices, optimizer targets, rebalance logic, and costs.
 - An execution simulator that models intended, executed, and unfilled trades with costs.
 - CLI commands for price updates, price inspection, account initialization, simulated buys and sells, portfolio snapshots, trade history, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtests, allocation, rebalance plans, cost estimates, optimization, risk, and execution simulation.
-- A modular CLI implementation under `quant/cli_commands/`; this is a maintainability refactor, not a quant feature release.
+- A modular CLI implementation under `quant/cli_commands/`.
 
 The project intentionally does not include:
 
@@ -56,6 +57,7 @@ The project intentionally does not include:
 - Factor backtest features must remain no-lookahead and must not be described as Strategy Evaluation or Performance Attribution until those modules are explicitly designed.
 - Strategy evaluation features must read or generate supported offline source reports, then explain them without introducing new strategies, modifying portfolio state, or executing trades.
 - Strategy evaluation warning codes are research diagnostics. Do not treat them as automatic trade instructions.
+- Portfolio construction features must use stored prices only, respect the requested end/as-of date, generate target weights only, and leave rebalance or execution simulation to downstream modules.
 
 ## Important Files
 
@@ -75,6 +77,7 @@ The project intentionally does not include:
 - `quant/rebalance/rebalance_engine.py`: pure allocation and rebalance calculation engine.
 - `quant/risk/risk_engine.py`: pure portfolio risk calculation engine.
 - `quant/optimizer/optimizer_engine.py`: pure target allocation optimizer.
+- `quant/portfolio_construction/portfolio_construction.py`: pure portfolio construction and risk contribution engine.
 - `quant/cost/cost_engine.py`: pure transaction cost estimator.
 - `quant/execution/execution_engine.py`: pure simulated execution engine.
 - `quant/cli.py`: command line entry point and dispatcher.

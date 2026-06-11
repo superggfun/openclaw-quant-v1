@@ -1,12 +1,12 @@
 # openclaw-quant-v1
 
-`openclaw-quant-v1` is an early OpenClaw-oriented quant system skeleton. It currently includes a market data layer, a simulated portfolio state module, an alpha engine, a factor pipeline, a factor evaluation framework, a long-short factor backtest, a strategy evaluation layer, a portfolio backtest engine, a portfolio rebalance engine, a risk engine, a portfolio optimizer, a cost engine, and an execution simulator. It does not make AI decisions, place live orders, connect to brokers, or perform automated trading.
+`openclaw-quant-v1` is an early OpenClaw-oriented quant system skeleton. It currently includes a market data layer, a simulated portfolio state module, an alpha engine, a factor pipeline, a factor evaluation framework, a long-short factor backtest, a strategy evaluation layer, a portfolio backtest engine, a portfolio rebalance engine, a risk engine, a portfolio optimizer, a portfolio construction/risk parity layer, a cost engine, and an execution simulator. It does not make AI decisions, place live orders, connect to brokers, or perform automated trading.
 
 This project is for research and simulation only. It is not investment advice.
 
 ## Current Version
 
-`v0.15.0-cli-refactor`
+`v0.16.0-portfolio-construction`
 
 This release includes:
 
@@ -24,13 +24,14 @@ This release includes:
 - Portfolio allocation and rebalance calculation engine.
 - Portfolio risk metrics and risk score.
 - Portfolio optimizer that generates target allocations.
+- Portfolio construction methods for equal weight, inverse volatility, risk parity, and minimum variance target weights.
 - Transaction cost estimation for rebalance suggestions.
 - Simulated execution of rebalance suggestions with immediate, next-day open, TWAP, and partial-fill modes.
-- JSON research, factor pipeline, factor evaluation, factor backtest, strategy evaluation, rebalance, cost, backtest, and execution reports under `reports/`.
-- CLI commands for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtest, allocation, rebalance, risk, optimizer, cost, and execution workflows.
+- JSON research, factor pipeline, factor evaluation, factor backtest, strategy evaluation, portfolio construction, rebalance, cost, backtest, and execution reports under `reports/`.
+- CLI commands for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtest, allocation, rebalance, risk, optimizer, portfolio construction, cost, and execution workflows.
 - pytest coverage for core state transitions.
 
-`v0.15.0` is a CLI architecture refactor. It does not add new quant features and is intended to preserve existing command names, arguments, outputs, and report schemas.
+`v0.16.0` adds portfolio construction and risk parity target generation. It remains offline and simulation-only.
 
 ## Scope
 
@@ -39,7 +40,7 @@ This release includes:
 - SQLite storage at `data/quant.db`
 - Idempotent price updates using `(symbol, date)` as the primary key
 - Simulated account, position, and trade tracking in SQLite
-- Pure calculation alpha, factor pipeline, factor evaluation, factor backtest, backtest, rebalance, risk, optimizer, cost, and execution modules
+- Pure calculation alpha, factor pipeline, factor evaluation, factor backtest, backtest, rebalance, risk, optimizer, portfolio construction, cost, and execution modules
 - Reserved OpenClaw integration boundary with no live execution code
 
 Default symbols:
@@ -69,6 +70,7 @@ openclaw-quant-v1/
 |  |- factor_eval/
 |  |- factor_pipeline/
 |  |- optimizer/
+|  |- portfolio_construction/
 |  |- rebalance/
 |  |  `- rebalance_engine.py
 |  |- services/
@@ -108,6 +110,7 @@ Key modules:
 - `quant/rebalance/rebalance_engine.py`: allocation and rebalance calculations.
 - `quant/risk/risk_engine.py`: concentration, cash, Top 5, and risk score calculations.
 - `quant/optimizer/optimizer_engine.py`: target allocation generation for rebalance.
+- `quant/portfolio_construction/portfolio_construction.py`: portfolio construction, covariance, and risk contribution calculations.
 - `quant/cost/cost_engine.py`: fixed, linear, and combined transaction cost estimates.
 - `quant/execution/execution_engine.py`: simulated execution of rebalance suggestions.
 - `quant/storage/sqlite_store.py`: price persistence.
@@ -245,6 +248,35 @@ reports/optimize_YYYYMMDD_HHMMSS.json
 ```
 
 See `docs/OPTIMIZER.md` for details.
+
+## Portfolio Construction
+
+The portfolio construction engine generates target allocations from stored historical close prices.
+
+Supported methods:
+
+- `equal_weight`
+- `inverse_volatility`
+- `risk_parity`
+- `min_variance`
+
+Run:
+
+```bash
+python -m quant.cli portfolio-construct --method equal_weight --symbols SPY QQQ NVDA
+python -m quant.cli portfolio-construct --method risk_parity --symbols SPY QQQ NVDA --output-targets examples/portfolio_constructed_targets.json
+python -m quant.cli rebalance --targets examples/portfolio_constructed_targets.json --with-costs
+```
+
+Reports:
+
+```text
+reports/portfolio_construction_YYYYMMDD_HHMMSS.json
+```
+
+`examples/portfolio_constructed_targets.json` is a generated local smoke-test artifact and is ignored by git. Regenerate it with `--output-targets` when needed.
+
+See `docs/PORTFOLIO_CONSTRUCTION.md` for details.
 
 ## Alpha Engine
 
@@ -506,6 +538,7 @@ export OPENCLAW_QUANT_DB_PATH=/tmp/openclaw-quant.db
 - `reports/factor_backtest_*.json`: generated long-short factor backtest reports, ignored by git
 - `reports/strategy_eval_*.json`: generated strategy evaluation reports, ignored by git
 - `reports/optimize_*.json`: generated optimizer reports, ignored by git
+- `reports/portfolio_construction_*.json`: generated portfolio construction reports, ignored by git
 - `reports/cost_*.json`: generated cost reports, ignored by git
 - `reports/execution_*.json`: generated execution simulation reports, ignored by git
 
@@ -520,6 +553,7 @@ Near-term work:
 - Add risk checks for max position size, cash usage, symbol allowlists, and rebalance suggestions.
 - Add configurable sector maps and risk thresholds.
 - Add optimizer modes that use return estimates and risk budgets.
+- Add richer portfolio construction methods and configurable risk budgets.
 - Add more alpha factors and signal combination rules.
 - Add richer factor evaluation diagnostics and benchmark comparisons.
 - Add richer neutralization methods and factor pipeline audit views.
@@ -553,6 +587,7 @@ Important docs:
 - `docs/FACTOR_BACKTEST.md`
 - `docs/STRATEGY_EVALUATION.md`
 - `docs/OPTIMIZER.md`
+- `docs/PORTFOLIO_CONSTRUCTION.md`
 - `docs/COST.md`
 - `docs/EXECUTION.md`
 - `docs/CLI.md`
