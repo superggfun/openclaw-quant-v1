@@ -4,7 +4,7 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v1.3.0-long-short-factor-backtest`
+`v1.3.0-factor-research-suite`
 
 The project currently includes:
 

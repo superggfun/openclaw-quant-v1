@@ -6,7 +6,7 @@ This project is for research and simulation only. It is not investment advice.
 
 ## Current Version
 
-`v1.3.0-long-short-factor-backtest`
+`v1.3.0-factor-research-suite`
 
 This release includes:
 

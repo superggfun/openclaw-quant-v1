@@ -124,7 +124,7 @@
 - CLI command: `python -m quant.cli factor-pipeline --factor momentum_20d`.
 - Tests for preprocessing steps, alpha compatibility, factor-eval compatibility, and no-lookahead behavior.
 
-## v1.3.0-long-short-factor-backtest
+## v1.3.0-factor-research-suite
 
 - Long-Short Factor Backtest module.
 - No-lookahead single-factor return testing.
