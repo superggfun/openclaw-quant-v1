@@ -82,23 +82,23 @@ Alpha factors use rows at or before `as_of_date`. Alpha targets are treated as n
 
 ## 2026-06-11: Alpha Backtests Must Execute After Signal Date
 
-The V1.0 alpha backtest path generates signals on T with T-and-earlier data and executes on the next available trading day. Legacy same-day-close portfolio modes remain available only as simple smoke paths.
+The v0.10 alpha backtest path generates signals on T with T-and-earlier data and executes on the next available trading day. Legacy same-day-close portfolio modes remain available only as simple smoke paths.
 
 ## 2026-06-11: Factor Evaluation Compares Past Signals To Future Returns
 
-The V1.1 factor evaluation framework calculates factors using only signal-date-and-earlier prices, then evaluates those values against future returns. It is a research diagnostic layer only and does not generate trades or target allocations.
+The v0.11 factor evaluation framework calculates factors using only signal-date-and-earlier prices, then evaluates those values against future returns. It is a research diagnostic layer only and does not generate trades or target allocations.
 
 ## 2026-06-11: Factor Pipeline Transforms Same-Date Cross-Sections Only
 
-The V1.2 factor pipeline receives factor values already calculated for one signal date and applies deterministic preprocessing to that cross-section. It does not read future prices, future returns, or dated future metadata.
+The v0.12 factor pipeline receives factor values already calculated for one signal date and applies deterministic preprocessing to that cross-section. It does not read future prices, future returns, or dated future metadata.
 
 ## 2026-06-11: Long-Short Factor Backtest Is Not Strategy Attribution
 
-The V1.3 factor backtest checks whether one factor can produce an equal-weight long-short return stream. It does not update portfolio state and does not implement Strategy Evaluation or Performance Attribution, which remain future work.
+The v0.13 factor backtest checks whether one factor can produce an equal-weight long-short return stream. It does not update portfolio state and does not implement Strategy Evaluation or Performance Attribution, which remain future work.
 
 ## 2026-06-11: Strategy Evaluation Reads Reports
 
-The V1.4 strategy evaluation layer explains returns and risk from supported generated reports. The CLI may generate an alpha or factor long-short source report before evaluation, but the evaluation layer itself does not recalculate alpha signals, introduce new strategies, modify portfolio state, or execute trades.
+The v0.14 strategy evaluation layer explains returns and risk from supported generated reports. The CLI may generate an alpha or factor long-short source report before evaluation, but the evaluation layer itself does not recalculate alpha signals, introduce new strategies, modify portfolio state, or execute trades.
 
 ## 2026-06-11: Strategy Diagnostics Are Warnings
 

@@ -124,7 +124,7 @@ Single-symbol evaluations can produce factor observations and quintile data, but
 
 Factor Evaluation measures predictive quality with IC, Rank IC, quintiles, and decay. It does not explain portfolio returns or risk.
 
-Use `python -m quant.cli factor-backtest --factor <factor>` to create a factor spread return stream, then use `python -m quant.cli strategy-eval --factor-backtest-report <report>` for V1.4 performance attribution and robustness diagnostics.
+Use `python -m quant.cli factor-backtest --factor <factor>` to create a factor spread return stream, then use `python -m quant.cli strategy-eval --factor-backtest-report <report>` for v0.14 performance attribution and robustness diagnostics.
 
 ## v0.19 Factor Registry
 

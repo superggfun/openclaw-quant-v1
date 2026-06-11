@@ -2,7 +2,7 @@
 
 The Long-Short Factor Backtest checks whether one factor can produce an equal-weight long-short factor spread return stream.
 
-It is not Strategy Evaluation and it is not Performance Attribution. V1.4 implements those as a separate report-reading module.
+It is not Strategy Evaluation and it is not Performance Attribution. v0.14 implements those as a separate report-reading module.
 
 It does not explain why returns happened inside the factor backtest itself. Use Strategy Evaluation to explain a generated factor backtest report.
 
@@ -100,7 +100,7 @@ Reports are written by default.
 
 `long_short_sharpe` uses the arithmetic mean and standard deviation of period long-short returns, annualized with `sqrt(252)`. Because compounded return and arithmetic mean are different statistics, they can differ in sign in high-volatility samples. This is possible without a sign bug.
 
-Long-short factor returns may also disagree with IC direction because of sample filtering, quantile boundaries, equal-weight portfolio construction, overlapping holding windows, pipeline transformations, missing symbols, and costs not being modeled in V1.3.
+Long-short factor returns may also disagree with IC direction because of sample filtering, quantile boundaries, equal-weight portfolio construction, overlapping holding windows, pipeline transformations, missing symbols, and costs not being modeled in v0.13.
 
 ## Reports
 

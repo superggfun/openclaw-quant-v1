@@ -46,7 +46,7 @@ Sector neutralization subtracts the sector mean from each symbol using a static 
 
 Rank normalization converts cross-sectional ranks to approximately `[-1, 1]`.
 
-Market/beta neutralization is intentionally a placeholder in V1.2. Enabling it records a warning and does not alter values.
+Market/beta neutralization is intentionally a placeholder in v0.12. Enabling it records a warning and does not alter values.
 
 ## Config
 

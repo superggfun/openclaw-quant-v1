@@ -1,5 +1,12 @@
 # Roadmap
 
+## v0.22.0-maintenance-cleanup
+
+- Removes unused placeholders and stale references.
+- Aligns documentation with the current v0.x release sequence.
+- Adds lightweight project hygiene checks for command documentation, ignored generated files, stale version references, and empty package directories.
+- No new strategies, factors, broker integrations, report schemas, or live-trading behavior.
+
 ## v0.1.0-data-portfolio
 
 - Market data ingestion with `yfinance`.
@@ -92,7 +99,7 @@
 - CLI command: `python -m quant.cli alpha`.
 - Tests for factor generation, target generation, rebalance compatibility, invalid config, and missing price data.
 
-## v1.0.0-backtest-no-lookahead
+## v0.10.0-backtest-no-lookahead
 
 - Alpha strategy integration in the Backtest Engine.
 - Signal generation uses only signal-date and earlier prices.
@@ -102,7 +109,7 @@
 - Reports include `no_lookahead`, `signal_execution_lag`, `alpha_config`, and excluded symbols per rebalance.
 - Legacy simple portfolio modes remain available but are documented as same-day-close smoke modes.
 
-## v1.1.0-factor-evaluation
+## v0.11.0-factor-evaluation
 
 - Factor Evaluation Framework module.
 - No-lookahead IC and Rank IC evaluation.
@@ -113,7 +120,7 @@
 - CLI command: `python -m quant.cli factor-eval --factor momentum_20d`.
 - Tests for IC, Rank IC, ICIR, quintiles, decay, missing prices, empty samples, no-lookahead, and single-symbol behavior.
 
-## v1.2.0-factor-pipeline
+## v0.12.0-factor-pipeline
 
 - Factor Pipeline module.
 - Missing value handling, winsorization, z-score standardization, rank normalization, and sector neutralization.
@@ -124,7 +131,7 @@
 - CLI command: `python -m quant.cli factor-pipeline --factor momentum_20d`.
 - Tests for preprocessing steps, alpha compatibility, factor-eval compatibility, and no-lookahead behavior.
 
-## v1.3.0-factor-research-suite
+## v0.13.0-factor-research-suite
 
 - Long-Short Factor Backtest module.
 - No-lookahead single-factor return testing.
@@ -135,9 +142,9 @@
 - CLI command: `python -m quant.cli factor-backtest --factor momentum_20d`.
 - Tests for no-lookahead behavior, quantile grouping, long-short return calculation, pipeline integration, exclusions, zero-volatility handling, and CLI smoke.
 
-Strategy Evaluation / Performance Attribution is not implemented in V1.3. It is intentionally left for V1.4 or later.
+Strategy Evaluation / Performance Attribution is not implemented in v0.13. It is intentionally left for v0.14 or later.
 
-## v1.4.0-strategy-evaluation
+## v0.14.0-strategy-evaluation
 
 - Strategy Evaluation module.
 - Reads factor backtest and portfolio backtest reports.

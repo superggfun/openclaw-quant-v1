@@ -152,7 +152,7 @@ python -m quant.cli factor-backtest --factor risk_adjusted_momentum --start 2024
 
 The factor-backtest command ranks each no-lookahead signal-date cross-section, longs the configured top quantile, shorts the configured bottom quantile, and prints long-short return metrics. It writes `reports/factor_backtest_*.json` and does not modify portfolio state.
 
-This is not Strategy Evaluation or Performance Attribution. V1.4 adds those as a separate report-reading layer.
+This is not Strategy Evaluation or Performance Attribution. v0.14 adds those as a separate report-reading layer.
 
 ## Strategy Evaluation
 

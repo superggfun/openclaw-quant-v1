@@ -105,7 +105,7 @@ Top positive contributors, top negative contributors, and return concentration a
 
 For factor long-short reports:
 
-- `long_side` and `short_side` preserve the raw V1.3 leg return fields from the source report.
+- `long_side` and `short_side` preserve the raw v0.13 leg return fields from the source report.
 - `raw_short_leg_underlying_return` is the compounded return of the underlying short basket.
 - `short_side_contribution` is sign-adjusted for the long-short spread, so a falling short basket contributes positively.
 - `by_symbol` contributions are arithmetic period contributions using long weights and negative short weights. They are attribution diagnostics and are not compounded portfolio returns.

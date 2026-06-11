@@ -4,7 +4,7 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v0.18.0-agent-export`
+`v0.22.0-maintenance-cleanup`
 
 The project currently includes:
 
@@ -26,6 +26,8 @@ The project currently includes:
 - A cost engine that estimates fixed, linear, combined, and slippage costs for suggested trades.
 - A deterministic daily portfolio backtest engine that combines stored prices, optimizer targets, rebalance logic, and costs.
 - An execution simulator that models intended, executed, and unfilled trades with costs.
+- A historical trading simulator that tracks in-memory account cash, positions, costs, trades, and equity through time.
+- Walk-forward and rolling validation for offline research robustness checks.
 - CLI commands for price updates, price inspection, account initialization, simulated buys and sells, portfolio snapshots, trade history, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtests, allocation, rebalance plans, cost estimates, optimization, risk, and execution simulation.
 - A modular CLI implementation under `quant/cli_commands/`.
 
@@ -87,6 +89,8 @@ The project intentionally does not include:
 - `quant/portfolio_construction/portfolio_construction.py`: pure portfolio construction and risk contribution engine.
 - `quant/cost/cost_engine.py`: pure transaction cost estimator.
 - `quant/execution/execution_engine.py`: pure simulated execution engine.
+- `quant/trading_simulation/`: offline historical account-style simulation.
+- `quant/walk_forward/`: offline walk-forward and rolling validation.
 - `quant/cli.py`: command line entry point and dispatcher.
 - `quant/cli_commands/`: command-specific parser registration and handlers.
 - `tests/`: pytest coverage for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtest, rebalance, optimizer, risk, cost, and execution behavior.

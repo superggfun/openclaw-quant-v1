@@ -211,7 +211,6 @@ The trading simulator is offline and deterministic. It does not write to SQLite 
 
 ## Extension Points
 
-- `quant/backtesting`: future historical simulation module.
 - `quant/data_layer`: stable universe, metadata, coverage, and data quality boundary for future factor research.
 - `quant/agent_export`: stable report-to-agent context boundary for future OpenClaw and LLM agent integrations.
 - `quant/risk`: future portfolio and strategy risk checks.

@@ -6,7 +6,7 @@ This project is for research and simulation only. It is not investment advice.
 
 ## Current Version
 
-`v0.21.0-trading-simulation`
+`v0.22.0-maintenance-cleanup`
 
 This release includes:
 
@@ -36,7 +36,7 @@ This release includes:
 - CLI commands for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtest, allocation, rebalance, risk, optimizer, portfolio construction, cost, and execution workflows.
 - pytest coverage for core state transitions.
 
-`v0.21.0` adds an offline historical account-style trading simulation loop. It does not modify existing backtest semantics, connect to brokers, or place live orders.
+`v0.22.0` is a maintenance and consistency release. It removes stale placeholders, aligns documentation version references, adds lightweight project hygiene checks, and does not add new quant features.
 
 ## Scope
 
@@ -76,16 +76,18 @@ openclaw-quant-v1/
 |  |- factor_backtest/
 |  |- factor_eval/
 |  |- factor_pipeline/
+|  |- factors/
 |  |- optimizer/
 |  |- portfolio_construction/
 |  |- rebalance/
 |  |  `- rebalance_engine.py
 |  |- services/
 |  |- storage/
-|  |- backtesting/
 |  |- portfolio/
 |  |- risk/
 |  |- openclaw/
+|  |- trading_simulation/
+|  |- walk_forward/
 |  `- cli.py
 |- reports/
 |- tests/
@@ -111,8 +113,10 @@ Key modules:
 - `quant/factor_backtest/factor_backtest.py`: long-short factor return backtest.
 - `quant/factor_pipeline/factor_pipeline.py`: factor preprocessing, standardization, and neutralization.
 - `quant/factor_eval/factor_evaluation.py`: no-lookahead factor evaluation metrics.
+- `quant/factors/`: deterministic factor registry and price-history factor implementations.
 - `quant/strategy_eval/strategy_evaluation.py`: strategy evaluation and attribution from generated reports.
 - `quant/trading_simulation/`: historical account-style simulation with cash, positions, trades, costs, and equity curves.
+- `quant/walk_forward/`: walk-forward and rolling validation.
 - `quant/services/price_service.py`: price update orchestration.
 - `quant/services/portfolio_service.py`: simulated portfolio rules and valuation.
 - `quant/services/backtest_service.py`: SMA crossover backtest engine.
@@ -424,7 +428,7 @@ See `docs/FACTOR_EVALUATION.md` for details.
 
 The long-short factor backtest checks whether one factor can produce a plausible equal-weight long-short return stream.
 
-It is not Strategy Evaluation and not Performance Attribution. V1.4 adds that as a separate report-reading layer.
+It is not Strategy Evaluation and not Performance Attribution. v0.14 adds that as a separate report-reading layer.
 
 Run:
 
