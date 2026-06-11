@@ -34,6 +34,7 @@ python -m quant.cli rebalance --targets examples/targets.json
 python -m quant.cli risk
 python -m quant.cli optimize
 python -m quant.cli cost
+python -m quant.cli execute-sim --targets examples/optimized_targets.json
 ```
 
 ## Rebalance
@@ -89,27 +90,38 @@ python -m quant.cli rebalance --targets examples/optimized_targets.json --with-c
 
 The cost command estimates costs for current rebalance suggestions. It writes a JSON report and does not modify the simulated account.
 
+## Execution Simulation
+
+```bash
+python -m quant.cli execute-sim --targets examples/optimized_targets.json
+python -m quant.cli execute-sim --targets examples/optimized_targets.json --mode next_day_open --date 2024-01-02
+python -m quant.cli execute-sim --targets examples/optimized_targets.json --mode twap --twap-slices 4
+python -m quant.cli execute-sim --targets examples/optimized_targets.json --mode partial_fill --fill-ratio 0.5
+```
+
+The execution simulator turns rebalance suggestions into simulated fills, unfilled quantities, costs, final cash, and final positions. It writes a JSON report and does not modify the simulated account.
+
 ## Backtest
 
 Backtests use existing rows in the `prices` table. Load prices first:
 
 ```bash
 python -m quant.cli update-prices --symbols SPY --start 2023-01-01 --end 2024-12-31
-python -m quant.cli backtest --symbol SPY --start 2023-01-01 --end 2024-12-31
+python -m quant.cli backtest --start 2023-01-01 --end 2024-12-31 --initial-cash 100000 --mode equal_weight --rebalance-frequency monthly
 ```
 
 Optional parameters:
 
 ```bash
 python -m quant.cli backtest \
-  --symbol SPY \
   --start 2023-01-01 \
   --end 2024-12-31 \
-  --cash 100000 \
-  --short-window 20 \
-  --long-window 50 \
-  --commission 0
+  --initial-cash 100000 \
+  --mode risk_adjusted \
+  --rebalance-frequency weekly
 ```
+
+Legacy SMA single-symbol backtests remain available with `--symbol`.
 
 ## Failure Behavior
 
@@ -123,3 +135,4 @@ python -m quant.cli backtest \
 - Risk requires latest prices for held symbols.
 - Optimize requires at least one symbol in the optimizer universe with stored price data.
 - Cost requires a target allocation that can produce rebalance suggestions.
+- Execution simulation requires an initialized account, target allocation, and latest prices for target and held symbols.

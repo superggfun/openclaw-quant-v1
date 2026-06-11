@@ -63,3 +63,11 @@ The V0.6 cost engine estimates transaction costs from suggested trades. It does 
 ## 2026-06-11: Cost Models Stay Simple
 
 V0.6 supports fixed, linear, and combined costs with simple slippage in basis points. Complex market impact is intentionally out of scope.
+
+## 2026-06-11: Portfolio Backtests Are In-Memory And Deterministic
+
+The V0.7 portfolio backtest engine simulates cash, positions, rebalance decisions, and costs in memory. It does not modify the persistent simulated portfolio state, and the same stored prices and parameters produce the same metrics and trades.
+
+## 2026-06-11: Execution Simulator Is Not Broker Execution
+
+The V0.8 execution simulator models fills from rebalance suggestions, including immediate, next-day open, TWAP, and partial-fill modes. It writes reports only and does not update persistent portfolio state, connect to brokers, or place orders.

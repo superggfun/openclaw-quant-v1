@@ -20,10 +20,12 @@ SQLite / External APIs
 - `quant.services.price_service`: Coordinates daily price updates and reads.
 - `quant.services.portfolio_service`: Applies simulated account, buy, sell, and valuation rules.
 - `quant.services.backtest_service`: Runs SMA crossover backtests from stored prices and writes JSON reports.
+- `quant.backtest.backtest_engine`: Runs daily portfolio backtests from stored prices, optimizer targets, rebalance logic, and costs.
 - `quant.rebalance.rebalance_engine`: Calculates current allocation and rebalance suggestions from account, position, and price state.
 - `quant.risk.risk_engine`: Calculates portfolio concentration, cash, Top 5, industry, and risk score metrics.
 - `quant.optimizer.optimizer_engine`: Generates target allocations for the Rebalance Engine.
 - `quant.cost.cost_engine`: Estimates transaction costs for suggested trades.
+- `quant.execution.execution_engine`: Simulates execution of rebalance suggestions and costs.
 - `quant.storage.sqlite_store`: Owns the `prices` table.
 - `quant.storage.portfolio_store`: Owns `accounts`, `positions`, and `trades`.
 - `quant.data_source.yfinance_client`: Wraps yfinance and normalizes downloaded prices.
@@ -89,6 +91,22 @@ CLI rebalance --with-costs -> RebalanceEngine -> CostEngine -> reports/cost_*.js
 
 The cost engine is side-effect free for portfolio state. It estimates costs only.
 
+Portfolio backtest flow:
+
+```text
+CLI backtest -> PortfolioBacktestEngine -> prices -> optimizer-style targets -> rebalance simulation -> CostEngine -> reports/backtest_*.json
+```
+
+The portfolio backtest engine is deterministic and runs in memory. It does not modify live simulated portfolio state.
+
+Execution simulation flow:
+
+```text
+CLI execute-sim -> RebalanceEngine -> ExecutionEngine -> CostEngine -> reports/execution_*.json
+```
+
+The execution simulator is side-effect free for portfolio state. It models fills, unfilled quantities, costs, slippage, final cash, and final positions without writing `accounts`, `positions`, or `trades`.
+
 ## Extension Points
 
 - `quant/backtesting`: future historical simulation module.
@@ -99,3 +117,5 @@ The cost engine is side-effect free for portfolio state. It estimates costs only
 - `quant/risk`: stable calculation boundary for future OpenClaw Risk Agent callers.
 - `quant/optimizer`: stable target-allocation boundary for future research and OpenClaw callers.
 - `quant/cost`: stable cost-estimation boundary for future Backtest and Execution Engines.
+- `quant/backtest`: stable daily portfolio backtest boundary for future research callers.
+- `quant/execution`: stable simulated execution boundary for future OpenClaw Execution Agent callers.

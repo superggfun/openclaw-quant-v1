@@ -4,7 +4,7 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v0.6.0-cost-engine`
+`v0.8.0-execution-simulator`
 
 The project currently includes:
 
@@ -16,7 +16,9 @@ The project currently includes:
 - A risk engine that calculates portfolio concentration, cash exposure, Top 5 holdings exposure, and a 0-100 risk score.
 - A portfolio optimizer that generates target allocations for the Rebalance Engine.
 - A cost engine that estimates fixed, linear, combined, and slippage costs for suggested trades.
-- CLI commands for price updates, price inspection, account initialization, simulated buys and sells, portfolio snapshots, trade history, backtests, allocation, and rebalance plans.
+- A deterministic daily portfolio backtest engine that combines stored prices, optimizer targets, rebalance logic, and costs.
+- An execution simulator that models intended, executed, and unfilled trades with costs.
+- CLI commands for price updates, price inspection, account initialization, simulated buys and sells, portfolio snapshots, trade history, backtests, allocation, rebalance plans, cost estimates, optimization, risk, and execution simulation.
 
 The project intentionally does not include:
 
@@ -51,10 +53,12 @@ The project intentionally does not include:
 - `quant/services/price_service.py`: price update orchestration.
 - `quant/services/portfolio_service.py`: simulated portfolio business rules.
 - `quant/services/backtest_service.py`: SMA crossover backtest engine and metrics.
+- `quant/backtest/backtest_engine.py`: deterministic daily portfolio backtest engine.
 - `quant/rebalance/rebalance_engine.py`: pure allocation and rebalance calculation engine.
 - `quant/risk/risk_engine.py`: pure portfolio risk calculation engine.
 - `quant/optimizer/optimizer_engine.py`: pure target allocation optimizer.
 - `quant/cost/cost_engine.py`: pure transaction cost estimator.
+- `quant/execution/execution_engine.py`: pure simulated execution engine.
 - `quant/cli.py`: command line interface.
 - `tests/`: pytest coverage for data, portfolio, backtest, and rebalance behavior.
 
@@ -70,6 +74,6 @@ The project intentionally does not include:
 
 ## Boundaries
 
-Future work may add strategy research and OpenClaw integration. Those modules should consume data, portfolio state, rebalance plans, and risk reports through service or engine boundaries rather than reaching directly into unrelated internals.
+Future work may add strategy research and OpenClaw integration. Those modules should consume data, portfolio state, rebalance plans, risk reports, optimizer targets, cost estimates, and execution simulation reports through service or engine boundaries rather than reaching directly into unrelated internals.
 
 Broker APIs, credentials, live execution, OpenClaw, Claude, GPT, and automatic trading must stay out of this repo until explicitly requested and designed.

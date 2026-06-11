@@ -83,7 +83,7 @@ class CostEngine:
         self.config = self._normalize_config(config or {})
         self.report_dir = Path(report_dir)
 
-    def estimate(self, trades: Iterable[TradeInput]) -> CostReport:
+    def estimate(self, trades: Iterable[TradeInput], write_report: bool = True) -> CostReport:
         trade_estimates = []
         warnings = []
 
@@ -147,7 +147,7 @@ class CostEngine:
             warnings=warnings,
             report_path="",
         )
-        report_path = self._write_report(report)
+        report_path = self._write_report(report) if write_report else Path("")
         return CostReport(
             model=report.model,
             currency=report.currency,
@@ -200,4 +200,3 @@ class CostEngine:
         path = self.report_dir / f"cost_{timestamp}.json"
         path.write_text(json.dumps(report.to_report(), indent=2), encoding="utf-8")
         return path
-

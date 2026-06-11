@@ -7,8 +7,10 @@ import json
 import sys
 from pathlib import Path
 
+from quant.backtest.backtest_engine import PortfolioBacktestEngine
 from quant.config import DB_PATH, DEFAULT_SYMBOLS
 from quant.cost.cost_engine import CostEngine, TradeInput
+from quant.execution.execution_engine import ExecutionEngine
 from quant.optimizer.optimizer_engine import DEFAULT_CONSTRAINTS, OptimizerEngine
 from quant.rebalance.rebalance_engine import DEFAULT_COMMISSION_RATE, RebalanceEngine
 from quant.risk.risk_engine import RiskEngine
@@ -92,11 +94,26 @@ def build_parser() -> argparse.ArgumentParser:
     cost.add_argument("--slippage-bps", type=float, default=None)
     cost.add_argument("--min-trade-notional", type=float, default=None)
 
-    backtest = subparsers.add_parser("backtest", help="Run an SMA crossover backtest.")
-    backtest.add_argument("--symbol", required=True)
+    execute_sim = subparsers.add_parser("execute-sim", help="Simulate execution of rebalance suggestions.")
+    execute_sim.add_argument("--targets", required=True, help="Path to target allocation JSON.")
+    execute_sim.add_argument(
+        "--mode",
+        choices=["immediate", "next_day_open", "twap", "partial_fill"],
+        default="immediate",
+    )
+    execute_sim.add_argument("--date", default=None, help="Optional execution reference date YYYY-MM-DD.")
+    execute_sim.add_argument("--cost-config", default="examples/cost_config.json")
+    execute_sim.add_argument("--twap-slices", type=int, default=4)
+    execute_sim.add_argument("--fill-ratio", type=float, default=0.5)
+
+    backtest = subparsers.add_parser("backtest", help="Run a portfolio backtest.")
+    backtest.add_argument("--symbol", default=None, help="Optional legacy SMA symbol backtest.")
     backtest.add_argument("--start", required=True, help="Inclusive start date YYYY-MM-DD.")
     backtest.add_argument("--end", required=True, help="Inclusive end date YYYY-MM-DD.")
     backtest.add_argument("--cash", type=float, default=100000.0)
+    backtest.add_argument("--initial-cash", type=float, default=None)
+    backtest.add_argument("--mode", choices=["equal_weight", "risk_adjusted", "constrained"], default="equal_weight")
+    backtest.add_argument("--rebalance-frequency", choices=["monthly", "weekly", "daily"], default="monthly")
     backtest.add_argument("--short-window", type=int, default=20)
     backtest.add_argument("--long-window", type=int, default=50)
     backtest.add_argument("--commission", type=float, default=0.0)
@@ -112,9 +129,11 @@ def main(argv: list[str] | None = None) -> int:
     portfolio_store = SQLitePortfolioStore(db_path)
     portfolio_service = PortfolioService(portfolio_store)
     backtest_service = BacktestService(price_store)
+    portfolio_backtest_engine = PortfolioBacktestEngine(price_store)
     rebalance_engine = RebalanceEngine(portfolio_store)
     risk_engine = RiskEngine(portfolio_store)
     optimizer_engine = OptimizerEngine(price_store, portfolio_store)
+    execution_engine = ExecutionEngine(price_store, portfolio_store)
 
     if args.command == "update-prices":
         results = price_service.update_prices(args.symbols, start=args.start, end=args.end)
@@ -312,12 +331,81 @@ def main(argv: list[str] | None = None) -> int:
             _print_cost_report(cost_report)
             return 0
 
+        if args.command == "execute-sim":
+            targets = _load_targets(Path(args.targets))
+            cost_config = _load_cost_config(Path(args.cost_config))
+            result = execution_engine.run(
+                targets=targets,
+                mode=args.mode,
+                execution_date=args.date,
+                cost_config=cost_config,
+                twap_slices=args.twap_slices,
+                fill_ratio=args.fill_ratio,
+            )
+            print("Execution Simulation Summary")
+            print(f"mode: {result.mode}")
+            print(f"intended_trades: {len(result.intended_trades)}")
+            print(f"executed_trades: {len(result.executed_trades)}")
+            print(f"unfilled_trades: {len(result.unfilled_trades)}")
+            print(f"total_cost: {result.execution_costs['total_cost']:.2f}")
+            print(f"slippage_estimate: {result.slippage_estimate:.2f}")
+            print(f"final_cash: {result.final_cash:.2f}")
+            print("executed:")
+            for trade in result.executed_trades:
+                print(
+                    f"{trade.side:<4} {trade.symbol:<6} shares={trade.shares} "
+                    f"price={trade.price:.2f} notional={trade.notional:.2f} "
+                    f"cost={trade.total_cost:.2f} batch={trade.batch}"
+                )
+            if result.unfilled_trades:
+                print("unfilled:")
+                for trade in result.unfilled_trades:
+                    print(
+                        f"{trade.side:<4} {trade.symbol:<6} shares={trade.shares} "
+                        f"price={trade.price:.2f} reason={trade.reason}"
+                    )
+            print("final_positions:")
+            for symbol, qty in result.final_positions.items():
+                print(f"{symbol:<6} {qty:.6g}")
+            for warning in result.warnings:
+                print(f"warning: {warning}", file=sys.stderr)
+            print(f"report: {result.report_path}")
+            return 0
+
         if args.command == "backtest":
+            initial_cash = args.initial_cash if args.initial_cash is not None else args.cash
+            if args.symbol is None:
+                result = portfolio_backtest_engine.run(
+                    start=args.start,
+                    end=args.end,
+                    initial_cash=initial_cash,
+                    mode=args.mode,
+                    rebalance_frequency=args.rebalance_frequency,
+                )
+                metrics = result.metrics
+                print("Portfolio Backtest Summary")
+                print(f"period: {result.start} to {result.end}")
+                print(f"mode: {result.mode}")
+                print(f"rebalance_frequency: {result.rebalance_frequency}")
+                print(f"initial_cash: {result.initial_cash:.2f}")
+                print(f"final_value: {metrics.final_value:.2f}")
+                print(f"total_return: {metrics.total_return:.4f}")
+                print(f"annual_return: {metrics.annual_return:.4f}")
+                print(f"max_drawdown: {metrics.max_drawdown:.4f}")
+                print(f"volatility: {metrics.volatility:.4f}")
+                print(f"sharpe_ratio: {metrics.sharpe_ratio:.4f}")
+                print(f"trade_count: {metrics.trade_count}")
+                print(f"turnover: {metrics.turnover:.4f}")
+                print(f"total_cost: {metrics.total_cost:.2f}")
+                print(f"cash_ratio: {metrics.cash_ratio:.4f}")
+                print(f"report: {result.report_path}")
+                return 0
+
             result = backtest_service.run_sma_crossover(
                 symbol=args.symbol,
                 start=args.start,
                 end=args.end,
-                initial_cash=args.cash,
+                initial_cash=initial_cash,
                 short_window=args.short_window,
                 long_window=args.long_window,
                 commission=args.commission,

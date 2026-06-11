@@ -60,6 +60,27 @@
 - Rebalance integration through `--with-costs`.
 - Tests for models, slippage, minimum commission, warnings, and rebalance cost output.
 
+## v0.7.0-backtest-engine
+
+- Daily portfolio backtest engine.
+- Uses stored historical prices only.
+- Integrates optimizer-style targets, rebalance simulation, and Cost Engine estimates.
+- Supports monthly, weekly, and daily rebalance frequencies.
+- Outputs final value, returns, drawdown, volatility, Sharpe ratio, trade count, turnover, total cost, and cash ratio.
+- JSON reports under `reports/`.
+- Tests for completion, metrics, costs, reproducibility, and missing data.
+
+## v0.8.0-execution-simulator
+
+- Execution Simulator module.
+- Immediate, next-day open, TWAP, and partial-fill simulation modes.
+- Rebalance Engine integration for intended trades.
+- Cost Engine integration for every simulated fill.
+- Outputs intended trades, executed trades, unfilled trades, execution costs, slippage estimate, final cash, final positions, and warnings.
+- JSON execution reports under `reports/`.
+- CLI command: `python -m quant.cli execute-sim --targets examples/optimized_targets.json`.
+- Tests for execution modes, partial fills, and cost accounting.
+
 ## Next
 
 - Add richer portfolio reporting.
@@ -71,7 +92,8 @@
 - Add risk checks for max position size, cash usage, and symbol allowlists.
 - Add configurable industry maps and risk score thresholds.
 - Add optimizer modes based on expected returns, volatility budgets, and drawdown constraints.
-- Feed cost estimates into Backtest Engine and future Execution Engine.
+- Add benchmark comparisons and richer backtest attribution.
+- Add richer execution assumptions and market calendar support.
 - Add CSV export for prices, trades, allocation snapshots, and rebalance plans.
 
 ## Later

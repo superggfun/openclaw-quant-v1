@@ -73,9 +73,13 @@ Backtest reports are generated files, not database tables. They are ignored by g
 
 Top-level keys:
 
-- `metrics`: symbol, period, initial cash, final value, return, drawdown, Sharpe ratio, trade count, and win rate.
-- `trades`: deterministic simulated backtest executions.
-- `equity_curve`: daily cash, position, close, and equity values.
+- `start`, `end`: requested backtest period.
+- `initial_cash`: initial simulated cash.
+- `mode`: optimizer mode.
+- `rebalance_frequency`: monthly, weekly, or daily.
+- `metrics`: final value, returns, drawdown, volatility, Sharpe ratio, trade count, turnover, total cost, and cash ratio.
+- `trades`: deterministic simulated backtest executions with costs.
+- `equity_curve`: daily cash, positions, and equity values.
 
 ## reports/rebalance_*.json
 
@@ -140,3 +144,20 @@ Top-level keys:
 - `total_cost`: all estimated costs.
 - `total_cost_ratio`: total cost divided by gross trade value.
 - `warnings`: small trades or poor cost efficiency warnings.
+
+## reports/execution_*.json
+
+Execution simulation reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `mode`: `immediate`, `next_day_open`, `twap`, or `partial_fill`.
+- `target_allocation`: target weights used for rebalance suggestions.
+- `intended_trades`: Rebalance Engine suggestions before execution simulation.
+- `executed_trades`: simulated fills with per-fill costs.
+- `unfilled_trades`: quantities that were not filled and reasons.
+- `execution_costs`: gross value, commission, slippage, total cost, and cost ratio.
+- `slippage_estimate`: total simulated slippage cost.
+- `final_cash`: cash after simulated fills and costs.
+- `final_positions`: simulated ending quantities.
+- `warnings`: non-blocking warnings.
