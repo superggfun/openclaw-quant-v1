@@ -109,6 +109,7 @@ class PortfolioBacktestEngine:
         strategy: str = "portfolio",
         execution_price: str = "close",
         alpha_config: dict | None = None,
+        alpha_pipeline_config: dict | None = None,
     ) -> PortfolioBacktestResult:
         self._validate(start, end, initial_cash, mode, rebalance_frequency, strategy, execution_price)
         if strategy == "alpha":
@@ -120,6 +121,7 @@ class PortfolioBacktestEngine:
                 cost_config=cost_config,
                 execution_price=execution_price,
                 alpha_config=alpha_config or {},
+                alpha_pipeline_config=alpha_pipeline_config,
             )
 
         universe = self._normalize_symbols(symbols or list(DEFAULT_SYMBOLS))
@@ -222,6 +224,7 @@ class PortfolioBacktestEngine:
         cost_config: dict | None,
         execution_price: str,
         alpha_config: dict,
+        alpha_pipeline_config: dict | None = None,
     ) -> PortfolioBacktestResult:
         merged_alpha_config = dict(alpha_config)
         universe = self._normalize_symbols(merged_alpha_config.get("universe") or list(DEFAULT_SYMBOLS))
@@ -277,7 +280,10 @@ class PortfolioBacktestEngine:
                 signal_alpha_config["universe"] = active_symbols
                 signal_alpha_config["as_of_date"] = signal_date
                 try:
-                    alpha_result = alpha_engine.generate(config=signal_alpha_config)
+                    alpha_result = alpha_engine.generate(
+                        config=signal_alpha_config,
+                        pipeline_config=alpha_pipeline_config,
+                    )
                 except ValueError:
                     alpha_result = None
 

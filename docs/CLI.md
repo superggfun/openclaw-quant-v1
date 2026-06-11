@@ -21,6 +21,9 @@ python -m quant.cli factor-eval --factor momentum_20d
 python -m quant.cli factor-eval --factor momentum_20d --pipeline examples/factor_pipeline_config.json
 python -m quant.cli factor-backtest --factor momentum_20d
 python -m quant.cli factor-backtest --factor momentum_20d --pipeline examples/factor_pipeline_config.json
+python -m quant.cli strategy-eval --factor-backtest-report reports/factor_backtest_YYYYMMDD_HHMMSS.json
+python -m quant.cli strategy-eval --strategy factor_long_short --factor momentum_20d
+python -m quant.cli strategy-eval --strategy alpha --pipeline examples/factor_pipeline_config.json
 python -m quant.cli optimize
 python -m quant.cli cost
 python -m quant.cli rebalance --targets examples/optimized_targets.json --with-costs

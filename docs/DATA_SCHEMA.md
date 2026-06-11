@@ -235,6 +235,23 @@ Top-level keys:
 - `periods`: per-signal-date long symbols, short symbols, weights, exposures, quantile returns, long-short return, and turnover.
 - `warnings`: non-blocking data quality warnings.
 
+## reports/strategy_eval_*.json
+
+Strategy evaluation reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `metadata`: creation time, engine name, offline/no-live-trading flags, and source no-lookahead flag.
+- `input_report_paths`: source report paths used for evaluation.
+- `strategy_type`: `factor_backtest` or `backtest`.
+- `evaluation_window`: first and last return observation date.
+- `summary_metrics`: total return, annual return, annual volatility, Sharpe, Sortino, max drawdown, Calmar, hit rate, win/loss ratio, best/worst period, turnover, total cost, cost-to-return ratio, exposure, cash drag, and benchmark metrics when available.
+- `benchmark_metrics`: benchmark symbol, benchmark return, excess return, and information ratio when supplied.
+- `attribution`: return attribution by symbol and side, cost attribution by symbol, turnover attribution by symbol, top positive and negative contributors, return concentration, methodology notes, risk attribution, and drawdown attribution.
+- `robustness_diagnostics`: rolling metrics, monthly returns, yearly returns, and diagnostics keyed by warning code.
+- `warnings`: warning objects with `code` and `reason`.
+- `interpretation_notes`: scope notes for offline interpretation.
+
 ## reports/cost_*.json
 
 Cost reports are generated files, not database tables. They are ignored by git.

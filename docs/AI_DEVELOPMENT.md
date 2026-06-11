@@ -4,7 +4,7 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v1.3.0-factor-research-suite`
+`v1.4.0-strategy-evaluation`
 
 The project currently includes:
 
@@ -15,6 +15,7 @@ The project currently includes:
 - A factor pipeline that preprocesses same-date factor cross-sections before alpha generation or evaluation.
 - A factor evaluation framework that calculates no-lookahead IC, Rank IC, ICIR, quintile, and decay metrics.
 - A long-short factor backtest that checks single-factor return streams without modifying portfolio state.
+- A strategy evaluation layer that explains return, risk, drawdown, rolling metrics, and attribution from generated reports.
 - A minimal SMA crossover backtest engine that uses stored prices.
 - A portfolio rebalance engine that calculates allocation drift and suggested trades.
 - A risk engine that calculates portfolio concentration, cash exposure, Top 5 holdings exposure, and a 0-100 risk score.
@@ -22,7 +23,7 @@ The project currently includes:
 - A cost engine that estimates fixed, linear, combined, and slippage costs for suggested trades.
 - A deterministic daily portfolio backtest engine that combines stored prices, optimizer targets, rebalance logic, and costs.
 - An execution simulator that models intended, executed, and unfilled trades with costs.
-- CLI commands for price updates, price inspection, account initialization, simulated buys and sells, portfolio snapshots, trade history, alpha, factor pipeline, factor evaluation, factor backtest, backtests, allocation, rebalance plans, cost estimates, optimization, risk, and execution simulation.
+- CLI commands for price updates, price inspection, account initialization, simulated buys and sells, portfolio snapshots, trade history, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtests, allocation, rebalance plans, cost estimates, optimization, risk, and execution simulation.
 
 The project intentionally does not include:
 
@@ -52,6 +53,8 @@ The project intentionally does not include:
 - Factor evaluation features must keep factor values and future returns separate: factor values use signal-date-and-earlier data, while returns come from later stored price rows.
 - Factor pipeline features must transform one signal-date cross-section at a time and must not read future prices, future returns, or future metadata.
 - Factor backtest features must remain no-lookahead and must not be described as Strategy Evaluation or Performance Attribution until those modules are explicitly designed.
+- Strategy evaluation features must read or generate supported offline source reports, then explain them without introducing new strategies, modifying portfolio state, or executing trades.
+- Strategy evaluation warning codes are research diagnostics. Do not treat them as automatic trade instructions.
 
 ## Important Files
 
@@ -66,6 +69,7 @@ The project intentionally does not include:
 - `quant/factor_backtest/factor_backtest.py`: pure long-short factor backtest engine.
 - `quant/factor_pipeline/factor_pipeline.py`: pure factor preprocessing pipeline.
 - `quant/factor_eval/factor_evaluation.py`: pure no-lookahead factor evaluation framework.
+- `quant/strategy_eval/strategy_evaluation.py`: pure strategy explanation and attribution engine.
 - `quant/backtest/backtest_engine.py`: deterministic daily portfolio backtest engine.
 - `quant/rebalance/rebalance_engine.py`: pure allocation and rebalance calculation engine.
 - `quant/risk/risk_engine.py`: pure portfolio risk calculation engine.
@@ -73,7 +77,7 @@ The project intentionally does not include:
 - `quant/cost/cost_engine.py`: pure transaction cost estimator.
 - `quant/execution/execution_engine.py`: pure simulated execution engine.
 - `quant/cli.py`: command line interface.
-- `tests/`: pytest coverage for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, backtest, rebalance, optimizer, risk, cost, and execution behavior.
+- `tests/`: pytest coverage for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtest, rebalance, optimizer, risk, cost, and execution behavior.
 
 ## Recommended Workflow
 
@@ -87,8 +91,6 @@ The project intentionally does not include:
 
 ## Boundaries
 
-Future work may add strategy research and OpenClaw integration. Those modules should consume data, alpha targets, factor pipeline reports, factor evaluation reports, factor backtest reports, portfolio state, rebalance plans, risk reports, optimizer targets, cost estimates, and execution simulation reports through service or engine boundaries rather than reaching directly into unrelated internals.
-
-Strategy Evaluation and Performance Attribution are not implemented as of V1.3.
+Future work may add strategy research and OpenClaw integration. Those modules should consume data, alpha targets, factor pipeline reports, factor evaluation reports, factor backtest reports, strategy evaluation reports, portfolio state, rebalance plans, risk reports, optimizer targets, cost estimates, and execution simulation reports through service or engine boundaries rather than reaching directly into unrelated internals.
 
 Broker APIs, credentials, live execution, OpenClaw, Claude, GPT, and automatic trading must stay out of this repo until explicitly requested and designed.

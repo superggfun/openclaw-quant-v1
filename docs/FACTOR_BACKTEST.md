@@ -2,9 +2,9 @@
 
 The Long-Short Factor Backtest checks whether one factor can produce an equal-weight long-short factor spread return stream.
 
-It is not Strategy Evaluation and it is not Performance Attribution. Those are intentionally left for V1.4 or later.
+It is not Strategy Evaluation and it is not Performance Attribution. V1.4 implements those as a separate report-reading module.
 
-It does not explain why returns happened. Attribution, risk contribution, and exposure decomposition are future work.
+It does not explain why returns happened inside the factor backtest itself. Use Strategy Evaluation to explain a generated factor backtest report.
 
 The module does not modify simulated portfolio state, write trades, connect to brokers, call AI models, or execute orders.
 
@@ -118,4 +118,6 @@ Use Factor Evaluation for IC, Rank IC, quintile, and decay diagnostics.
 
 Use Long-Short Factor Backtest to check whether a single factor creates a plausible return stream.
 
-Do not treat this as full strategy evaluation. Portfolio-level strategy evaluation, benchmark comparison, exposure attribution, risk contribution, exposure decomposition, and performance attribution are future work.
+Do not treat this module as full strategy evaluation. Portfolio-level explanation, benchmark comparison, exposure attribution, risk contribution, exposure decomposition, and performance attribution are handled by the separate Strategy Evaluation layer.
+
+Use `docs/STRATEGY_EVALUATION.md` and `python -m quant.cli strategy-eval --factor-backtest-report <factor_backtest_report>` to explain a generated factor backtest report.

@@ -25,6 +25,7 @@ from quant.services.portfolio_service import PortfolioService
 from quant.services.price_service import PriceService
 from quant.storage.portfolio_store import SQLitePortfolioStore
 from quant.storage.sqlite_store import SQLitePriceStore
+from quant.strategy_eval.strategy_evaluation import StrategyEvaluation
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -119,6 +120,16 @@ def build_parser() -> argparse.ArgumentParser:
     factor_pipeline.add_argument("--as-of-date", default=None)
     factor_pipeline.add_argument("--symbols", nargs="+", default=list(DEFAULT_SYMBOLS))
 
+    strategy_eval = subparsers.add_parser("strategy-eval", help="Evaluate and attribute a generated strategy report.")
+    strategy_eval.add_argument("--report", default=None, help="Legacy alias for a source report JSON.")
+    strategy_eval.add_argument("--backtest-report", default=None, help="Path to a portfolio backtest JSON report.")
+    strategy_eval.add_argument("--factor-backtest-report", default=None, help="Path to a factor backtest JSON report.")
+    strategy_eval.add_argument("--strategy", choices=["alpha", "factor_long_short"], default=None)
+    strategy_eval.add_argument("--factor", choices=sorted(SUPPORTED_FACTORS), default="momentum_20d")
+    strategy_eval.add_argument("--pipeline", default=None, help="Optional factor pipeline config JSON.")
+    strategy_eval.add_argument("--benchmark", default=None, help="Optional benchmark symbol, for example SPY.")
+    strategy_eval.add_argument("--output", default=None, help="Optional strategy evaluation report output path.")
+
     cost = subparsers.add_parser("cost", help="Estimate transaction costs for rebalance suggestions.")
     cost.add_argument("--targets", default="examples/optimized_targets.json")
     cost.add_argument("--config", default="examples/cost_config.json")
@@ -175,6 +186,7 @@ def main(argv: list[str] | None = None) -> int:
     alpha_engine = AlphaEngine(price_store)
     factor_evaluation = FactorEvaluation(price_store)
     factor_backtest_engine = FactorBacktest(price_store)
+    strategy_evaluation = StrategyEvaluation()
 
     if args.command == "update-prices":
         results = price_service.update_prices(args.symbols, start=args.start, end=args.end)
@@ -496,6 +508,89 @@ def main(argv: list[str] | None = None) -> int:
             print(f"report: {result.report_path}")
             return 0
 
+        if args.command == "strategy-eval":
+            source_report = _strategy_eval_source_report(
+                args=args,
+                price_store=price_store,
+                factor_backtest_engine=factor_backtest_engine,
+                portfolio_backtest_engine=portfolio_backtest_engine,
+            )
+            benchmark_returns = (
+                _benchmark_returns_for_report(price_store, args.benchmark, Path(source_report))
+                if args.benchmark
+                else None
+            )
+            result = strategy_evaluation.evaluate(
+                source_report,
+                benchmark_returns=benchmark_returns,
+                benchmark_name=args.benchmark,
+                output_path=args.output,
+            )
+            print("Strategy Evaluation Summary")
+            print(f"source_report: {result.source_report}")
+            print(f"strategy_type: {result.strategy_type}")
+            print("summary_metrics:")
+            for key in [
+                "total_return",
+                "annual_return",
+                "annual_volatility",
+                "sharpe_ratio",
+                "sortino_ratio",
+                "max_drawdown",
+                "calmar_ratio",
+                "hit_rate",
+                "win_loss_ratio",
+                "turnover",
+                "total_cost",
+                "cost_to_return_ratio",
+                "gross_exposure",
+                "net_exposure",
+                "cash_drag",
+            ]:
+                print(f"{key}: {_format_optional_number(result.summary_metrics.get(key))}")
+            if result.benchmark_metrics:
+                print("benchmark_metrics:")
+                for key in ["benchmark", "benchmark_return", "excess_return", "information_ratio"]:
+                    value = result.benchmark_metrics.get(key)
+                    print(f"{key}: {value if isinstance(value, str) else _format_optional_number(value)}")
+            print("return_attribution:")
+            for key in ["long_leg_return", "short_leg_return", "long_short_return", "cash_drag", "cost_drag"]:
+                print(f"{key}: {_format_optional_number(result.return_attribution.get(key))}")
+            print("risk_attribution:")
+            for key in ["gross_exposure", "net_exposure", "average_cash", "average_turnover"]:
+                print(f"{key}: {_format_optional_number(result.risk_attribution.get(key))}")
+            concentration = result.risk_attribution.get("concentration", {})
+            if concentration:
+                print(f"largest_position: {concentration.get('largest_position')}")
+                print(f"top_3_weight: {_format_optional_number(concentration.get('top_3_weight'))}")
+                print(f"top_5_weight: {_format_optional_number(concentration.get('top_5_weight'))}")
+            print("drawdown:")
+            print(f"max_drawdown: {_format_optional_number(result.drawdown.get('max_drawdown'))}")
+            print(f"drawdown_start: {result.drawdown.get('drawdown_start')}")
+            print(f"drawdown_end: {result.drawdown.get('drawdown_end')}")
+            print(f"drawdown_duration: {result.drawdown.get('drawdown_duration')}")
+            print("top_contributors:")
+            for row in result.attribution.get("top_positive_contributors", [])[:3]:
+                print(f"{row['symbol']}: {_format_optional_number(row['contribution'])}")
+            print("top_detractors:")
+            for row in result.attribution.get("top_negative_contributors", [])[:3]:
+                print(f"{row['symbol']}: {_format_optional_number(row['contribution'])}")
+            concentration = result.attribution.get("return_concentration", {})
+            if concentration:
+                print("return_concentration:")
+                print(f"top_1_pct: {_format_optional_number(concentration.get('top_1_pct'))}")
+                print(f"top_3_pct: {_format_optional_number(concentration.get('top_3_pct'))}")
+            print("monthly_returns:")
+            for period, value in list(result.monthly_returns.items())[:6]:
+                print(f"{period}: {_format_optional_number(value)}")
+            print("yearly_returns:")
+            for period, value in result.yearly_returns.items():
+                print(f"{period}: {_format_optional_number(value)}")
+            for warning in result.warnings:
+                print(f"warning: {warning['code']}: {warning['reason']}", file=sys.stderr)
+            print(f"report: {result.report_path}")
+            return 0
+
         if args.command == "cost":
             targets = _load_targets(Path(args.targets))
             plan = rebalance_engine.plan(targets)
@@ -601,6 +696,7 @@ def main(argv: list[str] | None = None) -> int:
                     strategy=args.strategy,
                     execution_price=args.execution_price,
                     alpha_config=alpha_config,
+                    alpha_pipeline_config=None,
                 )
                 metrics = result.metrics
                 print("Portfolio Backtest Summary")
@@ -651,6 +747,87 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     raise ValueError(f"Unknown command: {args.command}")
+
+
+def _strategy_eval_source_report(
+    args,
+    price_store: SQLitePriceStore,
+    factor_backtest_engine: FactorBacktest,
+    portfolio_backtest_engine: PortfolioBacktestEngine,
+) -> str:
+    explicit_report = args.factor_backtest_report or args.backtest_report or args.report
+    if explicit_report:
+        return str(explicit_report)
+
+    if args.strategy == "factor_long_short":
+        result = factor_backtest_engine.run(
+            factor=args.factor,
+            pipeline_config=_load_factor_pipeline_config(Path(args.pipeline)) if args.pipeline else None,
+            pipeline_config_path=args.pipeline,
+        )
+        return result.report_path
+
+    if args.strategy == "alpha":
+        alpha_config = _load_alpha_config(Path("examples/alpha_config.json"))
+        result = portfolio_backtest_engine.run(
+            start="2024-01-01",
+            end="2025-01-01",
+            initial_cash=100000.0,
+            mode="equal_weight",
+            rebalance_frequency="monthly",
+            strategy="alpha",
+            execution_price="close",
+            alpha_config=alpha_config,
+            alpha_pipeline_config=_load_factor_pipeline_config(Path(args.pipeline)) if args.pipeline else None,
+        )
+        return result.report_path
+
+    raise ValueError(
+        "strategy-eval requires --report, --backtest-report, --factor-backtest-report, "
+        "or --strategy alpha/factor_long_short"
+    )
+
+
+def _benchmark_returns_for_report(
+    price_store: SQLitePriceStore,
+    benchmark: str,
+    report_path: Path,
+) -> dict[str, float] | None:
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ValueError(f"benchmark source report not found: {report_path}") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"benchmark source report is not valid JSON: {report_path}") from exc
+
+    start, end = _report_date_window(report)
+    history = price_store.get_price_history(benchmark.upper(), start=start, end=end)
+    if history.empty or len(history) < 2:
+        return None
+    history = history.sort_values("date")
+    closes = pd.to_numeric(history["close"], errors="coerce")
+    returns = closes.pct_change()
+    output: dict[str, float] = {}
+    for date_value, value in zip(history["date"], returns, strict=False):
+        if pd.notna(value):
+            output[str(date_value)] = float(value)
+    return output
+
+
+def _report_date_window(report: dict) -> tuple[str | None, str | None]:
+    if "start" in report or "end" in report:
+        return report.get("start"), report.get("end")
+    if "start_date" in report or "end_date" in report:
+        return report.get("start_date"), report.get("end_date")
+    periods = report.get("periods") or []
+    dates = [
+        str(period.get("signal_date"))
+        for period in periods
+        if isinstance(period, dict) and period.get("signal_date")
+    ]
+    if dates:
+        return min(dates), max(dates)
+    return None, None
 
 
 def _format_optional_money(value: float | None) -> str:

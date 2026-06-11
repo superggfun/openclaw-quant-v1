@@ -119,3 +119,9 @@ When `--pipeline` is supplied, `factor_value` contains the cleaned same-date cro
 Symbols with no prices, missing closes, insufficient lookback history, zero volatility, or no valid future-return window are excluded from the evaluation sample and reported with a reason.
 
 Single-symbol evaluations can produce factor observations and quintile data, but IC and Rank IC require at least two symbols on a signal date.
+
+## Relationship To Strategy Evaluation
+
+Factor Evaluation measures predictive quality with IC, Rank IC, quintiles, and decay. It does not explain portfolio returns or risk.
+
+Use `python -m quant.cli factor-backtest --factor <factor>` to create a factor spread return stream, then use `python -m quant.cli strategy-eval --factor-backtest-report <report>` for V1.4 performance attribution and robustness diagnostics.

@@ -1,12 +1,12 @@
 # openclaw-quant-v1
 
-`openclaw-quant-v1` is an early OpenClaw-oriented quant system skeleton. It currently includes a market data layer, a simulated portfolio state module, an alpha engine, a factor pipeline, a factor evaluation framework, a long-short factor backtest, a portfolio backtest engine, a portfolio rebalance engine, a risk engine, a portfolio optimizer, a cost engine, and an execution simulator. It does not make AI decisions, place live orders, connect to brokers, or perform automated trading.
+`openclaw-quant-v1` is an early OpenClaw-oriented quant system skeleton. It currently includes a market data layer, a simulated portfolio state module, an alpha engine, a factor pipeline, a factor evaluation framework, a long-short factor backtest, a strategy evaluation layer, a portfolio backtest engine, a portfolio rebalance engine, a risk engine, a portfolio optimizer, a cost engine, and an execution simulator. It does not make AI decisions, place live orders, connect to brokers, or perform automated trading.
 
 This project is for research and simulation only. It is not investment advice.
 
 ## Current Version
 
-`v1.3.0-factor-research-suite`
+`v1.4.0-strategy-evaluation`
 
 This release includes:
 
@@ -18,14 +18,15 @@ This release includes:
 - Reusable factor preprocessing pipeline for cleaning and neutralization.
 - No-lookahead factor evaluation with IC, Rank IC, ICIR, quintile, and decay metrics.
 - No-lookahead long-short factor backtest for single-factor profitability checks.
+- Strategy evaluation and performance attribution from generated reports.
 - Daily portfolio backtest engine using stored prices, optimizer targets, rebalance logic, and costs.
 - Portfolio allocation and rebalance calculation engine.
 - Portfolio risk metrics and risk score.
 - Portfolio optimizer that generates target allocations.
 - Transaction cost estimation for rebalance suggestions.
 - Simulated execution of rebalance suggestions with immediate, next-day open, TWAP, and partial-fill modes.
-- JSON research, factor pipeline, factor evaluation, factor backtest, rebalance, cost, backtest, and execution reports under `reports/`.
-- CLI commands for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, backtest, allocation, rebalance, risk, optimizer, cost, and execution workflows.
+- JSON research, factor pipeline, factor evaluation, factor backtest, strategy evaluation, rebalance, cost, backtest, and execution reports under `reports/`.
+- CLI commands for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtest, allocation, rebalance, risk, optimizer, cost, and execution workflows.
 - pytest coverage for core state transitions.
 
 ## Scope
@@ -94,6 +95,7 @@ Key modules:
 - `quant/factor_backtest/factor_backtest.py`: long-short factor return backtest.
 - `quant/factor_pipeline/factor_pipeline.py`: factor preprocessing, standardization, and neutralization.
 - `quant/factor_eval/factor_evaluation.py`: no-lookahead factor evaluation metrics.
+- `quant/strategy_eval/strategy_evaluation.py`: strategy evaluation and attribution from generated reports.
 - `quant/services/price_service.py`: price update orchestration.
 - `quant/services/portfolio_service.py`: simulated portfolio rules and valuation.
 - `quant/services/backtest_service.py`: SMA crossover backtest engine.
@@ -342,7 +344,7 @@ See `docs/FACTOR_EVALUATION.md` for details.
 
 The long-short factor backtest checks whether one factor can produce a plausible equal-weight long-short return stream.
 
-It is not Strategy Evaluation and not Performance Attribution. Those are future roadmap items.
+It is not Strategy Evaluation and not Performance Attribution. V1.4 adds that as a separate report-reading layer.
 
 Run:
 
@@ -358,6 +360,27 @@ reports/factor_backtest_YYYYMMDD_HHMMSS.json
 ```
 
 See `docs/FACTOR_BACKTEST.md` for details.
+
+## Strategy Evaluation
+
+Strategy Evaluation explains return and risk from existing generated reports.
+
+Run:
+
+```bash
+python -m quant.cli strategy-eval --factor-backtest-report reports/factor_backtest_YYYYMMDD_HHMMSS.json
+python -m quant.cli strategy-eval --backtest-report reports/backtest_YYYYMMDD_HHMMSS.json
+python -m quant.cli strategy-eval --strategy factor_long_short --factor momentum_20d
+python -m quant.cli strategy-eval --strategy alpha --pipeline examples/factor_pipeline_config.json
+```
+
+Reports:
+
+```text
+reports/strategy_eval_YYYYMMDD_HHMMSS.json
+```
+
+See `docs/STRATEGY_EVALUATION.md` for details.
 
 ## Cost Engine
 
@@ -476,6 +499,7 @@ export OPENCLAW_QUANT_DB_PATH=/tmp/openclaw-quant.db
 - `reports/factor_pipeline_*.json`: generated factor pipeline reports, ignored by git
 - `reports/factor_eval_*.json`: generated factor evaluation reports, ignored by git
 - `reports/factor_backtest_*.json`: generated long-short factor backtest reports, ignored by git
+- `reports/strategy_eval_*.json`: generated strategy evaluation reports, ignored by git
 - `reports/optimize_*.json`: generated optimizer reports, ignored by git
 - `reports/cost_*.json`: generated cost reports, ignored by git
 - `reports/execution_*.json`: generated execution simulation reports, ignored by git
@@ -494,7 +518,7 @@ Near-term work:
 - Add more alpha factors and signal combination rules.
 - Add richer factor evaluation diagnostics and benchmark comparisons.
 - Add richer neutralization methods and factor pipeline audit views.
-- Add Strategy Evaluation / Performance Attribution in V1.4 or later.
+- Add execution report and portfolio report adapters for Strategy Evaluation.
 - Add richer execution assumptions and market calendar support.
 
 Out of scope until explicitly designed:
@@ -522,6 +546,7 @@ Important docs:
 - `docs/FACTOR_PIPELINE.md`
 - `docs/FACTOR_EVALUATION.md`
 - `docs/FACTOR_BACKTEST.md`
+- `docs/STRATEGY_EVALUATION.md`
 - `docs/OPTIMIZER.md`
 - `docs/COST.md`
 - `docs/EXECUTION.md`

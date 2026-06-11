@@ -95,3 +95,11 @@ The V1.2 factor pipeline receives factor values already calculated for one signa
 ## 2026-06-11: Long-Short Factor Backtest Is Not Strategy Attribution
 
 The V1.3 factor backtest checks whether one factor can produce an equal-weight long-short return stream. It does not update portfolio state and does not implement Strategy Evaluation or Performance Attribution, which remain future work.
+
+## 2026-06-11: Strategy Evaluation Reads Reports
+
+The V1.4 strategy evaluation layer explains returns and risk from supported generated reports. The CLI may generate an alpha or factor long-short source report before evaluation, but the evaluation layer itself does not recalculate alpha signals, introduce new strategies, modify portfolio state, or execute trades.
+
+## 2026-06-11: Strategy Diagnostics Are Warnings
+
+Robustness diagnostics such as high turnover, high cost drag, symbol concentration, benchmark underperformance, or unstable Sharpe are emitted as warning codes for research review. They are not trade signals and they do not alter backtest, factor backtest, rebalance, or portfolio state semantics.

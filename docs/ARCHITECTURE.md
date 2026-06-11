@@ -24,6 +24,7 @@ SQLite / External APIs
 - `quant.factor_backtest.factor_backtest`: Runs no-lookahead equal-weight long-short factor return backtests.
 - `quant.factor_pipeline.factor_pipeline`: Preprocesses same-date factor cross-sections before alpha generation or evaluation.
 - `quant.factor_eval.factor_evaluation`: Evaluates factor predictive quality with no-lookahead IC, Rank IC, quintile, and decay metrics.
+- `quant.strategy_eval.strategy_evaluation`: Explains returns, risk, drawdowns, rolling metrics, and attribution from generated reports.
 - `quant.backtest.backtest_engine`: Runs daily portfolio backtests from stored prices, optimizer targets, rebalance logic, and costs.
 - `quant.rebalance.rebalance_engine`: Calculates current allocation and rebalance suggestions from account, position, and price state.
 - `quant.risk.risk_engine`: Calculates portfolio concentration, cash, Top 5, industry, and risk score metrics.
@@ -120,6 +121,14 @@ CLI factor-backtest -> FactorBacktest -> optional FactorPipeline -> SQLitePriceS
 
 The long-short factor backtest is side-effect free for portfolio state. It ranks each signal-date cross-section, longs the configured top quantile, shorts the configured bottom quantile, and measures factor returns only.
 
+Strategy evaluation flow:
+
+```text
+CLI strategy-eval -> StrategyEvaluation -> reports/factor_backtest_*.json or reports/backtest_*.json -> reports/strategy_eval_*.json
+```
+
+The CLI may optionally generate a fresh alpha backtest or factor long-short source report first. StrategyEvaluation itself remains side-effect free for portfolio state: it reads supported reports and explains return contribution, cost attribution, turnover attribution, risk attribution, benchmark-relative results, robustness warnings, drawdowns, rolling metrics, and monthly/yearly performance.
+
 Cost flow:
 
 ```text
@@ -163,6 +172,7 @@ The execution simulator is side-effect free for portfolio state. It models fills
 - `quant/factor_backtest`: stable single-factor long-short return research boundary.
 - `quant/factor_pipeline`: stable factor preprocessing boundary for future alpha and evaluation callers.
 - `quant/factor_eval`: stable research diagnostics boundary for future factor and alpha research callers.
+- `quant/strategy_eval`: stable report explanation and attribution boundary.
 - `quant/rebalance`: stable calculation boundary for future Risk Engine, OpenClaw, and AI research callers.
 - `quant/risk`: stable calculation boundary for future OpenClaw Risk Agent callers.
 - `quant/optimizer`: stable target-allocation boundary for future research and OpenClaw callers.

@@ -37,6 +37,8 @@ python -m quant.cli alpha --pipeline examples/factor_pipeline_config.json
 python -m quant.cli factor-pipeline --factor momentum_20d
 python -m quant.cli factor-eval --factor momentum_20d
 python -m quant.cli factor-backtest --factor momentum_20d
+python -m quant.cli strategy-eval --factor-backtest-report reports/factor_backtest_YYYYMMDD_HHMMSS.json
+python -m quant.cli strategy-eval --strategy factor_long_short --factor momentum_20d
 python -m quant.cli optimize
 python -m quant.cli cost
 python -m quant.cli execute-sim --targets examples/optimized_targets.json
@@ -116,7 +118,20 @@ python -m quant.cli factor-backtest --factor risk_adjusted_momentum --start 2024
 
 The factor-backtest command ranks each no-lookahead signal-date cross-section, longs the configured top quantile, shorts the configured bottom quantile, and prints long-short return metrics. It writes `reports/factor_backtest_*.json` and does not modify portfolio state.
 
-This is not Strategy Evaluation or Performance Attribution.
+This is not Strategy Evaluation or Performance Attribution. V1.4 adds those as a separate report-reading layer.
+
+## Strategy Evaluation
+
+```bash
+python -m quant.cli strategy-eval --factor-backtest-report reports/factor_backtest_YYYYMMDD_HHMMSS.json
+python -m quant.cli strategy-eval --backtest-report reports/backtest_YYYYMMDD_HHMMSS.json
+python -m quant.cli strategy-eval --strategy factor_long_short --factor momentum_20d
+python -m quant.cli strategy-eval --strategy factor_long_short --factor momentum_20d --pipeline examples/factor_pipeline_config.json
+python -m quant.cli strategy-eval --strategy alpha --pipeline examples/factor_pipeline_config.json
+python -m quant.cli strategy-eval --factor-backtest-report reports/factor_backtest_YYYYMMDD_HHMMSS.json --benchmark SPY
+```
+
+The strategy-eval command reads or generates a supported source report, then explains return, risk, attribution, robustness diagnostics, drawdown, rolling metrics, monthly performance, and yearly performance. It writes `reports/strategy_eval_*.json` and does not introduce new signals, modify portfolio state, or execute trades.
 
 ## Optimize
 
@@ -204,6 +219,7 @@ The alpha strategy path records `signal_date` and `execution_date` and executes 
 - Factor pipeline requires stored price history for symbols whose raw factor values should be calculated.
 - Factor evaluation requires enough stored price history and future-return windows for at least one symbol.
 - Factor backtest requires enough stored price history and future-return windows for at least one long-short cross-section.
+- Strategy evaluation requires a supported JSON report path or `--strategy alpha/factor_long_short`.
 - Optimize requires at least one symbol in the optimizer universe with stored price data.
 - Cost requires a target allocation that can produce rebalance suggestions.
 - Execution simulation requires an initialized account, target allocation, and latest prices for target and held symbols.

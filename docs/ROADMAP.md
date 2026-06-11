@@ -137,6 +137,17 @@
 
 Strategy Evaluation / Performance Attribution is not implemented in V1.3. It is intentionally left for V1.4 or later.
 
+## v1.4.0-strategy-evaluation
+
+- Strategy Evaluation module.
+- Reads factor backtest and portfolio backtest reports.
+- Can generate a fresh `factor_long_short` or `alpha` source report before evaluating it.
+- Outputs summary metrics, benchmark metrics, return attribution, cost attribution, turnover attribution, return concentration, risk attribution, drawdown attribution, rolling metrics, monthly returns, and yearly returns.
+- Emits robustness warnings for low observation count, high turnover, high cost drag, negative compounded return with positive arithmetic Sharpe, large drawdown, benchmark underperformance, symbol concentration, long/short imbalance, and missing no-lookahead metadata.
+- JSON strategy evaluation reports under `reports/`.
+- CLI commands include `python -m quant.cli strategy-eval --factor-backtest-report reports/factor_backtest_*.json` and `python -m quant.cli strategy-eval --strategy factor_long_short --factor momentum_20d`.
+- Tests for summary metrics, Sortino, Calmar, benchmark information ratio, return attribution, cost attribution, concentration diagnostics, high turnover/cost warnings, benchmark warnings, no-lookahead compatibility, factor backtest compatibility, and backtest compatibility.
+
 ## Next
 
 - Add richer portfolio reporting.
@@ -152,7 +163,7 @@ Strategy Evaluation / Performance Attribution is not implemented in V1.3. It is 
 - Add alpha factor normalization, factor blending, and signal stability checks.
 - Add factor turnover, coverage, stability, and per-sector diagnostics.
 - Add regression-based beta neutralization once benchmark return inputs are explicitly modeled.
-- Add Strategy Evaluation / Performance Attribution in V1.4 or later.
+- Add execution report and portfolio report adapters for Strategy Evaluation.
 - Add richer execution assumptions and market calendar support.
 - Add CSV export for prices, trades, allocation snapshots, and rebalance plans.
 
