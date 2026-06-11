@@ -1,12 +1,12 @@
 # openclaw-quant-v1
 
-`openclaw-quant-v1` is an early OpenClaw-oriented quant system skeleton. It currently includes a market data layer, a simulated portfolio state module, a minimal backtest engine, a portfolio rebalance engine, and a risk engine. It does not make AI decisions, place live orders, connect to brokers, or perform automated trading.
+`openclaw-quant-v1` is an early OpenClaw-oriented quant system skeleton. It currently includes a market data layer, a simulated portfolio state module, a minimal backtest engine, a portfolio rebalance engine, a risk engine, and a portfolio optimizer. It does not make AI decisions, place live orders, connect to brokers, or perform automated trading.
 
 This project is for research and simulation only. It is not investment advice.
 
 ## Current Version
 
-`v0.4.0-risk-engine`
+`v0.5.0-portfolio-optimizer`
 
 This release includes:
 
@@ -17,6 +17,7 @@ This release includes:
 - SMA crossover backtest engine using stored prices.
 - Portfolio allocation and rebalance calculation engine.
 - Portfolio risk metrics and risk score.
+- Portfolio optimizer that generates target allocations.
 - JSON backtest and rebalance reports under `reports/`.
 - CLI commands for data, portfolio, backtest, allocation, and rebalance workflows.
 - pytest coverage for core state transitions.
@@ -80,6 +81,7 @@ Key modules:
 - `quant/services/backtest_service.py`: SMA crossover backtest engine.
 - `quant/rebalance/rebalance_engine.py`: allocation and rebalance calculations.
 - `quant/risk/risk_engine.py`: concentration, cash, Top 5, and risk score calculations.
+- `quant/optimizer/optimizer_engine.py`: target allocation generation for rebalance.
 - `quant/storage/sqlite_store.py`: price persistence.
 - `quant/storage/portfolio_store.py`: account, position, and trade persistence.
 - `quant/data_source/yfinance_client.py`: yfinance adapter.
@@ -182,6 +184,39 @@ reports/risk_YYYYMMDD_HHMMSS.json
 
 The Risk Engine is a pure calculation source for future OpenClaw Risk Agent work. It does not call OpenClaw or any AI model.
 
+## Portfolio Optimizer
+
+The optimizer generates target allocations that can be passed directly to the Rebalance Engine.
+
+Supported modes:
+
+- `equal_weight`
+- `risk_adjusted`
+- `constrained`
+
+Default constraints:
+
+- `max_position_weight`: `0.20`
+- `min_cash_weight`: `0.10`
+- `max_sector_weight`: `0.50`
+- `only_long`: `true`
+
+Run:
+
+```bash
+python -m quant.cli optimize
+python -m quant.cli rebalance --targets examples/optimized_targets.json
+```
+
+The optimize command reads `examples/optimizer_config.json` by default and writes:
+
+```text
+examples/optimized_targets.json
+reports/optimize_YYYYMMDD_HHMMSS.json
+```
+
+See `docs/OPTIMIZER.md` for details.
+
 ## Backtest Engine
 
 The backtest engine reads historical prices from the existing `prices` table. It does not download data. Load price data first with `update-prices`.
@@ -241,6 +276,7 @@ export OPENCLAW_QUANT_DB_PATH=/tmp/openclaw-quant.db
 - `reports/backtest_*.json`: generated backtest reports, ignored by git
 - `reports/rebalance_*.json`: generated rebalance reports, ignored by git
 - `reports/risk_*.json`: generated risk reports, ignored by git
+- `reports/optimize_*.json`: generated optimizer reports, ignored by git
 
 ## Roadmap
 
@@ -252,6 +288,7 @@ Near-term work:
 - Add more backtest strategies and benchmark comparisons.
 - Add risk checks for max position size, cash usage, symbol allowlists, and rebalance suggestions.
 - Add configurable sector maps and risk thresholds.
+- Add optimizer modes that use return estimates and risk budgets.
 
 Out of scope until explicitly designed:
 
@@ -274,6 +311,8 @@ Important docs:
 - `docs/DATA_SCHEMA.md`
 - `docs/REBALANCE.md`
 - `docs/RISK.md`
+- `docs/OPTIMIZER.md`
+- `docs/CLI.md`
 - `docs/CLI_COMMANDS.md`
 - `docs/DECISIONS.md`
 

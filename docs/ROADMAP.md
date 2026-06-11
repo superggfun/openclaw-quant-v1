@@ -39,6 +39,17 @@
 - CLI command: `python -m quant.cli risk`.
 - Tests for metrics, industry aggregation, cash-only accounts, unknown industries, and rebalance allocation integration.
 
+## v0.5.0-portfolio-optimizer
+
+- Portfolio Optimizer module.
+- Equal-weight target generation.
+- Risk-adjusted target generation from stored price volatility.
+- Constrained target generation with position, cash, sector, long-only, and total weight rules.
+- Optimized targets written to `examples/optimized_targets.json`.
+- JSON optimizer reports under `reports/`.
+- CLI command: `python -m quant.cli optimize`.
+- Tests for optimizer modes, constraints, rebalance compatibility, and missing price data.
+
 ## Next
 
 - Add richer portfolio reporting.
@@ -49,6 +60,7 @@
 - Add Rebalance Engine constraints for minimum trade size, max position size, and cash buffers.
 - Add risk checks for max position size, cash usage, and symbol allowlists.
 - Add configurable industry maps and risk score thresholds.
+- Add optimizer modes based on expected returns, volatility budgets, and drawdown constraints.
 - Add CSV export for prices, trades, allocation snapshots, and rebalance plans.
 
 ## Later

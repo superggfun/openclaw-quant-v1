@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from quant.config import DB_PATH, DEFAULT_SYMBOLS
+from quant.optimizer.optimizer_engine import DEFAULT_CONSTRAINTS, OptimizerEngine
 from quant.rebalance.rebalance_engine import DEFAULT_COMMISSION_RATE, RebalanceEngine
 from quant.risk.risk_engine import RiskEngine
 from quant.services.backtest_service import BacktestService
@@ -70,6 +71,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("risk", help="Calculate portfolio risk metrics.")
 
+    optimize = subparsers.add_parser("optimize", help="Generate an optimized target allocation.")
+    optimize.add_argument("--config", default="examples/optimizer_config.json")
+    optimize.add_argument("--mode", choices=["equal_weight", "risk_adjusted", "constrained"], default=None)
+    optimize.add_argument("--output-targets", default=None)
+    optimize.add_argument("--max-position-weight", type=float, default=None)
+    optimize.add_argument("--min-cash-weight", type=float, default=None)
+    optimize.add_argument("--max-sector-weight", type=float, default=None)
+
     backtest = subparsers.add_parser("backtest", help="Run an SMA crossover backtest.")
     backtest.add_argument("--symbol", required=True)
     backtest.add_argument("--start", required=True, help="Inclusive start date YYYY-MM-DD.")
@@ -92,6 +101,7 @@ def main(argv: list[str] | None = None) -> int:
     backtest_service = BacktestService(price_store)
     rebalance_engine = RebalanceEngine(portfolio_store)
     risk_engine = RiskEngine(portfolio_store)
+    optimizer_engine = OptimizerEngine(price_store, portfolio_store)
 
     if args.command == "update-prices":
         results = price_service.update_prices(args.symbols, start=args.start, end=args.end)
@@ -244,6 +254,38 @@ def main(argv: list[str] | None = None) -> int:
             print(f"report: {report.report_path}")
             return 0
 
+        if args.command == "optimize":
+            config = _load_optimizer_config(Path(args.config))
+            mode = args.mode or config.get("mode", "equal_weight")
+            constraints = dict(DEFAULT_CONSTRAINTS)
+            constraints.update(config.get("constraints", {}))
+            if args.max_position_weight is not None:
+                constraints["max_position_weight"] = args.max_position_weight
+            if args.min_cash_weight is not None:
+                constraints["min_cash_weight"] = args.min_cash_weight
+            if args.max_sector_weight is not None:
+                constraints["max_sector_weight"] = args.max_sector_weight
+
+            targets_path = args.output_targets or config.get("output_targets", "examples/optimized_targets.json")
+            result = optimizer_engine.optimize(
+                mode=mode,
+                symbols=config.get("symbols"),
+                constraints=constraints,
+                targets_path=targets_path,
+            )
+            print("Optimizer Summary")
+            print(f"mode: {result.mode}")
+            print(f"risk_score_before: {result.risk_score_before:.2f}")
+            print(f"estimated_risk_score_after: {result.estimated_risk_score_after:.2f}")
+            print("optimized_allocation:")
+            for symbol, weight in result.optimized_allocation.items():
+                print(f"{symbol:<6} {weight * 100:>8.2f}%")
+            for warning in result.warnings:
+                print(f"warning: {warning}", file=sys.stderr)
+            print(f"targets: {result.targets_path}")
+            print(f"report: {result.report_path}")
+            return 0
+
         if args.command == "backtest":
             result = backtest_service.run_sma_crossover(
                 symbol=args.symbol,
@@ -290,6 +332,21 @@ def _load_targets(path: Path) -> dict:
     if not isinstance(targets, dict):
         raise ValueError("targets file must contain a JSON object")
     return targets
+
+
+def _load_optimizer_config(path: Path) -> dict:
+    if not path.exists():
+        return {}
+
+    try:
+        with path.open("r", encoding="utf-8") as file:
+            config = json.load(file)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"optimizer config is not valid JSON: {path}") from exc
+
+    if not isinstance(config, dict):
+        raise ValueError("optimizer config must contain a JSON object")
+    return config
 
 
 if __name__ == "__main__":

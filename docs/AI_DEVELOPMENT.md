@@ -4,7 +4,7 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v0.4.0-risk-engine`
+`v0.5.0-portfolio-optimizer`
 
 The project currently includes:
 
@@ -14,6 +14,7 @@ The project currently includes:
 - A minimal SMA crossover backtest engine that uses stored prices.
 - A portfolio rebalance engine that calculates allocation drift and suggested trades.
 - A risk engine that calculates portfolio concentration, cash exposure, Top 5 holdings exposure, and a 0-100 risk score.
+- A portfolio optimizer that generates target allocations for the Rebalance Engine.
 - CLI commands for price updates, price inspection, account initialization, simulated buys and sells, portfolio snapshots, trade history, backtests, allocation, and rebalance plans.
 
 The project intentionally does not include:
@@ -51,6 +52,7 @@ The project intentionally does not include:
 - `quant/services/backtest_service.py`: SMA crossover backtest engine and metrics.
 - `quant/rebalance/rebalance_engine.py`: pure allocation and rebalance calculation engine.
 - `quant/risk/risk_engine.py`: pure portfolio risk calculation engine.
+- `quant/optimizer/optimizer_engine.py`: pure target allocation optimizer.
 - `quant/cli.py`: command line interface.
 - `tests/`: pytest coverage for data, portfolio, backtest, and rebalance behavior.
 

@@ -22,6 +22,7 @@ SQLite / External APIs
 - `quant.services.backtest_service`: Runs SMA crossover backtests from stored prices and writes JSON reports.
 - `quant.rebalance.rebalance_engine`: Calculates current allocation and rebalance suggestions from account, position, and price state.
 - `quant.risk.risk_engine`: Calculates portfolio concentration, cash, Top 5, industry, and risk score metrics.
+- `quant.optimizer.optimizer_engine`: Generates target allocations for the Rebalance Engine.
 - `quant.storage.sqlite_store`: Owns the `prices` table.
 - `quant.storage.portfolio_store`: Owns `accounts`, `positions`, and `trades`.
 - `quant.data_source.yfinance_client`: Wraps yfinance and normalizes downloaded prices.
@@ -70,6 +71,14 @@ CLI risk -> RiskEngine -> RebalanceEngine allocation -> SQLitePortfolioStore -> 
 
 The risk engine is side-effect free for portfolio state. It is designed as a stable data source for future OpenClaw Risk Agent work.
 
+Optimizer flow:
+
+```text
+CLI optimize -> OptimizerEngine -> prices + allocation + risk -> examples/optimized_targets.json -> reports/optimize_*.json
+```
+
+The optimizer is side-effect free for portfolio state. It generates target allocations, not trades.
+
 ## Extension Points
 
 - `quant/backtesting`: future historical simulation module.
@@ -78,3 +87,4 @@ The risk engine is side-effect free for portfolio state. It is designed as a sta
 - `quant/portfolio`: reserved for domain objects if the portfolio module grows beyond services and storage.
 - `quant/rebalance`: stable calculation boundary for future Risk Engine, OpenClaw, and AI research callers.
 - `quant/risk`: stable calculation boundary for future OpenClaw Risk Agent callers.
+- `quant/optimizer`: stable target-allocation boundary for future research and OpenClaw callers.

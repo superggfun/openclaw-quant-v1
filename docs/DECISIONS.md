@@ -47,3 +47,11 @@ The V0.4 risk engine reuses the Rebalance Engine allocation source so portfolio 
 ## 2026-06-11: Risk Score Is Deterministic
 
 Risk score is a deterministic 0-100 heuristic based on single-stock concentration, industry concentration, Top 5 holdings concentration, and cash exposure. It is not an AI judgment and is not investment advice.
+
+## 2026-06-11: Optimizer Generates Targets, Not Trades
+
+The V0.5 optimizer produces target allocations only. Rebalance Engine remains responsible for turning targets into buy and sell suggestions.
+
+## 2026-06-11: Optimizer Avoids Heavy Math Dependencies
+
+V0.5 uses deterministic rules for equal-weight, risk-adjusted, and constrained target generation. It does not introduce complex optimization libraries yet.

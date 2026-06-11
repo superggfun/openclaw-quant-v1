@@ -107,3 +107,19 @@ Top-level keys:
 - `holdings`: per-symbol value, weight, and industry.
 - `industries`: per-industry value and weight.
 - `warnings`: non-blocking warnings such as unknown industry mapping.
+
+## reports/optimize_*.json
+
+Optimizer reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `mode`: optimizer mode.
+- `current_allocation`: current cash and holding weights.
+- `optimized_allocation`: target weights compatible with `rebalance --targets`.
+- `constraints`: constraints used by the optimizer.
+- `warnings`: skipped symbols or constraint adjustments.
+- `risk_score_before`: current Risk Engine score.
+- `estimated_risk_score_after`: estimated score using optimized target weights.
+- `rationale`: human-readable explanation of the optimizer path.
+- `targets_path`: target allocation JSON path.

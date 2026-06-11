@@ -32,6 +32,7 @@ python -m quant.cli trades
 python -m quant.cli allocation
 python -m quant.cli rebalance --targets examples/targets.json
 python -m quant.cli risk
+python -m quant.cli optimize
 ```
 
 ## Rebalance
@@ -65,6 +66,17 @@ python -m quant.cli risk
 
 The risk command calculates concentration, cash exposure, Top 5 holdings concentration, industry concentration, and a 0-100 risk score. It writes a JSON report and does not modify the simulated account.
 
+## Optimize
+
+```bash
+python -m quant.cli optimize
+python -m quant.cli optimize --mode risk_adjusted
+python -m quant.cli optimize --mode constrained --max-position-weight 0.15
+python -m quant.cli rebalance --targets examples/optimized_targets.json
+```
+
+The optimize command reads `examples/optimizer_config.json` by default, writes `examples/optimized_targets.json`, and writes a JSON report. It does not modify the simulated account.
+
 ## Backtest
 
 Backtests use existing rows in the `prices` table. Load prices first:
@@ -97,3 +109,4 @@ python -m quant.cli backtest \
 - Rebalance rejects target weights that do not sum to `1.0`.
 - Rebalance requires latest prices for target symbols and held symbols.
 - Risk requires latest prices for held symbols.
+- Optimize requires at least one symbol in the optimizer universe with stored price data.

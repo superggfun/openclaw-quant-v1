@@ -1,0 +1,24 @@
+{
+  "mode": "equal_weight",
+  "symbols": [
+    "SPY",
+    "QQQ",
+    "NVDA",
+    "AAPL",
+    "MSFT",
+    "TSLA",
+    "AMD",
+    "META",
+    "GOOGL",
+    "TLT",
+    "GLD"
+  ],
+  "constraints": {
+    "max_position_weight": 0.2,
+    "min_cash_weight": 0.1,
+    "max_sector_weight": 0.5,
+    "only_long": true
+  },
+  "output_targets": "examples/optimized_targets.json"
+}
+
