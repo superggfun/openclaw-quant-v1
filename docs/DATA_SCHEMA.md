@@ -67,3 +67,12 @@ Columns:
 - `amount`: `qty * price`.
 - `created_at`: trade timestamp.
 
+## reports/backtest_*.json
+
+Backtest reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `metrics`: symbol, period, initial cash, final value, return, drawdown, Sharpe ratio, trade count, and win rate.
+- `trades`: deterministic simulated backtest executions.
+- `equity_curve`: daily cash, position, close, and equity values.

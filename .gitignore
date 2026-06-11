@@ -5,3 +5,4 @@ __pycache__/
 data/quant.db
 data/*.db
 data/*.db-*
+reports/*.json

@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from quant.config import DB_PATH, DEFAULT_SYMBOLS
+from quant.services.backtest_service import BacktestService
 from quant.services.portfolio_service import PortfolioService
 from quant.services.price_service import PriceService
 from quant.storage.portfolio_store import SQLitePortfolioStore
@@ -58,14 +59,25 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("portfolio", help="Show simulated portfolio state.")
     subparsers.add_parser("trades", help="Show simulated trade history.")
 
+    backtest = subparsers.add_parser("backtest", help="Run an SMA crossover backtest.")
+    backtest.add_argument("--symbol", required=True)
+    backtest.add_argument("--start", required=True, help="Inclusive start date YYYY-MM-DD.")
+    backtest.add_argument("--end", required=True, help="Inclusive end date YYYY-MM-DD.")
+    backtest.add_argument("--cash", type=float, default=100000.0)
+    backtest.add_argument("--short-window", type=int, default=20)
+    backtest.add_argument("--long-window", type=int, default=50)
+    backtest.add_argument("--commission", type=float, default=0.0)
+
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     db_path = Path(args.db_path)
-    price_service = PriceService(SQLitePriceStore(db_path))
+    price_store = SQLitePriceStore(db_path)
+    price_service = PriceService(price_store)
     portfolio_service = PortfolioService(SQLitePortfolioStore(db_path))
+    backtest_service = BacktestService(price_store)
 
     if args.command == "update-prices":
         results = price_service.update_prices(args.symbols, start=args.start, end=args.end)
@@ -147,6 +159,30 @@ def main(argv: list[str] | None = None) -> int:
                     f"{row['qty']:>10.6g} {row['price']:>10.2f} "
                     f"{row['amount']:>10.2f} {row['created_at']}"
                 )
+            return 0
+
+        if args.command == "backtest":
+            result = backtest_service.run_sma_crossover(
+                symbol=args.symbol,
+                start=args.start,
+                end=args.end,
+                initial_cash=args.cash,
+                short_window=args.short_window,
+                long_window=args.long_window,
+                commission=args.commission,
+            )
+            metrics = result.metrics
+            print("Backtest Summary")
+            print(f"symbol: {metrics.symbol}")
+            print(f"period: {metrics.start} to {metrics.end}")
+            print(f"initial_cash: {metrics.initial_cash:.2f}")
+            print(f"final_value: {metrics.final_value:.2f}")
+            print(f"total_return_pct: {metrics.total_return_pct:.2f}")
+            print(f"max_drawdown_pct: {metrics.max_drawdown_pct:.2f}")
+            print(f"sharpe_ratio: {metrics.sharpe_ratio:.4f}")
+            print(f"number_of_trades: {metrics.number_of_trades}")
+            print(f"win_rate_pct: {metrics.win_rate_pct:.2f}")
+            print(f"report: {result.report_path}")
             return 0
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)

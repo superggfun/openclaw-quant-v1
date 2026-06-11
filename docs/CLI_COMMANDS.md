@@ -31,9 +31,32 @@ python -m quant.cli portfolio
 python -m quant.cli trades
 ```
 
+## Backtest
+
+Backtests use existing rows in the `prices` table. Load prices first:
+
+```bash
+python -m quant.cli update-prices --symbols SPY --start 2023-01-01 --end 2024-12-31
+python -m quant.cli backtest --symbol SPY --start 2023-01-01 --end 2024-12-31
+```
+
+Optional parameters:
+
+```bash
+python -m quant.cli backtest \
+  --symbol SPY \
+  --start 2023-01-01 \
+  --end 2024-12-31 \
+  --cash 100000 \
+  --short-window 20 \
+  --long-window 50 \
+  --commission 0
+```
+
 ## Failure Behavior
 
 - Buying without enough cash returns a non-zero exit code and prints `Error: insufficient cash`.
 - Selling without enough position returns a non-zero exit code and prints `Error: insufficient position`.
 - Portfolio commands require an initialized account.
-
+- Backtest with no stored prices returns a non-zero exit code and a clear missing-data error.
+- Backtest rejects `short_window >= long_window`.

@@ -106,6 +106,34 @@ class SQLitePriceStore:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def get_price_history(
+        self,
+        symbol: str,
+        start: str | None = None,
+        end: str | None = None,
+    ) -> pd.DataFrame:
+        conditions = ["symbol = ?"]
+        params: list[str] = [symbol.upper()]
+
+        if start:
+            conditions.append("date >= ?")
+            params.append(start)
+        if end:
+            conditions.append("date <= ?")
+            params.append(end)
+
+        query = f"""
+            SELECT symbol, date, open, high, low, close, adj_close, volume
+            FROM prices
+            WHERE {' AND '.join(conditions)}
+            ORDER BY date ASC
+        """
+
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+
+        return pd.DataFrame([dict(row) for row in rows])
+
     def list_symbols(self) -> list[str]:
         with self.connect() as connection:
             rows = connection.execute(
@@ -120,4 +148,3 @@ class SQLitePriceStore:
                 (symbol.upper(),),
             ).fetchone()
         return row["latest_date"] if row and row["latest_date"] else None
-

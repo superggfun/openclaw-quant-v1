@@ -1,10 +1,12 @@
 # openclaw-quant-v1
 
-`openclaw-quant-v1` is an early OpenClaw-oriented quant system skeleton. It currently includes a market data layer and a simulated portfolio state module. It does not make AI decisions, place live orders, connect to brokers, or perform automated trading.
+`openclaw-quant-v1` is an early OpenClaw-oriented quant system skeleton. It currently includes a market data layer, a simulated portfolio state module, and a minimal backtest engine. It does not make AI decisions, place live orders, connect to brokers, or perform automated trading.
+
+This project is for research and simulation only. It is not investment advice.
 
 ## Current Version
 
-`v0.1.0-data-portfolio`
+`v0.2.0-backtest-engine`
 
 This release includes:
 
@@ -12,6 +14,8 @@ This release includes:
 - SQLite price storage with idempotent updates.
 - Simulated account state.
 - Simulated positions and trade history.
+- SMA crossover backtest engine using stored prices.
+- JSON backtest reports under `reports/`.
 - CLI commands for data and portfolio workflows.
 - pytest coverage for core state transitions.
 
@@ -69,6 +73,7 @@ Key modules:
 - `quant/cli.py`: command line entry point.
 - `quant/services/price_service.py`: price update orchestration.
 - `quant/services/portfolio_service.py`: simulated portfolio rules and valuation.
+- `quant/services/backtest_service.py`: SMA crossover backtest engine.
 - `quant/storage/sqlite_store.py`: price persistence.
 - `quant/storage/portfolio_store.py`: account, position, and trade persistence.
 - `quant/data_source/yfinance_client.py`: yfinance adapter.
@@ -145,6 +150,44 @@ Show trade history:
 python -m quant.cli trades
 ```
 
+## Backtest Engine
+
+The backtest engine reads historical prices from the existing `prices` table. It does not download data. Load price data first with `update-prices`.
+
+Default strategy: SMA crossover.
+
+- Short SMA default: 20 days
+- Long SMA default: 50 days
+- Buy when the short SMA crosses above the long SMA
+- Sell when the short SMA crosses below the long SMA
+- Position size is calculated by code using available cash and close price
+
+Example:
+
+```bash
+python -m quant.cli update-prices --symbols SPY --start 2023-01-01 --end 2024-12-31
+python -m quant.cli backtest --symbol SPY --start 2023-01-01 --end 2024-12-31
+```
+
+Custom parameters:
+
+```bash
+python -m quant.cli backtest \
+  --symbol SPY \
+  --start 2023-01-01 \
+  --end 2024-12-31 \
+  --cash 100000 \
+  --short-window 20 \
+  --long-window 50 \
+  --commission 1
+```
+
+The CLI prints a concise summary and writes a JSON report like:
+
+```text
+reports/backtest_SPY_YYYYMMDD_HHMMSS.json
+```
+
 The database path defaults to `data/quant.db`. You can override it with either:
 
 ```bash
@@ -163,6 +206,7 @@ export OPENCLAW_QUANT_DB_PATH=/tmp/openclaw-quant.db
 - `accounts`: simulated account cash and initial cash
 - `positions`: current simulated positions
 - `trades`: simulated trade ledger
+- `reports/backtest_*.json`: generated backtest reports, ignored by git
 
 ## Roadmap
 
@@ -171,7 +215,7 @@ Near-term work:
 - Add richer portfolio reporting.
 - Add realized PnL tracking.
 - Add basic performance metrics.
-- Add backtesting scaffolding and fixtures.
+- Add more backtest strategies and benchmark comparisons.
 - Add risk checks for max position size, cash usage, and symbol allowlists.
 
 Out of scope until explicitly designed:
@@ -197,6 +241,8 @@ Important docs:
 - `docs/DECISIONS.md`
 
 AI assistants should keep tests updated, avoid broker/live-trading code unless explicitly requested, and preserve existing CLI behavior unless the README and tests are updated together.
+
+New features must include CLI coverage and pytest coverage before they are considered complete.
 
 ## Test
 

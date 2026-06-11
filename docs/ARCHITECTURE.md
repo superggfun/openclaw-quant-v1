@@ -19,6 +19,7 @@ SQLite / External APIs
 - `quant.cli`: Parses user commands and prints human-readable output.
 - `quant.services.price_service`: Coordinates daily price updates and reads.
 - `quant.services.portfolio_service`: Applies simulated account, buy, sell, and valuation rules.
+- `quant.services.backtest_service`: Runs SMA crossover backtests from stored prices and writes JSON reports.
 - `quant.storage.sqlite_store`: Owns the `prices` table.
 - `quant.storage.portfolio_store`: Owns `accounts`, `positions`, and `trades`.
 - `quant.data_source.yfinance_client`: Wraps yfinance and normalizes downloaded prices.
@@ -43,10 +44,17 @@ Portfolio valuation flow:
 CLI portfolio -> PortfolioService -> SQLitePortfolioStore -> positions + latest prices.close
 ```
 
+Backtest flow:
+
+```text
+CLI backtest -> BacktestService -> SQLitePriceStore -> prices -> reports/backtest_*.json
+```
+
+The backtest engine never downloads data. It only uses rows already present in `prices`.
+
 ## Extension Points
 
 - `quant/backtesting`: future historical simulation module.
 - `quant/risk`: future portfolio and strategy risk checks.
 - `quant/openclaw`: future OpenClaw integration boundary.
 - `quant/portfolio`: reserved for domain objects if the portfolio module grows beyond services and storage.
-
