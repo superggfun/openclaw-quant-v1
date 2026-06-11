@@ -325,6 +325,30 @@ Top-level keys:
 - `coverage_report_path`
 - `data_quality_report_path`
 
+## Agent export summaries
+
+Agent export summaries can be printed to stdout or written to an optional output path. They are generated artifacts, not database tables. They are ignored by git when written under `reports/`.
+
+Supported formats:
+
+- text
+- markdown
+- compact JSON
+
+Common compact JSON keys:
+
+- `report_type`
+- `generated_from`
+- `summary`
+- `key_metrics`
+- `key_findings`
+- `warnings`
+- `recommended_next_steps`
+- `action_candidates`
+- `data_quality_notes`
+
+Agent exports are not raw source reports and do not modify source report schemas.
+
 ## reports/portfolio_construction_*.json
 
 Portfolio construction reports are generated files, not database tables. They are ignored by git.

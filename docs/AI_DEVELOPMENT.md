@@ -4,13 +4,14 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v0.17.0-data-layer-universe`
+`v0.18.0-agent-export`
 
 The project currently includes:
 
 - A market data layer using `yfinance` for US stock and ETF daily OHLCV data.
 - SQLite storage for normalized price data.
 - A `yfinance`-based offline data layer for universe management, static metadata, coverage, quality, and readiness diagnostics.
+- An agent export layer that compresses existing reports for LLM and OpenClaw-style agent context windows.
 - A simulated portfolio state module with accounts, positions, and trades.
 - An alpha engine that calculates deterministic factors and target weights from stored prices.
 - A factor pipeline that preprocesses same-date factor cross-sections before alpha generation or evaluation.
@@ -61,12 +62,14 @@ The project intentionally does not include:
 - Portfolio construction features must use stored prices only, respect the requested end/as-of date, generate target weights only, and leave rebalance or execution simulation to downstream modules.
 - Data layer features must not change factor evaluation or backtest semantics. They should improve metadata, coverage, quality, and readiness only.
 - AkShare, Tushare, A-share data, and real-time market data are future provider additions and are not part of v0.17.
+- Agent export features must remain read-only and export-only. Do not change source report schemas, quant logic, factor evaluation, backtest behavior, portfolio state, or execution behavior.
 
 ## Important Files
 
 - `quant/config.py`: project defaults and symbol universe.
 - `quant/data_source/yfinance_client.py`: external market data adapter.
 - `quant/data_layer/`: universe, metadata, data quality, coverage, and readiness modules.
+- `quant/agent_export/agent_exporter.py`: compact report export layer for LLM/agent consumers.
 - `quant/storage/sqlite_store.py`: price table persistence.
 - `quant/storage/portfolio_store.py`: account, position, and trade persistence.
 - `quant/services/price_service.py`: price update orchestration.

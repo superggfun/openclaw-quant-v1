@@ -181,6 +181,17 @@ Strategy Evaluation / Performance Attribution is not implemented in V1.3. It is 
 - Tests for universe creation, exclusions, metadata lookup, missing data detection, duplicate diagnostics, coverage, and readiness.
 - No changes to factor evaluation or backtest semantics.
 
+## v0.18.0-agent-export
+
+- Agent Export module for compact summaries from existing reports.
+- CLI command: `python -m quant.cli export-for-agent`.
+- Supports text, Markdown, and compact JSON output.
+- Auto-detects report type from schema keys, not file names.
+- Supports alpha, factor evaluation, factor backtest, strategy evaluation, portfolio construction, risk, rebalance, execution, and backtest reports.
+- Emits deterministic key metrics, findings, warnings, next steps, action candidates, and data quality notes.
+- Adds approximate `--max-tokens` trimming for LLM context windows.
+- Export-only: no report schema changes and no quant/backtest/factor logic changes.
+
 ## Next
 
 - Add richer portfolio reporting.

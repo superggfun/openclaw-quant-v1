@@ -6,7 +6,7 @@ This project is for research and simulation only. It is not investment advice.
 
 ## Current Version
 
-`v0.17.0-data-layer-universe`
+`v0.18.0-agent-export`
 
 This release includes:
 
@@ -16,6 +16,7 @@ This release includes:
 - Expanded research universe management.
 - Static symbol metadata storage.
 - Data coverage, data quality, and research readiness diagnostics.
+- Agent export summaries for OpenClaw, Claude, GPT, Qwen, and other LLM agents.
 - Simulated account state.
 - Simulated positions and trade history.
 - Alpha factor generation from stored historical prices.
@@ -34,7 +35,7 @@ This release includes:
 - CLI commands for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtest, allocation, rebalance, risk, optimizer, portfolio construction, cost, and execution workflows.
 - pytest coverage for core state transitions.
 
-`v0.17.0` expands the offline research data layer using the existing Yahoo Finance / `yfinance` daily data path. It does not add real-time data, AkShare, Tushare, A-share support, factor evaluation changes, or backtest semantic changes.
+`v0.18.0` adds an export-only agent summary layer for existing JSON reports. It does not modify report schemas, quant logic, factor evaluation, backtests, or execution behavior.
 
 ## Scope
 
@@ -64,6 +65,7 @@ openclaw-quant-v1/
 |- quant/
 |  |- config.py
 |  |- alpha/
+|  |- agent_export/
 |  |- data_source/
 |  |- backtest/
 |  |- cost/
@@ -103,6 +105,7 @@ Key modules:
 - `quant/cli.py`: command line entry point and command dispatcher.
 - `quant/cli_commands/`: parser registration and command handlers for each CLI area.
 - `quant/data_layer/`: universe management, symbol metadata, coverage, quality, and readiness diagnostics.
+- `quant/agent_export/agent_exporter.py`: compact report summaries for LLM/agent contexts.
 - `quant/alpha/alpha_engine.py`: factor calculation and target weight generation.
 - `quant/factor_backtest/factor_backtest.py`: long-short factor return backtest.
 - `quant/factor_pipeline/factor_pipeline.py`: factor preprocessing, standardization, and neutralization.
@@ -148,9 +151,24 @@ python -m quant.cli universe-build --sector Technology --max-symbols 10
 python -m quant.cli data-refresh
 python -m quant.cli data-coverage
 python -m quant.cli research-readiness
+python -m quant.cli export-for-agent --report reports/strategy_eval_YYYYMMDD_HHMMSS.json
 ```
 
 See `docs/DATA_LAYER.md` for universe, metadata, coverage, quality, and readiness details.
+
+## Agent Export
+
+The agent export layer converts existing detailed JSON reports into compact text, Markdown, or JSON summaries for LLM and agent context windows.
+
+Run:
+
+```bash
+python -m quant.cli export-for-agent --report reports/strategy_eval_YYYYMMDD_HHMMSS.json
+python -m quant.cli export-for-agent --report reports/factor_backtest_YYYYMMDD_HHMMSS.json --format markdown
+python -m quant.cli export-for-agent --report reports/portfolio_construction_YYYYMMDD_HHMMSS.json --format json
+```
+
+See `docs/AGENT_EXPORT.md` for details.
 
 ## Simulated Portfolio Commands
 
@@ -555,6 +573,7 @@ export OPENCLAW_QUANT_DB_PATH=/tmp/openclaw-quant.db
 - `reports/data_quality_*.json`: generated data quality reports, ignored by git
 - `reports/data_coverage_*.json`: generated data coverage reports, ignored by git
 - `reports/research_readiness_*.json`: generated research readiness reports, ignored by git
+- `reports/agent_summary.*`: optional local agent export output, ignored by git when generated under `reports/`
 - `reports/cost_*.json`: generated cost reports, ignored by git
 - `reports/execution_*.json`: generated execution simulation reports, ignored by git
 
@@ -597,6 +616,7 @@ Important docs:
 - `docs/ROADMAP.md`
 - `docs/DATA_SCHEMA.md`
 - `docs/DATA_LAYER.md`
+- `docs/AGENT_EXPORT.md`
 - `docs/REBALANCE.md`
 - `docs/RISK.md`
 - `docs/ALPHA.md`

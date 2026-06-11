@@ -17,7 +17,8 @@ SQLite / External APIs
 ## Components
 
 - `quant.cli`: Main CLI entry point. It builds the top-level parser, creates shared context, and dispatches to command modules.
-- `quant.cli_commands`: Dedicated parser registration and command handlers for data, data layer, portfolio, rebalance, risk, optimizer, portfolio construction, alpha, factor, strategy evaluation, cost, execution, and backtest commands.
+- `quant.cli_commands`: Dedicated parser registration and command handlers for data, data layer, agent export, portfolio, rebalance, risk, optimizer, portfolio construction, alpha, factor, strategy evaluation, cost, execution, and backtest commands.
+- `quant.agent_export.agent_exporter`: Converts detailed JSON reports into compact agent-friendly text, Markdown, or JSON summaries.
 - `quant.data_layer.universe_manager`: Builds default, custom, sector, ETF, and large-cap universes.
 - `quant.data_layer.symbol_metadata`: Stores static symbol metadata in SQLite.
 - `quant.data_layer.data_quality`: Produces coverage, data quality, and research readiness reports.
@@ -63,6 +64,14 @@ CLI universe/data commands -> UniverseManager + SymbolMetadataStore + DataQualit
 ```
 
 The data layer expands research coverage and diagnostics without changing factor evaluation, factor backtest, portfolio backtest, or no-lookahead semantics.
+
+Agent export flow:
+
+```text
+CLI export-for-agent -> AgentExporter -> existing reports/*.json -> compact text/markdown/json summary
+```
+
+The agent export layer is read-only and export-only. It does not modify source reports, quant logic, factor evaluation, backtest behavior, portfolio state, or execution behavior.
 
 Portfolio flow:
 
@@ -195,6 +204,7 @@ The execution simulator is side-effect free for portfolio state. It models fills
 
 - `quant/backtesting`: future historical simulation module.
 - `quant/data_layer`: stable universe, metadata, coverage, and data quality boundary for future factor research.
+- `quant/agent_export`: stable report-to-agent context boundary for future OpenClaw and LLM agent integrations.
 - `quant/risk`: future portfolio and strategy risk checks.
 - `quant/openclaw`: future OpenClaw integration boundary.
 - `quant/portfolio`: reserved for domain objects if the portfolio module grows beyond services and storage.

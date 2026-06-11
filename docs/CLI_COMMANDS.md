@@ -26,6 +26,7 @@ python -m quant.cli universe-build --sector Technology --max-symbols 10
 python -m quant.cli data-refresh
 python -m quant.cli data-coverage
 python -m quant.cli research-readiness
+python -m quant.cli export-for-agent --report reports/strategy_eval_YYYYMMDD_HHMMSS.json
 ```
 
 ## Data Layer
@@ -41,6 +42,17 @@ python -m quant.cli research-readiness
 ```
 
 The data layer commands manage research universes, static metadata, stored-price coverage, data quality, and readiness diagnostics. They use the existing Yahoo Finance / `yfinance` daily data path. They do not provide real-time market data, AkShare, Tushare, A-share data, factor evaluation semantic changes, backtest semantic changes, portfolio state changes, or execution behavior.
+
+## Agent Export
+
+```bash
+python -m quant.cli export-for-agent --report reports/strategy_eval_YYYYMMDD_HHMMSS.json
+python -m quant.cli export-for-agent --report reports/factor_backtest_YYYYMMDD_HHMMSS.json --format markdown
+python -m quant.cli export-for-agent --report reports/portfolio_construction_YYYYMMDD_HHMMSS.json --format json
+python -m quant.cli export-for-agent --report reports/strategy_eval_YYYYMMDD_HHMMSS.json --max-tokens 500 --output reports/agent_summary.md
+```
+
+The export-for-agent command reads an existing JSON report, auto-detects its report type from schema keys, and emits a compact text, Markdown, or JSON summary. It does not modify the source report, quant logic, factor evaluation logic, backtest logic, portfolio state, or execution behavior.
 
 ## Simulated Portfolio
 

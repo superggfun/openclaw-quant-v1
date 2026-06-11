@@ -18,6 +18,7 @@ EXPECTED_COMMANDS = {
     "data-refresh",
     "data-coverage",
     "research-readiness",
+    "export-for-agent",
     "init-account",
     "buy",
     "sell",

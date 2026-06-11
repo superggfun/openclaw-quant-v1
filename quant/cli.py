@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from quant.cli_commands import (
+    agent_export,
     alpha,
     backtest,
     cost,
@@ -30,6 +31,7 @@ from quant.config import DB_PATH
 COMMAND_MODULES = [
     data,
     data_layer,
+    agent_export,
     portfolio,
     rebalance,
     risk,
@@ -55,6 +57,7 @@ COMMAND_HANDLERS = {
     "data-refresh": data_layer.handle,
     "data-coverage": data_layer.handle,
     "research-readiness": data_layer.handle,
+    "export-for-agent": agent_export.handle,
     "init-account": portfolio.handle,
     "buy": portfolio.handle,
     "sell": portfolio.handle,

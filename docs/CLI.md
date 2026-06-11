@@ -13,6 +13,9 @@ python -m quant.cli universe-build --sector Technology --max-symbols 10
 python -m quant.cli data-refresh
 python -m quant.cli data-coverage
 python -m quant.cli research-readiness
+python -m quant.cli export-for-agent --report reports/strategy_eval_YYYYMMDD_HHMMSS.json
+python -m quant.cli export-for-agent --report reports/factor_backtest_YYYYMMDD_HHMMSS.json --format markdown
+python -m quant.cli export-for-agent --report reports/portfolio_construction_YYYYMMDD_HHMMSS.json --format json
 python -m quant.cli init-account --cash 100000
 python -m quant.cli buy SPY --qty 10 --price 500
 python -m quant.cli sell SPY --qty 3 --price 510

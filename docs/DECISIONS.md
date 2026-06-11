@@ -115,3 +115,7 @@ The `v0.16.0` portfolio construction layer uses stored close prices to generate 
 ## 2026-06-12: Data Layer Expands Research Coverage Without Changing Research Semantics
 
 The `v0.17.0` data layer adds static symbol metadata, universe construction, coverage reports, data quality diagnostics, and research readiness scoring. It does not change existing factor evaluation, factor backtest, portfolio backtest, or no-lookahead semantics.
+
+## 2026-06-12: Agent Export Is Read-Only
+
+The `v0.18.0` agent export layer converts existing reports into compact summaries for LLM and OpenClaw-style agents. It must not modify source report schemas, quant logic, factor evaluation logic, backtest logic, portfolio state, or execution behavior.

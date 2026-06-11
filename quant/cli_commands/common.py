@@ -10,6 +10,7 @@ from pathlib import Path
 import pandas as pd
 
 from quant.alpha.alpha_engine import AlphaEngine
+from quant.agent_export.agent_exporter import AgentExporter
 from quant.backtest.backtest_engine import PortfolioBacktestEngine
 from quant.cost.cost_engine import CostEngine, TradeInput
 from quant.data_layer.data_quality import DataQualityAnalyzer, DataRefreshManager
@@ -52,6 +53,7 @@ class CLIContext:
     universe_manager: UniverseManager
     data_quality_analyzer: DataQualityAnalyzer
     data_refresh_manager: DataRefreshManager
+    agent_exporter: AgentExporter
 
 
 def create_context(db_path: Path) -> CLIContext:
@@ -80,6 +82,7 @@ def create_context(db_path: Path) -> CLIContext:
         universe_manager=UniverseManager(metadata_store),
         data_quality_analyzer=DataQualityAnalyzer(price_store, metadata_store),
         data_refresh_manager=DataRefreshManager(price_store, price_service.data_source),
+        agent_exporter=AgentExporter(),
     )
 
 
