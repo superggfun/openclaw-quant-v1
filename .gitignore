@@ -6,6 +6,7 @@ data/quant.db
 data/*.db
 data/*.db-*
 reports/*.json
+reports/charts/
 reports/agent_summary.*
 reports/agent_export_*.*
 examples/portfolio_constructed_targets.json

@@ -464,3 +464,17 @@ Top-level keys:
 - `rebalance_events`: signal date, execution date, targets, fills, costs, and warnings by rebalance.
 - `warnings`: deterministic simulation warnings.
 - `no_lookahead`: true for the signal/execution design.
+
+## reports/charts/*
+
+Visualization outputs are generated artifacts, not database tables. They are ignored by git.
+
+Generated files include:
+
+- `*_equity_curve.png` / `.svg`
+- `*_drawdown_curve.png` / `.svg`
+- `*_factor_decay.png` / `.svg`
+- `*_target_weights.png` / `.svg`
+- `*_summary.html`
+
+The source JSON report is not modified. Agent Export may include chart paths in `visualization_paths` when matching chart files exist.

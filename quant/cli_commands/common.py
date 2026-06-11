@@ -30,6 +30,7 @@ from quant.storage.portfolio_store import SQLitePortfolioStore
 from quant.storage.sqlite_store import SQLitePriceStore
 from quant.strategy_eval.strategy_evaluation import StrategyEvaluation
 from quant.trading_simulation.trading_simulator import TradingSimulator
+from quant.visualization.report_visualizer import ReportVisualizer
 from quant.walk_forward.walk_forward import WalkForwardEngine
 
 
@@ -58,6 +59,7 @@ class CLIContext:
     agent_exporter: AgentExporter
     walk_forward_engine: WalkForwardEngine
     trading_simulator: TradingSimulator
+    report_visualizer: ReportVisualizer
 
 
 def create_context(db_path: Path) -> CLIContext:
@@ -89,6 +91,7 @@ def create_context(db_path: Path) -> CLIContext:
         agent_exporter=AgentExporter(),
         walk_forward_engine=WalkForwardEngine(price_store),
         trading_simulator=TradingSimulator(price_store),
+        report_visualizer=ReportVisualizer(),
     )
 
 

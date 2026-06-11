@@ -29,6 +29,7 @@ def test_generated_paths_are_ignored() -> None:
             "data/quant.db",
             "reports/example.json",
             "reports/agent_summary.md",
+            "reports/charts/example.png",
             "examples/portfolio_constructed_targets.json",
         ]
     )

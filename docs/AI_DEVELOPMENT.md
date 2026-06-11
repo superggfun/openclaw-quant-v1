@@ -4,7 +4,7 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v0.22.0-maintenance-cleanup`
+`v0.23.0-visualization-reports`
 
 The project currently includes:
 
@@ -28,6 +28,7 @@ The project currently includes:
 - An execution simulator that models intended, executed, and unfilled trades with costs.
 - A historical trading simulator that tracks in-memory account cash, positions, costs, trades, and equity through time.
 - Walk-forward and rolling validation for offline research robustness checks.
+- A visualization layer that turns existing JSON reports into PNG, SVG, and HTML dashboards.
 - CLI commands for price updates, price inspection, account initialization, simulated buys and sells, portfolio snapshots, trade history, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtests, allocation, rebalance plans, cost estimates, optimization, risk, and execution simulation.
 - A modular CLI implementation under `quant/cli_commands/`.
 
@@ -91,6 +92,7 @@ The project intentionally does not include:
 - `quant/execution/execution_engine.py`: pure simulated execution engine.
 - `quant/trading_simulation/`: offline historical account-style simulation.
 - `quant/walk_forward/`: offline walk-forward and rolling validation.
+- `quant/visualization/`: report charts and dashboards from existing JSON reports.
 - `quant/cli.py`: command line entry point and dispatcher.
 - `quant/cli_commands/`: command-specific parser registration and handlers.
 - `tests/`: pytest coverage for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtest, rebalance, optimizer, risk, cost, and execution behavior.
@@ -122,3 +124,7 @@ Walk-forward code belongs under `quant/walk_forward` and should orchestrate exis
 ## v0.21 Trading Simulation Notes
 
 Trading simulation code belongs under `quant/trading_simulation`. Keep it offline and deterministic. Use `PortfolioAccount` for in-memory cash and position state, preserve `signal_date < execution_date`, and do not write simulated historical loop state into persistent portfolio tables. New simulator changes should include CLI coverage, report schema tests, and Agent Export compatibility tests.
+
+## v0.23 Visualization Notes
+
+Visualization code belongs under `quant/visualization`. It should read existing JSON reports and write generated artifacts under `reports/charts/`. Do not change source report schemas, quant calculations, factor logic, portfolio state, or execution behavior.

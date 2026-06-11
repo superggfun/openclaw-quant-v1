@@ -97,6 +97,10 @@ Recommendations are deterministic and report-type specific, for example:
 
 The exporter does not invent external facts. It only uses fields in the input report.
 
+## Visualization Paths
+
+When `visualize-report` has generated charts for the same source report, Agent Export includes those files in `visualization_paths`. The source JSON report is not modified.
+
 ## Walk Forward Reports
 
 Agent Export supports `reports/walk_forward_*.json`. Summaries include fold count, average train/test return and Sharpe, factor stability ranking, warnings such as `WARN_OVERFIT` and `WARN_FACTOR_DECAY`, and deterministic next steps like reviewing out-of-sample folds or comparing factor stability.

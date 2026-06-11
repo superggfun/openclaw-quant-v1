@@ -24,6 +24,7 @@ GENERATED_PATHS = [
     "data/quant.db",
     "reports/example.json",
     "reports/agent_summary.md",
+    "reports/charts/example.png",
     "examples/portfolio_constructed_targets.json",
 ]
 ALLOWED_EMPTY_PACKAGES = {
@@ -41,6 +42,7 @@ REQUIRED_MODULE_DOCS = {
     "docs/PORTFOLIO_CONSTRUCTION.md",
     "docs/STRATEGY_EVALUATION.md",
     "docs/TRADING_SIMULATION.md",
+    "docs/VISUALIZATION.md",
     "docs/WALK_FORWARD.md",
 }
 

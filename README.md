@@ -6,7 +6,7 @@ This project is for research and simulation only. It is not investment advice.
 
 ## Current Version
 
-`v0.22.0-maintenance-cleanup`
+`v0.23.0-visualization-reports`
 
 This release includes:
 
@@ -17,6 +17,7 @@ This release includes:
 - Static symbol metadata storage.
 - Data coverage, data quality, and research readiness diagnostics.
 - Agent export summaries for OpenClaw, Claude, GPT, Qwen, and other LLM agents.
+- Visualization reports with PNG, SVG, and HTML dashboards for existing JSON reports.
 - Historical account-style trading simulation with in-memory cash, positions, costs, trade history, and daily equity.
 - Simulated account state.
 - Simulated positions and trade history.
@@ -33,10 +34,11 @@ This release includes:
 - Transaction cost estimation for rebalance suggestions.
 - Simulated execution of rebalance suggestions with immediate, next-day open, TWAP, and partial-fill modes.
 - JSON research, factor pipeline, factor evaluation, factor backtest, strategy evaluation, portfolio construction, trade simulation, rebalance, cost, backtest, and execution reports under `reports/`.
+- Generated charts and dashboards under `reports/charts/`.
 - CLI commands for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtest, allocation, rebalance, risk, optimizer, portfolio construction, cost, and execution workflows.
 - pytest coverage for core state transitions.
 
-`v0.22.0` is a maintenance and consistency release. It removes stale placeholders, aligns documentation version references, adds lightweight project hygiene checks, and does not add new quant features.
+`v0.23.0` adds visualization reports for existing JSON reports. It does not change quant calculations, add factors, connect brokers, or add machine learning.
 
 ## Scope
 
@@ -109,6 +111,7 @@ Key modules:
 - `quant/cli_commands/`: parser registration and command handlers for each CLI area.
 - `quant/data_layer/`: universe management, symbol metadata, coverage, quality, and readiness diagnostics.
 - `quant/agent_export/agent_exporter.py`: compact report summaries for LLM/agent contexts.
+- `quant/visualization/`: PNG, SVG, and HTML visual reports from existing JSON reports.
 - `quant/alpha/alpha_engine.py`: factor calculation and target weight generation.
 - `quant/factor_backtest/factor_backtest.py`: long-short factor return backtest.
 - `quant/factor_pipeline/factor_pipeline.py`: factor preprocessing, standardization, and neutralization.
@@ -158,6 +161,7 @@ python -m quant.cli data-refresh
 python -m quant.cli data-coverage
 python -m quant.cli research-readiness
 python -m quant.cli export-for-agent --report reports/strategy_eval_YYYYMMDD_HHMMSS.json
+python -m quant.cli visualize-report --report reports/trade_sim_YYYYMMDD_HHMMSS.json
 ```
 
 See `docs/DATA_LAYER.md` for universe, metadata, coverage, quality, and readiness details.
@@ -175,6 +179,17 @@ python -m quant.cli export-for-agent --report reports/portfolio_construction_YYY
 ```
 
 See `docs/AGENT_EXPORT.md` for details.
+
+## Visualization Reports
+
+Generate charts and a dashboard from existing JSON reports:
+
+```bash
+python -m quant.cli visualize-report --report reports/trade_sim_YYYYMMDD_HHMMSS.json
+python -m quant.cli visualize-report --report reports/walk_forward_YYYYMMDD_HHMMSS.json
+```
+
+Charts are written to `reports/charts/` and are ignored by git. See `docs/VISUALIZATION.md`.
 
 ## Historical Trading Simulation
 

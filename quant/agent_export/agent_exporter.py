@@ -22,6 +22,7 @@ class AgentExport:
     recommended_next_steps: list[str]
     action_candidates: list[str]
     data_quality_notes: list[str]
+    visualization_paths: list[str]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -34,6 +35,7 @@ class AgentExport:
             "recommended_next_steps": self.recommended_next_steps,
             "action_candidates": self.action_candidates,
             "data_quality_notes": self.data_quality_notes,
+            "visualization_paths": self.visualization_paths,
         }
 
 
@@ -482,6 +484,7 @@ class AgentExporter:
             recommended_next_steps=self._dedupe(recommended_next_steps or []),
             action_candidates=self._dedupe(action_candidates or []),
             data_quality_notes=self._dedupe(data_quality_notes or []),
+            visualization_paths=self._visualization_paths(generated_from),
         )
 
     def _performance_warnings(self, total_return: Any, sharpe: Any, drawdown: Any) -> list[str]:
@@ -521,7 +524,7 @@ class AgentExporter:
 
     def _trim_export(self, export: dict[str, Any], max_tokens: int) -> dict[str, Any]:
         trimmed = json.loads(json.dumps(export, default=str))
-        priority_order = ["data_quality_notes", "action_candidates", "key_findings", "recommended_next_steps", "warnings", "key_metrics"]
+        priority_order = ["data_quality_notes", "visualization_paths", "action_candidates", "key_findings", "recommended_next_steps", "warnings", "key_metrics"]
         for key in priority_order:
             if self._estimate_tokens(trimmed) <= max_tokens:
                 break
@@ -543,7 +546,7 @@ class AgentExporter:
             "key_metrics:",
         ]
         lines.extend(f"- {key}: {AgentExporter._stringify(value)}" for key, value in export["key_metrics"].items())
-        for section in ("key_findings", "warnings", "recommended_next_steps", "action_candidates", "data_quality_notes"):
+        for section in ("key_findings", "warnings", "recommended_next_steps", "action_candidates", "data_quality_notes", "visualization_paths"):
             lines.append(f"{section}:")
             lines.extend(f"- {item}" for item in export.get(section, []))
         return "\n".join(lines) + "\n"
@@ -566,6 +569,7 @@ class AgentExporter:
             ("Recommended Next Steps", "recommended_next_steps"),
             ("Action Candidates", "action_candidates"),
             ("Data Quality Notes", "data_quality_notes"),
+            ("Visualization Paths", "visualization_paths"),
         ):
             lines.extend(["", f"## {title}"])
             values = export.get(key, [])
@@ -616,6 +620,19 @@ class AgentExporter:
             text = str(warnings)
             cleaned.append(text if text.startswith("WARN_") else f"SOURCE_WARNING: {text}")
         return cleaned
+
+    @staticmethod
+    def _visualization_paths(generated_from: str) -> list[str]:
+        if generated_from == "<memory>":
+            return []
+        report_path = Path(generated_from)
+        charts_dir = report_path.parent / "charts"
+        if not charts_dir.exists():
+            return []
+        paths = []
+        for extension in ("png", "svg", "html"):
+            paths.extend(charts_dir.glob(f"{report_path.stem}_*.{extension}"))
+        return sorted(str(path) for path in paths if not path.name.endswith("_dashboard.png"))
 
     @staticmethod
     def _dedupe(values: list[str]) -> list[str]:

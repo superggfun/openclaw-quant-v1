@@ -14,6 +14,7 @@ python -m quant.cli data-refresh
 python -m quant.cli data-coverage
 python -m quant.cli research-readiness
 python -m quant.cli export-for-agent --report reports/strategy_eval_YYYYMMDD_HHMMSS.json
+python -m quant.cli visualize-report --report reports/trade_sim_YYYYMMDD_HHMMSS.json
 python -m quant.cli export-for-agent --report reports/factor_backtest_YYYYMMDD_HHMMSS.json --format markdown
 python -m quant.cli export-for-agent --report reports/portfolio_construction_YYYYMMDD_HHMMSS.json --format json
 python -m quant.cli init-account --cash 100000
@@ -72,3 +73,12 @@ python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-
 ```
 
 `trade-sim` is an offline historical account simulation. It records signal dates and next execution dates, updates in-memory cash and positions, and writes `reports/trade_sim_*.json`.
+
+## Visualization
+
+```bash
+python -m quant.cli visualize-report --report reports/trade_sim_YYYYMMDD_HHMMSS.json
+python -m quant.cli visualize-report --report reports/walk_forward_YYYYMMDD_HHMMSS.json
+```
+
+`visualize-report` reads existing JSON reports and writes PNG, SVG, and HTML dashboard files under `reports/charts/`.

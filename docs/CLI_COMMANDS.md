@@ -27,6 +27,7 @@ python -m quant.cli data-refresh
 python -m quant.cli data-coverage
 python -m quant.cli research-readiness
 python -m quant.cli export-for-agent --report reports/strategy_eval_YYYYMMDD_HHMMSS.json
+python -m quant.cli visualize-report --report reports/trade_sim_YYYYMMDD_HHMMSS.json
 ```
 
 ## Data Layer
@@ -53,6 +54,16 @@ python -m quant.cli export-for-agent --report reports/strategy_eval_YYYYMMDD_HHM
 ```
 
 The export-for-agent command reads an existing JSON report, auto-detects its report type from schema keys, and emits a compact text, Markdown, or JSON summary. It does not modify the source report, quant logic, factor evaluation logic, backtest logic, portfolio state, or execution behavior.
+
+## Visualization
+
+```bash
+python -m quant.cli visualize-report --report reports/trade_sim_YYYYMMDD_HHMMSS.json
+python -m quant.cli visualize-report --report reports/strategy_eval_YYYYMMDD_HHMMSS.json
+python -m quant.cli visualize-report --report reports/walk_forward_YYYYMMDD_HHMMSS.json
+```
+
+The visualize-report command reads an existing JSON report, auto-detects its type from schema keys, and writes PNG, SVG, and HTML dashboard files under `reports/charts/`. It does not modify source reports or quant calculations.
 
 ## Simulated Portfolio
 

@@ -17,8 +17,9 @@ SQLite / External APIs
 ## Components
 
 - `quant.cli`: Main CLI entry point. It builds the top-level parser, creates shared context, and dispatches to command modules.
-- `quant.cli_commands`: Dedicated parser registration and command handlers for data, data layer, agent export, portfolio, rebalance, risk, optimizer, portfolio construction, alpha, factor, strategy evaluation, trading simulation, cost, execution, and backtest commands.
+- `quant.cli_commands`: Dedicated parser registration and command handlers for data, data layer, agent export, visualization, portfolio, rebalance, risk, optimizer, portfolio construction, alpha, factor, strategy evaluation, trading simulation, cost, execution, and backtest commands.
 - `quant.agent_export.agent_exporter`: Converts detailed JSON reports into compact agent-friendly text, Markdown, or JSON summaries.
+- `quant.visualization`: Converts existing JSON reports into PNG, SVG, and HTML visual dashboards.
 - `quant.data_layer.universe_manager`: Builds default, custom, sector, ETF, and large-cap universes.
 - `quant.data_layer.symbol_metadata`: Stores static symbol metadata in SQLite.
 - `quant.data_layer.data_quality`: Produces coverage, data quality, and research readiness reports.
@@ -73,6 +74,14 @@ CLI export-for-agent -> AgentExporter -> existing reports/*.json -> compact text
 ```
 
 The agent export layer is read-only and export-only. It does not modify source reports, quant logic, factor evaluation, backtest behavior, portfolio state, or execution behavior.
+
+Visualization flow:
+
+```text
+CLI visualize-report -> ReportVisualizer -> existing reports/*.json -> reports/charts/*.png/*.svg/*_summary.html
+```
+
+The visualization layer is read-only with respect to source reports. It does not modify quant calculations, report schemas, portfolio state, or execution behavior.
 
 Portfolio flow:
 

@@ -1,5 +1,14 @@
 # Roadmap
 
+## v0.23.0-visualization-reports
+
+- Adds `quant/visualization` for report charts and dashboards.
+- Adds `visualize-report` CLI.
+- Generates PNG, SVG, and HTML outputs under `reports/charts/`.
+- Supports trade simulation, backtest, strategy evaluation, factor evaluation, factor backtest, portfolio construction, walk-forward, and risk reports.
+- Integrates chart path discovery into Agent Export through `visualization_paths`.
+- Visualization-only: no quant calculation, factor, broker, live-trading, or ML changes.
+
 ## v0.22.0-maintenance-cleanup
 
 - Removes unused placeholders and stale references.

@@ -37,6 +37,7 @@ EXPECTED_COMMANDS = {
     "strategy-eval",
     "walk-forward",
     "trade-sim",
+    "visualize-report",
     "cost",
     "execute-sim",
     "backtest",
