@@ -6,10 +6,11 @@ This project is for research and simulation only. It is not investment advice.
 
 ## Current Version
 
-`v1.4.0-strategy-evaluation`
+`v0.15.0-cli-refactor`
 
 This release includes:
 
+- CLI parser and command handlers split under `quant/cli_commands/`.
 - yfinance daily OHLCV ingestion.
 - SQLite price storage with idempotent updates.
 - Simulated account state.
@@ -28,6 +29,8 @@ This release includes:
 - JSON research, factor pipeline, factor evaluation, factor backtest, strategy evaluation, rebalance, cost, backtest, and execution reports under `reports/`.
 - CLI commands for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtest, allocation, rebalance, risk, optimizer, cost, and execution workflows.
 - pytest coverage for core state transitions.
+
+`v0.15.0` is a CLI architecture refactor. It does not add new quant features and is intended to preserve existing command names, arguments, outputs, and report schemas.
 
 ## Scope
 
@@ -60,6 +63,7 @@ openclaw-quant-v1/
 |  |- data_source/
 |  |- backtest/
 |  |- cost/
+|  |- cli_commands/
 |  |- execution/
 |  |- factor_backtest/
 |  |- factor_eval/
@@ -90,7 +94,8 @@ CLI -> Services / Engines -> Storage / Data Sources -> SQLite / yfinance
 
 Key modules:
 
-- `quant/cli.py`: command line entry point.
+- `quant/cli.py`: command line entry point and command dispatcher.
+- `quant/cli_commands/`: parser registration and command handlers for each CLI area.
 - `quant/alpha/alpha_engine.py`: factor calculation and target weight generation.
 - `quant/factor_backtest/factor_backtest.py`: long-short factor return backtest.
 - `quant/factor_pipeline/factor_pipeline.py`: factor preprocessing, standardization, and neutralization.

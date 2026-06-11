@@ -1,0 +1,72 @@
+"""Factor backtest CLI command."""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+from quant.cli_commands.common import format_optional_number, format_optional_pct, load_factor_pipeline_config
+from quant.factor_eval.factor_evaluation import SUPPORTED_FACTORS
+
+
+def register_parser(subparsers) -> None:
+    factor_backtest = subparsers.add_parser("factor-backtest", help="Run a long-short factor backtest.")
+    factor_backtest.add_argument("--factor", choices=sorted(SUPPORTED_FACTORS), required=True)
+    factor_backtest.add_argument("--start", default=None, help="Inclusive signal start date YYYY-MM-DD.")
+    factor_backtest.add_argument("--end", default=None, help="Inclusive signal end date YYYY-MM-DD.")
+    factor_backtest.add_argument("--holding-period", type=int, default=20)
+    factor_backtest.add_argument("--quantiles", type=int, default=5)
+    factor_backtest.add_argument("--long-quantile", type=int, default=None)
+    factor_backtest.add_argument("--short-quantile", type=int, default=1)
+    factor_backtest.add_argument("--pipeline", default=None, help="Optional factor pipeline config JSON.")
+    factor_backtest.add_argument("--report", action="store_true", help="Write JSON report. Reports are written by default.")
+
+
+def handle(args, context) -> int:
+    result = context.factor_backtest_engine.run(
+        factor=args.factor,
+        start=args.start,
+        end=args.end,
+        holding_period=args.holding_period,
+        quantiles=args.quantiles,
+        long_quantile=args.long_quantile,
+        short_quantile=args.short_quantile,
+        pipeline_config=load_factor_pipeline_config(Path(args.pipeline)) if args.pipeline else None,
+        pipeline_config_path=args.pipeline,
+    )
+    print("Factor Backtest Summary")
+    print(f"factor: {result.factor}")
+    print(f"period: {result.start_date or 'earliest'} to {result.end_date or 'latest'}")
+    print(f"holding_period: {result.holding_period}")
+    print(f"quantiles: {result.quantiles}")
+    print(f"long_quantile: {result.long_quantile}")
+    print(f"short_quantile: {result.short_quantile}")
+    print(f"no_lookahead: {str(result.no_lookahead).lower()}")
+    print(f"signal_execution_lag: {result.signal_execution_lag}")
+    print(f"observations: {result.observations}")
+    print("quantile_returns:")
+    for quantile, value in result.quantile_returns.items():
+        print(f"{quantile}: {format_optional_number(value)}")
+    print(f"top_quantile_return: {format_optional_number(result.top_quantile_return)}")
+    print(f"bottom_quantile_return: {format_optional_number(result.bottom_quantile_return)}")
+    print(f"long_short_return: {format_optional_number(result.long_short_return)}")
+    print(f"long_short_annual_return: {format_optional_number(result.long_short_annual_return)}")
+    print(f"long_short_volatility: {format_optional_number(result.long_short_volatility)}")
+    print(f"long_short_sharpe: {format_optional_number(result.long_short_sharpe)}")
+    print(f"max_drawdown: {format_optional_number(result.max_drawdown)}")
+    print(f"hit_rate: {format_optional_pct(result.hit_rate)}")
+    print(f"turnover: {format_optional_number(result.turnover)}")
+    print(f"gross_exposure: {format_optional_number(result.gross_exposure)}")
+    print(f"net_exposure: {format_optional_number(result.net_exposure)}")
+    print(f"ic_mean: {format_optional_number(result.ic_mean)}")
+    print(f"rank_ic_mean: {format_optional_number(result.rank_ic_mean)}")
+    print(f"icir: {format_optional_number(result.icir)}")
+    if result.excluded_symbols:
+        print("excluded_symbols:")
+        for symbol in result.excluded_symbols:
+            print(f"{symbol}: {result.exclusion_reasons[symbol]}")
+    for warning in result.warnings:
+        print(f"warning: {warning}", file=sys.stderr)
+    print(f"report: {result.report_path}")
+    return 0
+

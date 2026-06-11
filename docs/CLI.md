@@ -2,6 +2,8 @@
 
 This file is the concise CLI index. See `docs/CLI_COMMANDS.md` for fuller examples.
 
+The public entry point remains `python -m quant.cli`. In `v0.15.0`, command parser registration and command execution were split into `quant/cli_commands/` modules without changing command names, arguments, output text, or report schemas.
+
 ```bash
 python -m quant.cli update-prices
 python -m quant.cli show-prices SPY --limit 5

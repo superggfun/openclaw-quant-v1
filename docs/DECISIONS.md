@@ -103,3 +103,7 @@ The V1.4 strategy evaluation layer explains returns and risk from supported gene
 ## 2026-06-11: Strategy Diagnostics Are Warnings
 
 Robustness diagnostics such as high turnover, high cost drag, symbol concentration, benchmark underperformance, or unstable Sharpe are emitted as warning codes for research review. They are not trade signals and they do not alter backtest, factor backtest, rebalance, or portfolio state semantics.
+
+## 2026-06-11: CLI Commands Are Split By Area
+
+The `v0.15.0` CLI refactor keeps `python -m quant.cli` as the public entry point while moving parser registration and command handlers into `quant/cli_commands/`. This is a maintainability change only: command names, arguments, output text, report schemas, and engine behavior should remain backward compatible.

@@ -4,7 +4,7 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v1.4.0-strategy-evaluation`
+`v0.15.0-cli-refactor`
 
 The project currently includes:
 
@@ -24,6 +24,7 @@ The project currently includes:
 - A deterministic daily portfolio backtest engine that combines stored prices, optimizer targets, rebalance logic, and costs.
 - An execution simulator that models intended, executed, and unfilled trades with costs.
 - CLI commands for price updates, price inspection, account initialization, simulated buys and sells, portfolio snapshots, trade history, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtests, allocation, rebalance plans, cost estimates, optimization, risk, and execution simulation.
+- A modular CLI implementation under `quant/cli_commands/`; this is a maintainability refactor, not a quant feature release.
 
 The project intentionally does not include:
 
@@ -76,7 +77,8 @@ The project intentionally does not include:
 - `quant/optimizer/optimizer_engine.py`: pure target allocation optimizer.
 - `quant/cost/cost_engine.py`: pure transaction cost estimator.
 - `quant/execution/execution_engine.py`: pure simulated execution engine.
-- `quant/cli.py`: command line interface.
+- `quant/cli.py`: command line entry point and dispatcher.
+- `quant/cli_commands/`: command-specific parser registration and handlers.
 - `tests/`: pytest coverage for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtest, rebalance, optimizer, risk, cost, and execution behavior.
 
 ## Recommended Workflow

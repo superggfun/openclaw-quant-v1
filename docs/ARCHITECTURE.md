@@ -16,7 +16,8 @@ SQLite / External APIs
 
 ## Components
 
-- `quant.cli`: Parses user commands and prints human-readable output.
+- `quant.cli`: Main CLI entry point. It builds the top-level parser, creates shared context, and dispatches to command modules.
+- `quant.cli_commands`: Dedicated parser registration and command handlers for data, portfolio, rebalance, risk, optimizer, alpha, factor, strategy evaluation, cost, execution, and backtest commands.
 - `quant.services.price_service`: Coordinates daily price updates and reads.
 - `quant.services.portfolio_service`: Applies simulated account, buy, sell, and valuation rules.
 - `quant.services.backtest_service`: Runs SMA crossover backtests from stored prices and writes JSON reports.
@@ -36,6 +37,14 @@ SQLite / External APIs
 - `quant.data_source.yfinance_client`: Wraps yfinance and normalizes downloaded prices.
 
 ## Data Flow
+
+CLI dispatch flow:
+
+```text
+python -m quant.cli -> quant.cli build_parser/create_context -> quant.cli_commands.<area>.handle
+```
+
+`v0.15.0` only refactors CLI structure. It does not change command names, arguments, output text, report schemas, or engine behavior.
 
 Price update flow:
 

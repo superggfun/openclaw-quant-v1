@@ -6,6 +6,8 @@ Run commands from the project root:
 python -m quant.cli <command>
 ```
 
+`v0.15.0` is an internal CLI refactor. The public commands below are intentionally unchanged while implementation lives in smaller `quant/cli_commands/` modules.
+
 Use a custom database path:
 
 ```bash
