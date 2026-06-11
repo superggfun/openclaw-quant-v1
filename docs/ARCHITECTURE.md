@@ -17,7 +17,10 @@ SQLite / External APIs
 ## Components
 
 - `quant.cli`: Main CLI entry point. It builds the top-level parser, creates shared context, and dispatches to command modules.
-- `quant.cli_commands`: Dedicated parser registration and command handlers for data, portfolio, rebalance, risk, optimizer, portfolio construction, alpha, factor, strategy evaluation, cost, execution, and backtest commands.
+- `quant.cli_commands`: Dedicated parser registration and command handlers for data, data layer, portfolio, rebalance, risk, optimizer, portfolio construction, alpha, factor, strategy evaluation, cost, execution, and backtest commands.
+- `quant.data_layer.universe_manager`: Builds default, custom, sector, ETF, and large-cap universes.
+- `quant.data_layer.symbol_metadata`: Stores static symbol metadata in SQLite.
+- `quant.data_layer.data_quality`: Produces coverage, data quality, and research readiness reports.
 - `quant.services.price_service`: Coordinates daily price updates and reads.
 - `quant.services.portfolio_service`: Applies simulated account, buy, sell, and valuation rules.
 - `quant.services.backtest_service`: Runs SMA crossover backtests from stored prices and writes JSON reports.
@@ -52,6 +55,14 @@ Price update flow:
 ```text
 CLI update-prices -> PriceService -> YFinanceClient -> SQLitePriceStore -> prices
 ```
+
+Data layer flow:
+
+```text
+CLI universe/data commands -> UniverseManager + SymbolMetadataStore + DataQualityAnalyzer -> prices/symbol_metadata -> reports/data_*.json
+```
+
+The data layer expands research coverage and diagnostics without changing factor evaluation, factor backtest, portfolio backtest, or no-lookahead semantics.
 
 Portfolio flow:
 
@@ -183,6 +194,7 @@ The execution simulator is side-effect free for portfolio state. It models fills
 ## Extension Points
 
 - `quant/backtesting`: future historical simulation module.
+- `quant/data_layer`: stable universe, metadata, coverage, and data quality boundary for future factor research.
 - `quant/risk`: future portfolio and strategy risk checks.
 - `quant/openclaw`: future OpenClaw integration boundary.
 - `quant/portfolio`: reserved for domain objects if the portfolio module grows beyond services and storage.

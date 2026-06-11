@@ -11,6 +11,7 @@ from quant.cli_commands import (
     backtest,
     cost,
     data,
+    data_layer,
     execution,
     factor_backtest,
     factor_eval,
@@ -28,6 +29,7 @@ from quant.config import DB_PATH
 
 COMMAND_MODULES = [
     data,
+    data_layer,
     portfolio,
     rebalance,
     risk,
@@ -48,6 +50,11 @@ COMMAND_HANDLERS = {
     "update-prices": data.handle,
     "show-prices": data.handle,
     "list-symbols": data.handle,
+    "universe-list": data_layer.handle,
+    "universe-build": data_layer.handle,
+    "data-refresh": data_layer.handle,
+    "data-coverage": data_layer.handle,
+    "research-readiness": data_layer.handle,
     "init-account": portfolio.handle,
     "buy": portfolio.handle,
     "sell": portfolio.handle,

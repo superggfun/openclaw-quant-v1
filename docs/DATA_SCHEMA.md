@@ -23,6 +23,26 @@ Columns:
 - `created_at`: insertion timestamp.
 - `updated_at`: update timestamp.
 
+## symbol_metadata
+
+Static symbol metadata for universe construction and sector diagnostics.
+
+Primary key:
+
+- `symbol`
+
+Columns:
+
+- `symbol`: ticker symbol.
+- `name`: issuer or fund name.
+- `asset_type`: `Equity` or `ETF`.
+- `sector`: sector classification or `ETF`.
+- `industry`: industry classification.
+- `currency`: reporting/trading currency.
+- `exchange`: primary exchange.
+- `created_at`: insertion timestamp.
+- `updated_at`: update timestamp.
+
 ## accounts
 
 Simulated account state.
@@ -251,6 +271,59 @@ Top-level keys:
 - `robustness_diagnostics`: rolling metrics, monthly returns, yearly returns, and diagnostics keyed by warning code.
 - `warnings`: warning objects with `code` and `reason`.
 - `interpretation_notes`: scope notes for offline interpretation.
+
+## reports/data_quality_*.json
+
+Data quality reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `created_at`: report timestamp.
+- `symbols`: analyzed symbols.
+- `status`: overall `PASS`, `WARNING`, or `FAIL`.
+- `summary`: count of pass, warning, and fail symbols.
+- `diagnostics`: per-symbol checks for missing ratio, duplicate rows, price outliers, zero/negative prices, zero-volume days, short history, data gaps, stale data, and adjusted close availability.
+
+## reports/data_refresh_*.json
+
+Data refresh reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `created_at`: report timestamp.
+- `symbols`: refreshed symbols.
+- `summary`: total symbols, inserted rows, updated rows, skipped existing rows, and error count.
+- `per_symbol`: per-symbol inserted, updated, skipped, fetched, fetch start, end date, status, and error message.
+
+## reports/data_coverage_*.json
+
+Data coverage reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `total_symbols`
+- `symbols_with_price_data`
+- `symbols_without_price_data`
+- `average_history_length`
+- `oldest_date`
+- `newest_date`
+- `symbols`: per-symbol coverage rows.
+
+## reports/research_readiness_*.json
+
+Research readiness reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `readiness_score`: 0-100 score.
+- `universe_size`
+- `history_depth_average`
+- `sector_count`
+- `factor_coverage_symbols`
+- `data_quality_status`
+- `recommendations`
+- `coverage_report_path`
+- `data_quality_report_path`
 
 ## reports/portfolio_construction_*.json
 

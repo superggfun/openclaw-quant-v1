@@ -4,12 +4,13 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v0.16.0-portfolio-construction`
+`v0.17.0-data-layer-universe`
 
 The project currently includes:
 
 - A market data layer using `yfinance` for US stock and ETF daily OHLCV data.
 - SQLite storage for normalized price data.
+- A `yfinance`-based offline data layer for universe management, static metadata, coverage, quality, and readiness diagnostics.
 - A simulated portfolio state module with accounts, positions, and trades.
 - An alpha engine that calculates deterministic factors and target weights from stored prices.
 - A factor pipeline that preprocesses same-date factor cross-sections before alpha generation or evaluation.
@@ -58,11 +59,14 @@ The project intentionally does not include:
 - Strategy evaluation features must read or generate supported offline source reports, then explain them without introducing new strategies, modifying portfolio state, or executing trades.
 - Strategy evaluation warning codes are research diagnostics. Do not treat them as automatic trade instructions.
 - Portfolio construction features must use stored prices only, respect the requested end/as-of date, generate target weights only, and leave rebalance or execution simulation to downstream modules.
+- Data layer features must not change factor evaluation or backtest semantics. They should improve metadata, coverage, quality, and readiness only.
+- AkShare, Tushare, A-share data, and real-time market data are future provider additions and are not part of v0.17.
 
 ## Important Files
 
 - `quant/config.py`: project defaults and symbol universe.
 - `quant/data_source/yfinance_client.py`: external market data adapter.
+- `quant/data_layer/`: universe, metadata, data quality, coverage, and readiness modules.
 - `quant/storage/sqlite_store.py`: price table persistence.
 - `quant/storage/portfolio_store.py`: account, position, and trade persistence.
 - `quant/services/price_service.py`: price update orchestration.

@@ -21,7 +21,26 @@ python -m quant.cli update-prices
 python -m quant.cli update-prices --symbols SPY QQQ AAPL
 python -m quant.cli show-prices SPY --limit 5
 python -m quant.cli list-symbols
+python -m quant.cli universe-list
+python -m quant.cli universe-build --sector Technology --max-symbols 10
+python -m quant.cli data-refresh
+python -m quant.cli data-coverage
+python -m quant.cli research-readiness
 ```
+
+## Data Layer
+
+```bash
+python -m quant.cli universe-list
+python -m quant.cli universe-build
+python -m quant.cli universe-build --symbols SPY,QQQ,NVDA
+python -m quant.cli universe-build --sector Technology --max-symbols 10
+python -m quant.cli data-refresh --universe etf_universe --start-date 2024-01-01
+python -m quant.cli data-coverage
+python -m quant.cli research-readiness
+```
+
+The data layer commands manage research universes, static metadata, stored-price coverage, data quality, and readiness diagnostics. They use the existing Yahoo Finance / `yfinance` daily data path. They do not provide real-time market data, AkShare, Tushare, A-share data, factor evaluation semantic changes, backtest semantic changes, portfolio state changes, or execution behavior.
 
 ## Simulated Portfolio
 
@@ -226,6 +245,8 @@ The alpha strategy path records `signal_date` and `execution_date` and executes 
 - Selling without enough position returns a non-zero exit code and prints `Error: insufficient position`.
 - Portfolio commands require an initialized account.
 - Backtest with no stored prices returns a non-zero exit code and a clear missing-data error.
+- Universe build excludes symbols that do not have metadata.
+- Data coverage and readiness commands can run with partial or missing price coverage and report recommendations.
 - Backtest rejects `short_window >= long_window`.
 - Rebalance rejects target weights that do not sum to `1.0`.
 - Rebalance requires latest prices for target symbols and held symbols.

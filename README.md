@@ -6,13 +6,16 @@ This project is for research and simulation only. It is not investment advice.
 
 ## Current Version
 
-`v0.16.0-portfolio-construction`
+`v0.17.0-data-layer-universe`
 
 This release includes:
 
 - CLI parser and command handlers split under `quant/cli_commands/`.
 - yfinance daily OHLCV ingestion.
 - SQLite price storage with idempotent updates.
+- Expanded research universe management.
+- Static symbol metadata storage.
+- Data coverage, data quality, and research readiness diagnostics.
 - Simulated account state.
 - Simulated positions and trade history.
 - Alpha factor generation from stored historical prices.
@@ -31,7 +34,7 @@ This release includes:
 - CLI commands for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtest, allocation, rebalance, risk, optimizer, portfolio construction, cost, and execution workflows.
 - pytest coverage for core state transitions.
 
-`v0.16.0` adds portfolio construction and risk parity target generation. It remains offline and simulation-only.
+`v0.17.0` expands the offline research data layer using the existing Yahoo Finance / `yfinance` daily data path. It does not add real-time data, AkShare, Tushare, A-share support, factor evaluation changes, or backtest semantic changes.
 
 ## Scope
 
@@ -64,6 +67,7 @@ openclaw-quant-v1/
 |  |- data_source/
 |  |- backtest/
 |  |- cost/
+|  |- data_layer/
 |  |- cli_commands/
 |  |- execution/
 |  |- factor_backtest/
@@ -98,6 +102,7 @@ Key modules:
 
 - `quant/cli.py`: command line entry point and command dispatcher.
 - `quant/cli_commands/`: parser registration and command handlers for each CLI area.
+- `quant/data_layer/`: universe management, symbol metadata, coverage, quality, and readiness diagnostics.
 - `quant/alpha/alpha_engine.py`: factor calculation and target weight generation.
 - `quant/factor_backtest/factor_backtest.py`: long-short factor return backtest.
 - `quant/factor_pipeline/factor_pipeline.py`: factor preprocessing, standardization, and neutralization.
@@ -138,7 +143,14 @@ python -m quant.cli update-prices
 python -m quant.cli update-prices --symbols SPY QQQ AAPL
 python -m quant.cli show-prices SPY --limit 5
 python -m quant.cli list-symbols
+python -m quant.cli universe-list
+python -m quant.cli universe-build --sector Technology --max-symbols 10
+python -m quant.cli data-refresh
+python -m quant.cli data-coverage
+python -m quant.cli research-readiness
 ```
+
+See `docs/DATA_LAYER.md` for universe, metadata, coverage, quality, and readiness details.
 
 ## Simulated Portfolio Commands
 
@@ -526,6 +538,7 @@ export OPENCLAW_QUANT_DB_PATH=/tmp/openclaw-quant.db
 ## SQLite Tables
 
 - `prices`: daily OHLCV data from yfinance
+- `symbol_metadata`: static symbol metadata for universe and sector workflows
 - `accounts`: simulated account cash and initial cash
 - `positions`: current simulated positions
 - `trades`: simulated trade ledger
@@ -539,6 +552,9 @@ export OPENCLAW_QUANT_DB_PATH=/tmp/openclaw-quant.db
 - `reports/strategy_eval_*.json`: generated strategy evaluation reports, ignored by git
 - `reports/optimize_*.json`: generated optimizer reports, ignored by git
 - `reports/portfolio_construction_*.json`: generated portfolio construction reports, ignored by git
+- `reports/data_quality_*.json`: generated data quality reports, ignored by git
+- `reports/data_coverage_*.json`: generated data coverage reports, ignored by git
+- `reports/research_readiness_*.json`: generated research readiness reports, ignored by git
 - `reports/cost_*.json`: generated cost reports, ignored by git
 - `reports/execution_*.json`: generated execution simulation reports, ignored by git
 
@@ -547,6 +563,7 @@ export OPENCLAW_QUANT_DB_PATH=/tmp/openclaw-quant.db
 Near-term work:
 
 - Add richer portfolio reporting.
+- Add richer universe curation and metadata maintenance workflows.
 - Add realized PnL tracking.
 - Add basic performance metrics.
 - Add more backtest strategies and benchmark comparisons.
@@ -579,6 +596,7 @@ Important docs:
 - `docs/ARCHITECTURE.md`
 - `docs/ROADMAP.md`
 - `docs/DATA_SCHEMA.md`
+- `docs/DATA_LAYER.md`
 - `docs/REBALANCE.md`
 - `docs/RISK.md`
 - `docs/ALPHA.md`

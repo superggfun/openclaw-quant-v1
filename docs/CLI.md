@@ -8,6 +8,11 @@ The public entry point remains `python -m quant.cli`. In `v0.15.0`, command pars
 python -m quant.cli update-prices
 python -m quant.cli show-prices SPY --limit 5
 python -m quant.cli list-symbols
+python -m quant.cli universe-list
+python -m quant.cli universe-build --sector Technology --max-symbols 10
+python -m quant.cli data-refresh
+python -m quant.cli data-coverage
+python -m quant.cli research-readiness
 python -m quant.cli init-account --cash 100000
 python -m quant.cli buy SPY --qty 10 --price 500
 python -m quant.cli sell SPY --qty 3 --price 510

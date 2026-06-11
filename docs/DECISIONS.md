@@ -111,3 +111,7 @@ The `v0.15.0` CLI refactor keeps `python -m quant.cli` as the public entry point
 ## 2026-06-11: Portfolio Construction Generates Targets Only
 
 The `v0.16.0` portfolio construction layer uses stored close prices to generate long-only target weights and risk contribution diagnostics. It does not update portfolio state, execute trades, call brokers, or make AI decisions. Rebalance and execution simulation remain separate downstream layers.
+
+## 2026-06-12: Data Layer Expands Research Coverage Without Changing Research Semantics
+
+The `v0.17.0` data layer adds static symbol metadata, universe construction, coverage reports, data quality diagnostics, and research readiness scoring. It does not change existing factor evaluation, factor backtest, portfolio backtest, or no-lookahead semantics.

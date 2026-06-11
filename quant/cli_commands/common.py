@@ -12,6 +12,9 @@ import pandas as pd
 from quant.alpha.alpha_engine import AlphaEngine
 from quant.backtest.backtest_engine import PortfolioBacktestEngine
 from quant.cost.cost_engine import CostEngine, TradeInput
+from quant.data_layer.data_quality import DataQualityAnalyzer, DataRefreshManager
+from quant.data_layer.symbol_metadata import SymbolMetadataStore
+from quant.data_layer.universe_manager import UniverseManager
 from quant.execution.execution_engine import ExecutionEngine
 from quant.factor_backtest.factor_backtest import FactorBacktest
 from quant.factor_eval.factor_evaluation import FactorEvaluation
@@ -32,6 +35,7 @@ class CLIContext:
     db_path: Path
     price_store: SQLitePriceStore
     portfolio_store: SQLitePortfolioStore
+    metadata_store: SymbolMetadataStore
     price_service: PriceService
     portfolio_service: PortfolioService
     backtest_service: BacktestService
@@ -45,16 +49,22 @@ class CLIContext:
     factor_evaluation: FactorEvaluation
     factor_backtest_engine: FactorBacktest
     strategy_evaluation: StrategyEvaluation
+    universe_manager: UniverseManager
+    data_quality_analyzer: DataQualityAnalyzer
+    data_refresh_manager: DataRefreshManager
 
 
 def create_context(db_path: Path) -> CLIContext:
     price_store = SQLitePriceStore(db_path)
     portfolio_store = SQLitePortfolioStore(db_path)
+    metadata_store = SymbolMetadataStore(db_path)
+    price_service = PriceService(price_store)
     return CLIContext(
         db_path=db_path,
         price_store=price_store,
         portfolio_store=portfolio_store,
-        price_service=PriceService(price_store),
+        metadata_store=metadata_store,
+        price_service=price_service,
         portfolio_service=PortfolioService(portfolio_store),
         backtest_service=BacktestService(price_store),
         portfolio_backtest_engine=PortfolioBacktestEngine(price_store),
@@ -67,6 +77,9 @@ def create_context(db_path: Path) -> CLIContext:
         factor_evaluation=FactorEvaluation(price_store),
         factor_backtest_engine=FactorBacktest(price_store),
         strategy_evaluation=StrategyEvaluation(),
+        universe_manager=UniverseManager(metadata_store),
+        data_quality_analyzer=DataQualityAnalyzer(price_store, metadata_store),
+        data_refresh_manager=DataRefreshManager(price_store, price_service.data_source),
     )
 
 

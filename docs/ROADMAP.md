@@ -168,9 +168,24 @@ Strategy Evaluation / Performance Attribution is not implemented in V1.3. It is 
 - JSON portfolio construction reports under `reports/`.
 - Tests for methods, constraints, no-lookahead behavior, data exclusions, rebalance compatibility, report schema, and CLI smoke.
 
+## v0.17.0-data-layer-universe
+
+- Data Layer module for universe management, symbol metadata, coverage, quality, and readiness diagnostics.
+- Continues to use Yahoo Finance / `yfinance` daily data; AkShare, Tushare, and A-share providers are not implemented in this version.
+- Static `symbol_metadata` SQLite table bootstrapped from project metadata.
+- Universe workflows for default, custom, sector, ETF, and large-cap universes.
+- CLI commands: `universe-list`, `universe-build`, `data-refresh`, `data-coverage`, and `research-readiness`.
+- Data quality diagnostics for missing ratio, duplicates, price outliers, zero-volume days, short history, and data gaps.
+- Research readiness score from 0 to 100 with recommendations.
+- JSON reports under `reports/` for quality, coverage, and readiness.
+- Tests for universe creation, exclusions, metadata lookup, missing data detection, duplicate diagnostics, coverage, and readiness.
+- No changes to factor evaluation or backtest semantics.
+
 ## Next
 
 - Add richer portfolio reporting.
+- Add configurable universe files and metadata maintenance commands.
+- Add provider abstraction for future AkShare, Tushare, and A-share research data after separate design.
 - Add realized PnL tracking.
 - Add basic performance metrics.
 - Add benchmark and buy-and-hold comparison metrics.
