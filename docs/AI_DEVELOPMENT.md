@@ -114,3 +114,7 @@ Use `quant/factors/factor_registry.py` as the central registry for deterministic
 ## v0.20 Walk Forward Notes
 
 Walk-forward code belongs under `quant/walk_forward` and should orchestrate existing engines rather than rewriting strategy logic. Keep reports deterministic, no-lookahead, and offline. New validation warnings should be stable codes with clear reasons and pytest coverage.
+
+## v0.21 Trading Simulation Notes
+
+Trading simulation code belongs under `quant/trading_simulation`. Keep it offline and deterministic. Use `PortfolioAccount` for in-memory cash and position state, preserve `signal_date < execution_date`, and do not write simulated historical loop state into persistent portfolio tables. New simulator changes should include CLI coverage, report schema tests, and Agent Export compatibility tests.

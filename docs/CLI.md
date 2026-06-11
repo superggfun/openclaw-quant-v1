@@ -59,6 +59,16 @@ python -m quant.cli alpha
 ```bash
 python -m quant.cli walk-forward --strategy alpha
 python -m quant.cli walk-forward --strategy factor_long_short --factor momentum_20d
+python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --portfolio-method equal_weight
+python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --portfolio-method risk_parity
 ```
 
 Use `--train-years`, `--test-years`, `--start`, `--end`, `--symbols`, and `--max-folds` to control fold generation. `--max-folds 0` runs all generated folds.
+
+## Trading Simulation
+
+```bash
+python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --portfolio-method equal_weight
+```
+
+`trade-sim` is an offline historical account simulation. It records signal dates and next execution dates, updates in-memory cash and positions, and writes `reports/trade_sim_*.json`.

@@ -55,6 +55,8 @@ Portfolio construction reads only stored close prices at or before the requested
 
 The module computes target weights only. Rebalance or execution simulation remains responsible for next-step trade suggestions and fills.
 
+`trade-sim` can also consume portfolio construction methods inside an offline historical account loop. In that path, portfolio construction still only computes target weights from signal-date-and-earlier data; the Trading Simulator handles next-date execution, costs, cash, and positions.
+
 ## Report
 
 Reports are written to:

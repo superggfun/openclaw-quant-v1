@@ -77,6 +77,11 @@ class AgentExporter:
         return builder(report, generated_from)
 
     def detect_report_type(self, report: dict[str, Any]) -> str:
+        if (
+            report.get("metadata", {}).get("report_type") == "trade_sim"
+            or {"strategy", "portfolio_method", "equity_curve", "rebalance_events", "final_equity"}.issubset(report)
+        ):
+            return "trade_sim"
         if {"strategy", "folds", "stability_analysis", "summary"}.issubset(report):
             return "walk_forward"
         if {"summary_metrics", "attribution", "robustness_diagnostics"}.issubset(report):
@@ -411,6 +416,47 @@ class AgentExporter:
             warnings,
             ["compare folds", "review factor stability", "inspect out-of-sample drawdowns"],
             [],
+            [],
+        )
+
+    def _export_trade_sim(self, report: dict[str, Any], generated_from: str) -> AgentExport:
+        warnings = self._clean_warnings(report.get("warnings"))
+        warnings.extend(
+            self._performance_warnings(
+                total_return=report.get("total_return"),
+                sharpe=report.get("sharpe"),
+                drawdown=report.get("max_drawdown"),
+            )
+        )
+        final_equity = self._num(report.get("final_equity"))
+        total_cost = self._num(report.get("total_cost"))
+        if final_equity is not None and total_cost is not None and total_cost / max(abs(final_equity), 1.0) > 0.02:
+            warnings.append("WARN_COST_DRAG_HIGH")
+        metrics = {
+            "strategy": report.get("strategy"),
+            "portfolio_method": report.get("portfolio_method"),
+            "initial_cash": report.get("initial_cash"),
+            "final_equity": report.get("final_equity"),
+            "total_return": report.get("total_return"),
+            "annual_return": report.get("annual_return"),
+            "sharpe": report.get("sharpe"),
+            "max_drawdown": report.get("max_drawdown"),
+            "total_cost": report.get("total_cost"),
+            "turnover": report.get("turnover"),
+            "trade_count": report.get("trade_count"),
+            "rebalance_events": len(report.get("rebalance_events") or []),
+            "no_lookahead": report.get("no_lookahead"),
+        }
+        assessment = "positive historical simulation" if self._num(report.get("total_return")) and self._num(report.get("total_return")) > 0 else "weak or negative historical simulation"
+        return self._base_export(
+            "trade_sim",
+            generated_from,
+            f"Historical trading simulation completed with {assessment}.",
+            metrics,
+            [assessment, "account-style cash and positions were tracked through time"],
+            warnings,
+            ["run walk-forward validation", "compare portfolio methods", "inspect cost drag", "review drawdown"],
+            ["run strategy evaluation", "export trade simulation report"],
             [],
         )
 

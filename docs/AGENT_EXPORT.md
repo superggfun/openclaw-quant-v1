@@ -36,6 +36,7 @@ Supported report types:
 - `rebalance`
 - `execution`
 - `backtest`
+- `trade_sim`
 
 ## Common Output Schema
 
@@ -99,3 +100,7 @@ The exporter does not invent external facts. It only uses fields in the input re
 ## Walk Forward Reports
 
 Agent Export supports `reports/walk_forward_*.json`. Summaries include fold count, average train/test return and Sharpe, factor stability ranking, warnings such as `WARN_OVERFIT` and `WARN_FACTOR_DECAY`, and deterministic next steps like reviewing out-of-sample folds or comparing factor stability.
+
+## Trade Simulation Reports
+
+Agent Export supports `reports/trade_sim_*.json`. Summaries include strategy, portfolio method, initial cash, final equity, total return, annual return, Sharpe, max drawdown, total cost, turnover, trade count, rebalance count, no-lookahead marker, warnings, and deterministic next steps such as comparing portfolio methods or inspecting cost drag.

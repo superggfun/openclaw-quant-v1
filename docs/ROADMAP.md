@@ -246,3 +246,13 @@ Strategy Evaluation / Performance Attribution is not implemented in V1.3. It is 
 - Adds out-of-sample train/test fold metrics, overfit warnings, factor decay warnings, regime sensitivity warnings, rolling validation, and factor stability ranking.
 - Adds `walk-forward` CLI and `reports/walk_forward_*.json`.
 - Validation layer only: no new factors, ML, broker integration, live trading, or no-lookahead changes.
+
+## v0.21.0-trading-simulation
+
+- Adds `quant/trading_simulation` for offline historical account-style simulation.
+- Adds reusable `PortfolioAccount` with cash, positions, trade history, realized PnL, unrealized PnL, cost tracking, and mark-to-market snapshots.
+- Adds `trade-sim` CLI for alpha-driven simulation with equal weight, inverse volatility, risk parity, or minimum variance portfolio construction.
+- Uses no-lookahead signal generation on the signal date and next available trading date execution by default.
+- Integrates Alpha Engine, Portfolio Construction, Cost Engine, and account state in one historical loop.
+- Adds `reports/trade_sim_*.json` and Agent Export support for trade simulation reports.
+- Offline simulation only: no broker API, no live execution, no high-frequency trading, and no change to existing backtest semantics.

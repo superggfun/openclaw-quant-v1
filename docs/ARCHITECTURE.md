@@ -17,7 +17,7 @@ SQLite / External APIs
 ## Components
 
 - `quant.cli`: Main CLI entry point. It builds the top-level parser, creates shared context, and dispatches to command modules.
-- `quant.cli_commands`: Dedicated parser registration and command handlers for data, data layer, agent export, portfolio, rebalance, risk, optimizer, portfolio construction, alpha, factor, strategy evaluation, cost, execution, and backtest commands.
+- `quant.cli_commands`: Dedicated parser registration and command handlers for data, data layer, agent export, portfolio, rebalance, risk, optimizer, portfolio construction, alpha, factor, strategy evaluation, trading simulation, cost, execution, and backtest commands.
 - `quant.agent_export.agent_exporter`: Converts detailed JSON reports into compact agent-friendly text, Markdown, or JSON summaries.
 - `quant.data_layer.universe_manager`: Builds default, custom, sector, ETF, and large-cap universes.
 - `quant.data_layer.symbol_metadata`: Stores static symbol metadata in SQLite.
@@ -30,6 +30,7 @@ SQLite / External APIs
 - `quant.factor_pipeline.factor_pipeline`: Preprocesses same-date factor cross-sections before alpha generation or evaluation.
 - `quant.factor_eval.factor_evaluation`: Evaluates factor predictive quality with no-lookahead IC, Rank IC, quintile, and decay metrics.
 - `quant.strategy_eval.strategy_evaluation`: Explains returns, risk, drawdowns, rolling metrics, and attribution from generated reports.
+- `quant.trading_simulation`: Runs offline account-style historical simulations with in-memory cash, positions, trades, costs, and equity curves.
 - `quant.backtest.backtest_engine`: Runs daily portfolio backtests from stored prices, optimizer targets, rebalance logic, and costs.
 - `quant.rebalance.rebalance_engine`: Calculates current allocation and rebalance suggestions from account, position, and price state.
 - `quant.risk.risk_engine`: Calculates portfolio concentration, cash, Top 5, industry, and risk score metrics.
@@ -200,6 +201,14 @@ CLI execute-sim -> RebalanceEngine -> ExecutionEngine -> CostEngine -> reports/e
 
 The execution simulator is side-effect free for portfolio state. It models fills, unfilled quantities, costs, slippage, final cash, and final positions without writing `accounts`, `positions`, or `trades`.
 
+Historical trading simulation flow:
+
+```text
+CLI trade-sim -> TradingSimulator -> AlphaEngine signal date T -> PortfolioConstructionEngine -> next trading day execution -> CostEngine -> PortfolioAccount -> reports/trade_sim_*.json
+```
+
+The trading simulator is offline and deterministic. It does not write to SQLite portfolio state, does not connect to brokers, and does not alter existing backtest semantics.
+
 ## Extension Points
 
 - `quant/backtesting`: future historical simulation module.
@@ -213,6 +222,7 @@ The execution simulator is side-effect free for portfolio state. It models fills
 - `quant/factor_pipeline`: stable factor preprocessing boundary for future alpha and evaluation callers.
 - `quant/factor_eval`: stable research diagnostics boundary for future factor and alpha research callers.
 - `quant/strategy_eval`: stable report explanation and attribution boundary.
+- `quant/trading_simulation`: stable offline historical account simulation boundary for future research and agent review.
 - `quant/rebalance`: stable calculation boundary for future Risk Engine, OpenClaw, and AI research callers.
 - `quant/risk`: stable calculation boundary for future OpenClaw Risk Agent callers.
 - `quant/optimizer`: stable target-allocation boundary for future research and OpenClaw callers.

@@ -127,3 +127,7 @@ The `v0.19.0` factor library adds value, quality, growth, reversal, and low-vola
 ## 2026-06-12: Walk Forward Is Validation Only
 
 The `v0.20.0` walk-forward layer orchestrates existing alpha, backtest, factor evaluation, and factor backtest engines to measure out-of-sample behavior. It must not add factors, change strategy semantics, connect brokers, place trades, or weaken no-lookahead guarantees.
+
+## 2026-06-12: Trading Simulation Uses In-Memory Account State
+
+The `v0.21.0` trading simulation layer tracks cash, positions, PnL, costs, and trades in an in-memory `PortfolioAccount`. It writes reports only and does not mutate the persistent `accounts`, `positions`, or `trades` tables. Signals use signal-date-and-earlier data, execution is scheduled for the next available trading date, and the feature remains offline historical research only.

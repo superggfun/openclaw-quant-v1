@@ -24,6 +24,7 @@ from quant.cli_commands import (
     rebalance,
     risk,
     strategy_eval,
+    trading_simulation,
     walk_forward,
 )
 from quant.cli_commands.common import create_context
@@ -46,6 +47,7 @@ COMMAND_MODULES = [
     factor_backtest,
     strategy_eval,
     walk_forward,
+    trading_simulation,
     cost,
     execution,
     backtest,
@@ -79,6 +81,7 @@ COMMAND_HANDLERS = {
     "factor-backtest": factor_backtest.handle,
     "strategy-eval": strategy_eval.handle,
     "walk-forward": walk_forward.handle,
+    "trade-sim": trading_simulation.handle,
     "cost": cost.handle,
     "execute-sim": execution.handle,
     "backtest": backtest.handle,

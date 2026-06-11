@@ -1,12 +1,12 @@
 # openclaw-quant-v1
 
-`openclaw-quant-v1` is an early OpenClaw-oriented quant system skeleton. It currently includes a market data layer, a simulated portfolio state module, an alpha engine, a factor pipeline, a factor evaluation framework, a long-short factor backtest, a strategy evaluation layer, a portfolio backtest engine, a portfolio rebalance engine, a risk engine, a portfolio optimizer, a portfolio construction/risk parity layer, a cost engine, and an execution simulator. It does not make AI decisions, place live orders, connect to brokers, or perform automated trading.
+`openclaw-quant-v1` is an early OpenClaw-oriented quant system skeleton. It currently includes a market data layer, a simulated portfolio state module, an alpha engine, a factor pipeline, a factor evaluation framework, a long-short factor backtest, a strategy evaluation layer, a portfolio backtest engine, a historical trading simulator, a portfolio rebalance engine, a risk engine, a portfolio optimizer, a portfolio construction/risk parity layer, a cost engine, and an execution simulator. It does not make AI decisions, place live orders, connect to brokers, or perform automated trading.
 
 This project is for research and simulation only. It is not investment advice.
 
 ## Current Version
 
-`v0.18.0-agent-export`
+`v0.21.0-trading-simulation`
 
 This release includes:
 
@@ -17,6 +17,7 @@ This release includes:
 - Static symbol metadata storage.
 - Data coverage, data quality, and research readiness diagnostics.
 - Agent export summaries for OpenClaw, Claude, GPT, Qwen, and other LLM agents.
+- Historical account-style trading simulation with in-memory cash, positions, costs, trade history, and daily equity.
 - Simulated account state.
 - Simulated positions and trade history.
 - Alpha factor generation from stored historical prices.
@@ -31,11 +32,11 @@ This release includes:
 - Portfolio construction methods for equal weight, inverse volatility, risk parity, and minimum variance target weights.
 - Transaction cost estimation for rebalance suggestions.
 - Simulated execution of rebalance suggestions with immediate, next-day open, TWAP, and partial-fill modes.
-- JSON research, factor pipeline, factor evaluation, factor backtest, strategy evaluation, portfolio construction, rebalance, cost, backtest, and execution reports under `reports/`.
+- JSON research, factor pipeline, factor evaluation, factor backtest, strategy evaluation, portfolio construction, trade simulation, rebalance, cost, backtest, and execution reports under `reports/`.
 - CLI commands for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtest, allocation, rebalance, risk, optimizer, portfolio construction, cost, and execution workflows.
 - pytest coverage for core state transitions.
 
-`v0.18.0` adds an export-only agent summary layer for existing JSON reports. It does not modify report schemas, quant logic, factor evaluation, backtests, or execution behavior.
+`v0.21.0` adds an offline historical account-style trading simulation loop. It does not modify existing backtest semantics, connect to brokers, or place live orders.
 
 ## Scope
 
@@ -111,6 +112,7 @@ Key modules:
 - `quant/factor_pipeline/factor_pipeline.py`: factor preprocessing, standardization, and neutralization.
 - `quant/factor_eval/factor_evaluation.py`: no-lookahead factor evaluation metrics.
 - `quant/strategy_eval/strategy_evaluation.py`: strategy evaluation and attribution from generated reports.
+- `quant/trading_simulation/`: historical account-style simulation with cash, positions, trades, costs, and equity curves.
 - `quant/services/price_service.py`: price update orchestration.
 - `quant/services/portfolio_service.py`: simulated portfolio rules and valuation.
 - `quant/services/backtest_service.py`: SMA crossover backtest engine.
@@ -169,6 +171,17 @@ python -m quant.cli export-for-agent --report reports/portfolio_construction_YYY
 ```
 
 See `docs/AGENT_EXPORT.md` for details.
+
+## Historical Trading Simulation
+
+`trade-sim` runs an offline account-style historical simulation. It generates alpha targets on signal dates, constructs a portfolio, simulates next-day execution with costs, updates in-memory cash and positions, and marks the account to market through time.
+
+```bash
+python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --portfolio-method equal_weight
+python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --portfolio-method risk_parity
+```
+
+Reports are written to `reports/trade_sim_YYYYMMDD_HHMMSS.json`. See `docs/TRADING_SIMULATION.md`.
 
 ## Simulated Portfolio Commands
 

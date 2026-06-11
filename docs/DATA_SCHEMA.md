@@ -440,3 +440,27 @@ Walk-forward reports are generated files, not database tables. Top-level keys:
 - `stability_analysis`: factor stability ranking.
 - `warnings`: deterministic diagnostics.
 - `recommendations`: deterministic follow-up suggestions.
+
+## reports/trade_sim_*.json
+
+Trading simulation reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `metadata`: report type, generation time, offline simulation flags, and no-broker markers.
+- `parameters`: start/end, rebalance frequency, execution price, symbols, alpha config, and cost config.
+- `strategy`: currently `alpha`.
+- `portfolio_method`: `equal_weight`, `inverse_volatility`, `risk_parity`, or `min_variance`.
+- `initial_cash`: starting simulated account cash.
+- `final_equity`: final marked-to-market account equity.
+- `total_return`, `annual_return`, `volatility`, `sharpe`, `max_drawdown`: account-level metrics.
+- `total_cost`: cumulative simulated transaction costs paid.
+- `turnover`: gross trade value divided by initial cash.
+- `trade_count`: number of simulated fills.
+- `equity_curve`: daily equity observations.
+- `cash_curve`: daily cash observations.
+- `positions_by_date`: daily positions and marked market value.
+- `trades`: simulated fills with signal and execution dates.
+- `rebalance_events`: signal date, execution date, targets, fills, costs, and warnings by rebalance.
+- `warnings`: deterministic simulation warnings.
+- `no_lookahead`: true for the signal/execution design.

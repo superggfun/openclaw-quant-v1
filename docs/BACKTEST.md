@@ -112,3 +112,7 @@ Alpha strategy reports include:
 ## Reproducibility
 
 The engine uses only stored prices and explicit parameters. It simulates positions in memory and includes deterministic cost estimates, so repeated runs with the same inputs produce the same trades and metrics.
+
+## Trading Simulation Relationship
+
+`python -m quant.cli trade-sim` is a separate v0.21 account-style simulator. It preserves existing `backtest` semantics and focuses on unified historical account state: cash, positions, costs, trades, realized/unrealized PnL, and daily mark-to-market snapshots. Use `backtest` for the existing research backtest path and `trade-sim` when account state evolution is the primary object of study.

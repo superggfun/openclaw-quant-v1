@@ -268,6 +268,7 @@ The alpha strategy path records `signal_date` and `execution_date` and executes 
 - Factor evaluation requires enough stored price history and future-return windows for at least one symbol.
 - Factor backtest requires enough stored price history and future-return windows for at least one long-short cross-section.
 - Strategy evaluation requires a supported JSON report path or `--strategy alpha/factor_long_short`.
+- Trading simulation requires enough stored price history before the first signal date and at least one next execution date.
 - Optimize requires at least one symbol in the optimizer universe with stored price data.
 - Portfolio construction requires at least one requested symbol with sufficient stored return history.
 - Cost requires a target allocation that can produce rebalance suggestions.
@@ -293,3 +294,12 @@ python -m quant.cli walk-forward --strategy factor_long_short --factor momentum_
 ```
 
 The command generates rolling train/test folds, computes out-of-sample metrics, factor stability rankings, and warnings such as `WARN_OVERFIT`, `WARN_FACTOR_DECAY`, and `WARN_REGIME_DEPENDENT`. It writes `reports/walk_forward_*.json` and does not modify portfolio state.
+
+## Historical Trading Simulation
+
+```bash
+python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --portfolio-method equal_weight
+python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --portfolio-method risk_parity
+```
+
+The command generates alpha signals on rebalance dates, constructs target weights, simulates next-trading-day execution with costs, updates an in-memory `PortfolioAccount`, and writes `reports/trade_sim_*.json`. It is offline research only and does not update persistent portfolio state or connect to brokers.
