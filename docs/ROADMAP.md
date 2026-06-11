@@ -229,3 +229,12 @@ Strategy Evaluation / Performance Attribution is not implemented in V1.3. It is 
 - Automated order execution.
 - AI decision execution.
 - Credential storage.
+
+## v0.19.0-factor-expansion
+
+- Adds `quant/factors` with a central `FactorRegistry`.
+- Adds value, quality, growth, reversal, and low-volatility price-history factor proxies.
+- Adds `factor-list` CLI.
+- Integrates registered factors with factor evaluation, factor pipeline, factor backtest, and alpha generation.
+- Adds composite alpha scoring through normalized `factor_weights`.
+- Preserves no-lookahead semantics and does not add machine learning, news sentiment, broker APIs, or live trading.

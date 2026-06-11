@@ -42,3 +42,14 @@ python -m quant.cli execute-sim --targets examples/optimized_targets.json
 python -m quant.cli backtest --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --alpha-config examples/alpha_config.json --execution-price close
 python -m quant.cli backtest --start 2023-01-01 --end 2024-12-31 --initial-cash 100000 --mode equal_weight --rebalance-frequency monthly
 ```
+
+## Factor Library
+
+```bash
+python -m quant.cli factor-list
+python -m quant.cli factor-eval --factor quality_score
+python -m quant.cli factor-backtest --factor reversal_20d
+python -m quant.cli alpha
+```
+
+`factor-list` prints registered factor names, categories, descriptions, required inputs, and lookback windows. Registered factors work with factor evaluation, factor pipeline, factor backtest, and composite alpha generation.

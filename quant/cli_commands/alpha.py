@@ -37,7 +37,10 @@ def handle(args, context) -> int:
     print(f"suggested_execution_date: {result.suggested_execution_date or 'next_available_session'}")
     print(f"weighting_mode: {result.config['weighting_mode']}")
     print("factors:")
-    print("symbol rank selected excluded momentum_20d momentum_60d volatility_20d risk_adjusted_momentum")
+    print(
+        "symbol rank selected excluded momentum_20d momentum_60d volatility_20d "
+        "risk_adjusted_momentum composite_alpha_score factor_contributions"
+    )
     for row in result.factors:
         print(
             f"{row.symbol:<6} {format_optional_rank(row.rank):>4} "
@@ -46,7 +49,9 @@ def handle(args, context) -> int:
             f"{format_optional_number(row.momentum_20d):>12} "
             f"{format_optional_number(row.momentum_60d):>12} "
             f"{format_optional_number(row.volatility_20d):>14} "
-            f"{format_optional_number(row.risk_adjusted_momentum):>23}"
+            f"{format_optional_number(row.risk_adjusted_momentum):>23} "
+            f"{format_optional_number(row.composite_alpha_score):>21} "
+            f"{json.dumps(row.factor_contributions or {}, sort_keys=True)}"
         )
     if result.excluded_symbols:
         print("excluded_symbols:")
@@ -66,4 +71,3 @@ def handle(args, context) -> int:
         print(f"targets: {result.targets_path}")
     print(f"report: {result.report_path}")
     return 0
-

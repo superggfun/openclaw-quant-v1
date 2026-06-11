@@ -12,6 +12,7 @@ import pandas as pd
 
 from quant.config import DEFAULT_SYMBOLS
 from quant.factor_pipeline.factor_pipeline import FactorPipeline
+from quant.factors.factor_registry import FactorRegistry
 from quant.storage.sqlite_store import SQLitePriceStore
 
 
@@ -24,7 +25,9 @@ DEFAULT_ALPHA_CONFIG = {
     "weighting_mode": "equal_weight",
     "min_cash_weight": 0.10,
     "max_position_weight": 0.20,
+    "factor_weights": None,
 }
+_UNSET = object()
 
 
 @dataclass(frozen=True)
@@ -42,6 +45,9 @@ class AlphaFactorRow:
     selected: bool
     excluded: bool
     exclusion_reason: str | None
+    factor_values: dict[str, float | None] | None = None
+    factor_contributions: dict[str, float] | None = None
+    composite_alpha_score: float | None = None
 
 
 @dataclass(frozen=True)
@@ -93,6 +99,7 @@ class AlphaEngine:
     ) -> None:
         self.price_store = price_store
         self.report_dir = Path(report_dir)
+        self.factor_registry = FactorRegistry()
 
     def generate(
         self,
@@ -112,6 +119,14 @@ class AlphaEngine:
             self._factor_row(symbol, normalized_config, warnings)
             for symbol in normalized_config["universe"]
         ]
+        composite_score_by_symbol: dict[str, float] | None = None
+        if normalized_config.get("factor_weights"):
+            factor_rows, composite_score_by_symbol = self._apply_composite_scores(
+                factor_rows,
+                normalized_config["factor_weights"],
+                warnings,
+            )
+            pipeline_factor = "composite_alpha_score"
         if pipeline_config is not None:
             normalized_pipeline_config = FactorPipeline.normalize_config(pipeline_config)
             pipeline_factor = str(dict(pipeline_config).get("factor", pipeline_factor)).strip().lower()
@@ -131,7 +146,7 @@ class AlphaEngine:
         ranked_rows = self._rank_rows(
             factor_rows,
             ranking_factor=pipeline_factor,
-            score_by_symbol=pipeline_score_by_symbol,
+            score_by_symbol=pipeline_score_by_symbol or composite_score_by_symbol,
         )
         selected_symbols = [
             row.symbol
@@ -245,6 +260,10 @@ class AlphaEngine:
             )
 
         risk_adjusted = momentum_long / volatility_short
+        factor_values = {
+            definition.name: self.factor_registry.factor_value(closes, definition.name)
+            for definition in self.factor_registry.list_factors()
+        }
 
         return AlphaFactorRow(
             symbol=symbol,
@@ -260,7 +279,77 @@ class AlphaEngine:
             selected=False,
             excluded=False,
             exclusion_reason=None,
+            factor_values=factor_values,
+            factor_contributions=None,
+            composite_alpha_score=None,
         )
+
+    @staticmethod
+    def _apply_composite_scores(
+        rows: list[AlphaFactorRow],
+        factor_weights: dict[str, float],
+        warnings: list[str],
+    ) -> tuple[list[AlphaFactorRow], dict[str, float]]:
+        valid_rows = [row for row in rows if not row.excluded]
+        normalized_scores_by_factor: dict[str, dict[str, float]] = {}
+        for factor in factor_weights:
+            raw_values = {
+                row.symbol: (row.factor_values or {}).get(factor)
+                for row in valid_rows
+            }
+            clean_values = {
+                symbol: float(value)
+                for symbol, value in raw_values.items()
+                if value is not None and pd.notna(value)
+            }
+            if not clean_values:
+                warnings.append(f"composite factor {factor} has no valid values")
+                normalized_scores_by_factor[factor] = {}
+                continue
+            series = pd.Series(clean_values, dtype="float64").sort_index()
+            if len(series) == 1 or float(series.std()) == 0:
+                normalized_scores_by_factor[factor] = {symbol: 1.0 for symbol in series.index}
+            else:
+                ranks = series.rank(method="average", pct=True)
+                normalized_scores_by_factor[factor] = {
+                    str(symbol): float(value)
+                    for symbol, value in ranks.items()
+                }
+
+        updated_rows: list[AlphaFactorRow] = []
+        composite_score_by_symbol: dict[str, float] = {}
+        for row in rows:
+            contributions = {}
+            composite_score = 0.0
+            has_signal = False
+            if not row.excluded:
+                for factor, weight in factor_weights.items():
+                    normalized_score = normalized_scores_by_factor.get(factor, {}).get(row.symbol)
+                    if normalized_score is None:
+                        contributions[factor] = 0.0
+                        continue
+                    contribution = float(weight) * float(normalized_score)
+                    contributions[factor] = contribution
+                    composite_score += contribution
+                    has_signal = True
+            excluded = row.excluded or not has_signal
+            reason = row.exclusion_reason
+            if not row.excluded and not has_signal:
+                reason = "no valid composite alpha factors"
+                warnings.append(f"excluded {row.symbol}: {reason}")
+            final_score = composite_score if has_signal else None
+            if final_score is not None:
+                composite_score_by_symbol[row.symbol] = final_score
+            updated_rows.append(
+                AlphaEngine._copy_row(
+                    row,
+                    excluded=excluded,
+                    exclusion_reason=reason,
+                    factor_contributions=contributions if contributions else None,
+                    composite_alpha_score=final_score,
+                )
+            )
+        return updated_rows, composite_score_by_symbol
 
     @staticmethod
     def _rank_rows(
@@ -280,20 +369,10 @@ class AlphaEngine:
         )
         rank_by_symbol = {row.symbol: rank for rank, row in enumerate(valid, start=1)}
         return [
-            AlphaFactorRow(
-                symbol=row.symbol,
-                as_of_date=row.as_of_date,
-                data_start_date=row.data_start_date,
-                data_end_date=row.data_end_date,
-                lookback_used=row.lookback_used,
-                momentum_20d=row.momentum_20d,
-                momentum_60d=row.momentum_60d,
-                volatility_20d=row.volatility_20d,
-                risk_adjusted_momentum=row.risk_adjusted_momentum,
+            AlphaEngine._copy_row(
+                row,
                 rank=rank_by_symbol.get(row.symbol),
                 selected=False,
-                excluded=row.excluded,
-                exclusion_reason=row.exclusion_reason,
             )
             for row in rows
         ]
@@ -312,20 +391,9 @@ class AlphaEngine:
     def _mark_selected(rows: list[AlphaFactorRow], selected_symbols: list[str]) -> list[AlphaFactorRow]:
         selected = set(selected_symbols)
         return [
-            AlphaFactorRow(
-                symbol=row.symbol,
-                as_of_date=row.as_of_date,
-                data_start_date=row.data_start_date,
-                data_end_date=row.data_end_date,
-                lookback_used=row.lookback_used,
-                momentum_20d=row.momentum_20d,
-                momentum_60d=row.momentum_60d,
-                volatility_20d=row.volatility_20d,
-                risk_adjusted_momentum=row.risk_adjusted_momentum,
-                rank=row.rank,
+            AlphaEngine._copy_row(
+                row,
                 selected=row.symbol in selected,
-                excluded=row.excluded,
-                exclusion_reason=row.exclusion_reason,
             )
             for row in rows
         ]
@@ -351,7 +419,11 @@ class AlphaEngine:
                     (
                         score_by_symbol.get(row.symbol)
                         if score_by_symbol is not None
-                        else row.risk_adjusted_momentum
+                        else (
+                            row.composite_alpha_score
+                            if row.composite_alpha_score is not None
+                            else row.risk_adjusted_momentum
+                        )
                     )
                     or 0.0,
                     0.0,
@@ -402,7 +474,49 @@ class AlphaEngine:
             return row.volatility_20d
         if factor == "risk_adjusted_momentum":
             return row.risk_adjusted_momentum
-        raise ValueError("pipeline factor must be one of: momentum_20d, momentum_60d, volatility_20d, risk_adjusted_momentum")
+        if factor == "composite_alpha_score":
+            return row.composite_alpha_score
+        if row.factor_values and factor in row.factor_values:
+            return row.factor_values[factor]
+        valid = sorted(FactorRegistry().factor_names() + ["composite_alpha_score"])
+        raise ValueError(f"pipeline factor must be one of: {', '.join(valid)}")
+
+    @staticmethod
+    def _copy_row(
+        row: AlphaFactorRow,
+        rank: int | None | object = _UNSET,
+        selected: bool | object = _UNSET,
+        excluded: bool | object = _UNSET,
+        exclusion_reason: str | None | object = _UNSET,
+        factor_contributions: dict[str, float] | None | object = _UNSET,
+        composite_alpha_score: float | None | object = _UNSET,
+    ) -> AlphaFactorRow:
+        return AlphaFactorRow(
+            symbol=row.symbol,
+            as_of_date=row.as_of_date,
+            data_start_date=row.data_start_date,
+            data_end_date=row.data_end_date,
+            lookback_used=row.lookback_used,
+            momentum_20d=row.momentum_20d,
+            momentum_60d=row.momentum_60d,
+            volatility_20d=row.volatility_20d,
+            risk_adjusted_momentum=row.risk_adjusted_momentum,
+            rank=row.rank if rank is _UNSET else rank,
+            selected=row.selected if selected is _UNSET else selected,
+            excluded=row.excluded if excluded is _UNSET else excluded,
+            exclusion_reason=row.exclusion_reason if exclusion_reason is _UNSET else exclusion_reason,
+            factor_values=row.factor_values,
+            factor_contributions=(
+                row.factor_contributions
+                if factor_contributions is _UNSET
+                else factor_contributions
+            ),
+            composite_alpha_score=(
+                row.composite_alpha_score
+                if composite_alpha_score is _UNSET
+                else composite_alpha_score
+            ),
+        )
 
     def _excluded_row(
         self,
@@ -427,6 +541,9 @@ class AlphaEngine:
             selected=False,
             excluded=True,
             exclusion_reason=reason,
+            factor_values=None,
+            factor_contributions=None,
+            composite_alpha_score=None,
         )
 
     @staticmethod
@@ -442,6 +559,7 @@ class AlphaEngine:
         merged["weighting_mode"] = str(merged["weighting_mode"]).lower()
         merged["min_cash_weight"] = float(merged["min_cash_weight"])
         merged["max_position_weight"] = float(merged["max_position_weight"])
+        merged["factor_weights"] = AlphaEngine._normalize_factor_weights(merged.get("factor_weights"))
 
         if not merged["universe"]:
             raise ValueError("alpha universe must not be empty")
@@ -461,10 +579,39 @@ class AlphaEngine:
 
     @staticmethod
     def _lookback_used(config: Mapping) -> dict[str, int]:
-        return {
+        lookbacks = {
             "momentum_20d": int(config["lookback_short"]),
             "momentum_60d": int(config["lookback_long"]),
             "volatility_20d": int(config["lookback_short"]),
+        }
+        factor_weights = config.get("factor_weights") if isinstance(config, Mapping) else None
+        if factor_weights:
+            registry = FactorRegistry()
+            for factor in factor_weights:
+                lookbacks[factor] = registry.describe(factor).lookback_days
+        return dict(sorted(lookbacks.items()))
+
+    @staticmethod
+    def _normalize_factor_weights(factor_weights) -> dict[str, float] | None:
+        if factor_weights is None or factor_weights == "":
+            return None
+        registry = FactorRegistry()
+        raw = dict(factor_weights)
+        normalized = {}
+        for factor, weight in raw.items():
+            name = str(factor).strip().lower()
+            registry.describe(name)
+            numeric_weight = float(weight)
+            if numeric_weight < 0:
+                raise ValueError("factor_weights must be non-negative")
+            if numeric_weight > 0:
+                normalized[name] = numeric_weight
+        if not normalized:
+            return None
+        total = sum(normalized.values())
+        return {
+            factor: weight / total
+            for factor, weight in sorted(normalized.items())
         }
 
     @staticmethod
@@ -486,7 +633,7 @@ class AlphaEngine:
         total_weight = round(sum(targets.values()), 6)
         if total_weight != 1.0:
             raise ValueError("alpha target weights must sum to 1.0")
-        if targets.get("cash", 0.0) + 1e-12 < config["min_cash_weight"]:
+        if targets.get("cash", 0.0) + 1e-6 < config["min_cash_weight"]:
             raise ValueError("alpha cash target is below min_cash_weight")
         for symbol, weight in targets.items():
             if symbol != "cash" and weight > config["max_position_weight"] + 1e-12:

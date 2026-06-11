@@ -105,3 +105,13 @@ The Alpha Engine creates research signals and target weights only. The Rebalance
 Use `docs/FACTOR_PIPELINE.md` and `python -m quant.cli alpha --pipeline examples/factor_pipeline_config.json` to clean or neutralize same-date factor scores before ranking.
 
 Use `docs/FACTOR_EVALUATION.md` and `python -m quant.cli factor-eval` to evaluate factor predictive quality before promoting a factor into target generation rules.
+
+## Composite Alpha Factors
+
+v0.19 adds optional `factor_weights` support. When configured, Alpha normalizes positive weights, rank-normalizes each same-date factor cross-section, computes per-factor `factor_contributions`, and ranks symbols by `composite_alpha_score`.
+
+Missing values receive zero contribution for that factor. Symbols with no valid composite inputs are excluded with a clear reason. The no-lookahead rule is unchanged: all factor values are computed from `as_of_date` and earlier rows, and generated targets should be executed or backtested on the next available trading day.
+
+Factor direction comes from the central registry. Most score factors are `higher_is_better=true`; raw `volatility_20d` is `higher_is_better=false` because it is a risk measure, while `low_volatility_score` flips that into a preference score. Reversal factors use negative recent momentum, so a higher `reversal_20d` means the symbol recently underperformed more and has a stronger mean-reversion score.
+
+The current `value_score`, `quality_score`, and `growth_score` are price-only proxies. They are placeholders for future fundamental-data-aware factors and should not be interpreted as true valuation, accounting quality, or fundamental growth measures.

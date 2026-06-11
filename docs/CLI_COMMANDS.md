@@ -272,3 +272,14 @@ The alpha strategy path records `signal_date` and `execution_date` and executes 
 - Portfolio construction requires at least one requested symbol with sufficient stored return history.
 - Cost requires a target allocation that can produce rebalance suggestions.
 - Execution simulation requires an initialized account, target allocation, and latest prices for target and held symbols.
+
+## Factor Library
+
+```bash
+python -m quant.cli factor-list
+python -m quant.cli factor-eval --factor quality_score
+python -m quant.cli factor-backtest --factor reversal_20d
+python -m quant.cli alpha
+```
+
+The factor library is registry-driven. `factor-list` shows each factor's category, type, required inputs, lookback window, and description. The Alpha Engine can combine registered factors using `factor_weights` in `examples/alpha_config.json`, producing `composite_alpha_score` and per-factor contributions in alpha reports.

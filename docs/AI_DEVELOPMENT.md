@@ -106,3 +106,7 @@ The project intentionally does not include:
 Future work may add strategy research and OpenClaw integration. Those modules should consume data, alpha targets, factor pipeline reports, factor evaluation reports, factor backtest reports, strategy evaluation reports, portfolio state, rebalance plans, risk reports, optimizer targets, cost estimates, and execution simulation reports through service or engine boundaries rather than reaching directly into unrelated internals.
 
 Broker APIs, credentials, live execution, OpenClaw, Claude, GPT, and automatic trading must stay out of this repo until explicitly requested and designed.
+
+## v0.19 Factor Development Notes
+
+Use `quant/factors/factor_registry.py` as the central registry for deterministic factors. Each factor must declare category, type, description, required inputs, and lookback window. Factor calculations must use only signal-date-and-earlier data, and new factors should be tested through `factor-eval`, `factor-backtest`, `factor-pipeline`, and `alpha` compatibility paths.

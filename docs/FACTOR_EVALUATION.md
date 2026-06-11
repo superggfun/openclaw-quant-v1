@@ -125,3 +125,9 @@ Single-symbol evaluations can produce factor observations and quintile data, but
 Factor Evaluation measures predictive quality with IC, Rank IC, quintiles, and decay. It does not explain portfolio returns or risk.
 
 Use `python -m quant.cli factor-backtest --factor <factor>` to create a factor spread return stream, then use `python -m quant.cli strategy-eval --factor-backtest-report <report>` for V1.4 performance attribution and robustness diagnostics.
+
+## v0.19 Factor Registry
+
+Factor Evaluation resolves supported factors through `FactorRegistry`. In addition to the original momentum and volatility factors, registered factors include `value_score`, `quality_score`, `growth_score`, `reversal_5d`, `reversal_20d`, and `low_volatility_score`.
+
+Reports include `factor_family`, `factor_type`, `factor_category`, `factor_description`, and `factor_inputs` so downstream tools can interpret factor results without filename assumptions.

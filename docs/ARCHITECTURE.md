@@ -220,3 +220,12 @@ The execution simulator is side-effect free for portfolio state. It models fills
 - `quant/cost`: stable cost-estimation boundary for future Backtest and Execution Engines.
 - `quant/backtest`: stable daily portfolio backtest boundary for future research callers.
 - `quant/execution`: stable simulated execution boundary for future OpenClaw Execution Agent callers.
+
+## v0.19 Factor Library
+
+- `quant/factors`: central deterministic factor registry plus price-history factor implementations.
+- `factor-list`: CLI command for factor discovery.
+- Alpha can blend configured `factor_weights` into `composite_alpha_score`.
+- Factor Evaluation, Factor Pipeline, and Factor Backtest resolve supported factors through the same registry.
+
+All v0.19 factors are computed from stored rows at or before the signal date. Future returns remain labels for evaluation/backtest only.

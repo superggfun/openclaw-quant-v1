@@ -408,3 +408,21 @@ Top-level keys:
 - `final_cash`: cash after simulated fills and costs.
 - `final_positions`: simulated ending quantities.
 - `warnings`: non-blocking warnings.
+
+## v0.19 Factor Metadata
+
+Factor evaluation and factor backtest reports include registry metadata:
+
+- `factor_family`
+- `factor_type`
+- `factor_category`
+- `factor_description`
+- `factor_inputs`
+- `factor_higher_is_better`
+- `factor_no_lookahead`
+
+Alpha factor rows may include:
+
+- `factor_values`: raw registered factor values by symbol.
+- `factor_contributions`: weighted normalized factor contributions when composite alpha is enabled.
+- `composite_alpha_score`: final blended score used for ranking when `factor_weights` are configured.

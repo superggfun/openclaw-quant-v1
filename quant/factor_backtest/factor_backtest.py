@@ -12,6 +12,7 @@ import pandas as pd
 from quant.config import DEFAULT_SYMBOLS
 from quant.factor_eval.factor_evaluation import SUPPORTED_FACTORS, FactorEvaluation
 from quant.factor_pipeline.factor_pipeline import FactorPipeline
+from quant.factors.factor_registry import FactorRegistry
 from quant.storage.sqlite_store import SQLitePriceStore
 
 
@@ -78,6 +79,13 @@ class FactorBacktestResult:
     rank_ic_mean: float | None
     icir: float | None
     ic_count: int
+    factor_family: str
+    factor_type: str
+    factor_category: str
+    factor_description: str
+    factor_inputs: list[str]
+    factor_higher_is_better: bool
+    factor_no_lookahead: bool
     excluded_symbols: list[str]
     exclusion_reasons: dict[str, str]
     no_lookahead: bool
@@ -123,6 +131,13 @@ class FactorBacktestResult:
             "rank_ic_mean": self.rank_ic_mean,
             "icir": self.icir,
             "ic_count": self.ic_count,
+            "factor_family": self.factor_family,
+            "factor_type": self.factor_type,
+            "factor_category": self.factor_category,
+            "factor_description": self.factor_description,
+            "factor_inputs": self.factor_inputs,
+            "factor_higher_is_better": self.factor_higher_is_better,
+            "factor_no_lookahead": self.factor_no_lookahead,
             "excluded_symbols": self.excluded_symbols,
             "exclusion_reasons": self.exclusion_reasons,
             "no_lookahead": self.no_lookahead,
@@ -145,6 +160,7 @@ class FactorBacktest:
     ) -> None:
         self.price_store = price_store
         self.report_dir = Path(report_dir)
+        self.factor_registry = FactorRegistry()
 
     def run(
         self,
@@ -162,6 +178,7 @@ class FactorBacktest:
         factor = factor.strip().lower()
         long_quantile = long_quantile or quantiles
         self._validate(factor, start, end, holding_period, quantiles, long_quantile, short_quantile)
+        factor_metadata = self.factor_registry.metadata(factor)
         symbols = self._normalize_symbols(universe or list(DEFAULT_SYMBOLS))
         normalized_pipeline_config = (
             FactorPipeline.normalize_config(pipeline_config)
@@ -212,6 +229,17 @@ class FactorBacktest:
         annual_return = self._annual_return(long_short_returns)
         volatility = self._annual_volatility(long_short_returns)
         sharpe = self._sharpe(long_short_returns)
+        if any(value <= -1.0 for value in long_short_returns):
+            warnings.append(
+                "long_short_return reached -100% because at least one leveraged long-short "
+                "spread period return was <= -100%; inspect period returns before treating "
+                "the compounded spread as an investable equity curve"
+            )
+        elif long_short_return is not None and long_short_return <= -0.999999:
+            warnings.append(
+                "long_short_return rounded to -100% after compounding many overlapping "
+                "long-short spread returns"
+            )
         if long_short_return is not None and sharpe is not None and long_short_return * sharpe < 0:
             warnings.append(
                 "long_short_return and sharpe differ in sign because long_short_return is compounded "
@@ -251,6 +279,13 @@ class FactorBacktest:
             rank_ic_mean=self._mean(rank_ic_values),
             icir=(ic_mean / ic_std) if ic_mean is not None and ic_std not in {None, 0.0} else None,
             ic_count=len(ic_values),
+            factor_family=str(factor_metadata["factor_family"]),
+            factor_type=str(factor_metadata["factor_type"]),
+            factor_category=str(factor_metadata["factor_category"]),
+            factor_description=str(factor_metadata["factor_description"]),
+            factor_inputs=list(factor_metadata["factor_inputs"]),
+            factor_higher_is_better=bool(factor_metadata["higher_is_better"]),
+            factor_no_lookahead=bool(factor_metadata["no_lookahead"]),
             excluded_symbols=excluded_symbols,
             exclusion_reasons=exclusion_reasons,
             no_lookahead=True,
@@ -296,6 +331,13 @@ class FactorBacktest:
             rank_ic_mean=result.rank_ic_mean,
             icir=result.icir,
             ic_count=result.ic_count,
+            factor_family=result.factor_family,
+            factor_type=result.factor_type,
+            factor_category=result.factor_category,
+            factor_description=result.factor_description,
+            factor_inputs=result.factor_inputs,
+            factor_higher_is_better=result.factor_higher_is_better,
+            factor_no_lookahead=result.factor_no_lookahead,
             excluded_symbols=result.excluded_symbols,
             exclusion_reasons=result.exclusion_reasons,
             no_lookahead=result.no_lookahead,
@@ -556,6 +598,8 @@ class FactorBacktest:
         compounded = FactorBacktest._compound_return(values)
         if compounded is None or not values:
             return None
+        if 1.0 + compounded <= 0:
+            return -1.0
         return (1.0 + compounded) ** (252.0 / len(values)) - 1.0
 
     @staticmethod

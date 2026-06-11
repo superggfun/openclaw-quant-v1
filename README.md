@@ -643,3 +643,16 @@ pytest
 ```
 
 The core tests use temporary SQLite databases and a fake market data source, so they do not need network access.
+
+## v0.19.0 Factor Expansion
+
+v0.19.0 adds a deterministic price-history factor library under `quant/factors/` plus the `factor-list` CLI command. New supported factors include `value_score`, `quality_score`, `growth_score`, `reversal_5d`, `reversal_20d`, and `low_volatility_score` alongside the original momentum and volatility factors.
+
+```bash
+python -m quant.cli factor-list
+python -m quant.cli factor-eval --factor quality_score
+python -m quant.cli factor-backtest --factor reversal_20d
+python -m quant.cli alpha
+```
+
+`examples/alpha_config.json` supports `factor_weights` for composite alpha scoring. Alpha reports include `factor_values`, `factor_contributions`, and `composite_alpha_score`. This remains offline research infrastructure: no machine learning, no news sentiment, no broker integration, and no live execution.

@@ -119,3 +119,7 @@ The `v0.17.0` data layer adds static symbol metadata, universe construction, cov
 ## 2026-06-12: Agent Export Is Read-Only
 
 The `v0.18.0` agent export layer converts existing reports into compact summaries for LLM and OpenClaw-style agents. It must not modify source report schemas, quant logic, factor evaluation logic, backtest logic, portfolio state, or execution behavior.
+
+## 2026-06-12: Factor Expansion Is Price-Only
+
+The `v0.19.0` factor library adds value, quality, growth, reversal, and low-volatility proxies using stored price history only. These are deterministic research factors, not paid-fundamental, sentiment, machine-learning, or live-trading features. New factors must be registered centrally and tested through factor evaluation/backtest compatibility.

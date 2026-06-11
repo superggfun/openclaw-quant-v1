@@ -11,15 +11,12 @@ import pandas as pd
 
 from quant.config import DEFAULT_SYMBOLS
 from quant.factor_pipeline.factor_pipeline import FactorPipeline
+from quant.factors.factor_registry import FactorRegistry
 from quant.storage.sqlite_store import SQLitePriceStore
 
 
-SUPPORTED_FACTORS = {
-    "momentum_20d",
-    "momentum_60d",
-    "volatility_20d",
-    "risk_adjusted_momentum",
-}
+FACTOR_REGISTRY = FactorRegistry()
+SUPPORTED_FACTORS = set(FACTOR_REGISTRY.factor_names())
 DEFAULT_DECAY_DAYS = [1, 5, 10, 20, 60]
 
 
@@ -56,6 +53,13 @@ class FactorEvaluationResult:
     observations: list[FactorObservation]
     excluded_symbols: list[str]
     exclusion_reasons: dict[str, str]
+    factor_family: str
+    factor_type: str
+    factor_category: str
+    factor_description: str
+    factor_inputs: list[str]
+    factor_higher_is_better: bool
+    factor_no_lookahead: bool
     warnings: list[str]
     pipeline_config: dict | None
     report_path: str
@@ -83,6 +87,13 @@ class FactorEvaluationResult:
             "observations": [asdict(observation) for observation in self.observations],
             "excluded_symbols": self.excluded_symbols,
             "exclusion_reasons": self.exclusion_reasons,
+            "factor_family": self.factor_family,
+            "factor_type": self.factor_type,
+            "factor_category": self.factor_category,
+            "factor_description": self.factor_description,
+            "factor_inputs": self.factor_inputs,
+            "factor_higher_is_better": self.factor_higher_is_better,
+            "factor_no_lookahead": self.factor_no_lookahead,
             "warnings": self.warnings,
             "pipeline_config": self.pipeline_config,
         }
@@ -98,6 +109,7 @@ class FactorEvaluation:
     ) -> None:
         self.price_store = price_store
         self.report_dir = Path(report_dir)
+        self.factor_registry = FACTOR_REGISTRY
 
     def evaluate(
         self,
@@ -110,6 +122,7 @@ class FactorEvaluation:
     ) -> FactorEvaluationResult:
         factor = factor.strip().lower()
         self._validate(factor, start, end, forward_days)
+        factor_metadata = self.factor_registry.metadata(factor)
         symbols = self._normalize_symbols(universe or list(DEFAULT_SYMBOLS))
         normalized_pipeline_config = (
             FactorPipeline.normalize_config(pipeline_config)
@@ -170,6 +183,13 @@ class FactorEvaluation:
             observations=observations,
             excluded_symbols=excluded_symbols,
             exclusion_reasons=exclusion_reasons,
+            factor_family=str(factor_metadata["factor_family"]),
+            factor_type=str(factor_metadata["factor_type"]),
+            factor_category=str(factor_metadata["factor_category"]),
+            factor_description=str(factor_metadata["factor_description"]),
+            factor_inputs=list(factor_metadata["factor_inputs"]),
+            factor_higher_is_better=bool(factor_metadata["higher_is_better"]),
+            factor_no_lookahead=bool(factor_metadata["no_lookahead"]),
             warnings=warnings,
             pipeline_config=normalized_pipeline_config,
             report_path="",
@@ -197,6 +217,13 @@ class FactorEvaluation:
             observations=result.observations,
             excluded_symbols=result.excluded_symbols,
             exclusion_reasons=result.exclusion_reasons,
+            factor_family=result.factor_family,
+            factor_type=result.factor_type,
+            factor_category=result.factor_category,
+            factor_description=result.factor_description,
+            factor_inputs=result.factor_inputs,
+            factor_higher_is_better=result.factor_higher_is_better,
+            factor_no_lookahead=result.factor_no_lookahead,
             warnings=result.warnings,
             pipeline_config=result.pipeline_config,
             report_path=str(report_path),
@@ -291,27 +318,7 @@ class FactorEvaluation:
 
     @staticmethod
     def _factor_value(closes: pd.Series, factor: str) -> float | None:
-        closes = pd.to_numeric(closes, errors="coerce").dropna()
-        if factor == "momentum_20d":
-            if len(closes) <= 20:
-                return None
-            return float((closes.iloc[-1] / closes.iloc[-21]) - 1.0)
-        if factor == "momentum_60d":
-            if len(closes) <= 60:
-                return None
-            return float((closes.iloc[-1] / closes.iloc[-61]) - 1.0)
-        returns_20d = closes.pct_change().dropna().tail(20)
-        if len(returns_20d) < 20:
-            return None
-        volatility_20d = float(returns_20d.std())
-        if factor == "volatility_20d":
-            return volatility_20d if volatility_20d > 0 else None
-        if factor == "risk_adjusted_momentum":
-            if len(closes) <= 60 or volatility_20d <= 0:
-                return None
-            momentum_60d = float((closes.iloc[-1] / closes.iloc[-61]) - 1.0)
-            return momentum_60d / volatility_20d
-        raise ValueError(f"unsupported factor: {factor}")
+        return FACTOR_REGISTRY.factor_value(closes, factor)
 
     @staticmethod
     def _correlations(observations: list[FactorObservation]) -> tuple[list[float], list[float]]:

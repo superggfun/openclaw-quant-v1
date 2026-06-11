@@ -31,6 +31,7 @@ EXPECTED_COMMANDS = {
     "portfolio-construct",
     "alpha",
     "factor-eval",
+    "factor-list",
     "factor-pipeline",
     "factor-backtest",
     "strategy-eval",
