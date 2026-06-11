@@ -238,3 +238,11 @@ Strategy Evaluation / Performance Attribution is not implemented in V1.3. It is 
 - Integrates registered factors with factor evaluation, factor pipeline, factor backtest, and alpha generation.
 - Adds composite alpha scoring through normalized `factor_weights`.
 - Preserves no-lookahead semantics and does not add machine learning, news sentiment, broker APIs, or live trading.
+
+## v0.20.0-walk-forward-validation
+
+- Adds `quant/walk_forward` for walk-forward and rolling validation.
+- Supports `alpha` and `factor_long_short` strategies using existing engines.
+- Adds out-of-sample train/test fold metrics, overfit warnings, factor decay warnings, regime sensitivity warnings, rolling validation, and factor stability ranking.
+- Adds `walk-forward` CLI and `reports/walk_forward_*.json`.
+- Validation layer only: no new factors, ML, broker integration, live trading, or no-lookahead changes.

@@ -53,3 +53,12 @@ python -m quant.cli alpha
 ```
 
 `factor-list` prints registered factor names, categories, descriptions, required inputs, and lookback windows. Registered factors work with factor evaluation, factor pipeline, factor backtest, and composite alpha generation.
+
+## Walk Forward
+
+```bash
+python -m quant.cli walk-forward --strategy alpha
+python -m quant.cli walk-forward --strategy factor_long_short --factor momentum_20d
+```
+
+Use `--train-years`, `--test-years`, `--start`, `--end`, `--symbols`, and `--max-folds` to control fold generation. `--max-folds 0` runs all generated folds.

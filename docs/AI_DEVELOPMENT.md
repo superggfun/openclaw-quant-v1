@@ -110,3 +110,7 @@ Broker APIs, credentials, live execution, OpenClaw, Claude, GPT, and automatic t
 ## v0.19 Factor Development Notes
 
 Use `quant/factors/factor_registry.py` as the central registry for deterministic factors. Each factor must declare category, type, description, required inputs, and lookback window. Factor calculations must use only signal-date-and-earlier data, and new factors should be tested through `factor-eval`, `factor-backtest`, `factor-pipeline`, and `alpha` compatibility paths.
+
+## v0.20 Walk Forward Notes
+
+Walk-forward code belongs under `quant/walk_forward` and should orchestrate existing engines rather than rewriting strategy logic. Keep reports deterministic, no-lookahead, and offline. New validation warnings should be stable codes with clear reasons and pytest coverage.

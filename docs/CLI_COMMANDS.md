@@ -283,3 +283,13 @@ python -m quant.cli alpha
 ```
 
 The factor library is registry-driven. `factor-list` shows each factor's category, type, required inputs, lookback window, and description. The Alpha Engine can combine registered factors using `factor_weights` in `examples/alpha_config.json`, producing `composite_alpha_score` and per-factor contributions in alpha reports.
+
+## Walk Forward Validation
+
+```bash
+python -m quant.cli walk-forward --strategy alpha
+python -m quant.cli walk-forward --strategy factor_long_short --factor momentum_20d
+python -m quant.cli walk-forward --strategy factor_long_short --factor momentum_20d --train-years 3 --test-years 1 --max-folds 0
+```
+
+The command generates rolling train/test folds, computes out-of-sample metrics, factor stability rankings, and warnings such as `WARN_OVERFIT`, `WARN_FACTOR_DECAY`, and `WARN_REGIME_DEPENDENT`. It writes `reports/walk_forward_*.json` and does not modify portfolio state.

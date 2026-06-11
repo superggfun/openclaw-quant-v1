@@ -29,6 +29,7 @@ from quant.services.price_service import PriceService
 from quant.storage.portfolio_store import SQLitePortfolioStore
 from quant.storage.sqlite_store import SQLitePriceStore
 from quant.strategy_eval.strategy_evaluation import StrategyEvaluation
+from quant.walk_forward.walk_forward import WalkForwardEngine
 
 
 @dataclass(frozen=True)
@@ -54,6 +55,7 @@ class CLIContext:
     data_quality_analyzer: DataQualityAnalyzer
     data_refresh_manager: DataRefreshManager
     agent_exporter: AgentExporter
+    walk_forward_engine: WalkForwardEngine
 
 
 def create_context(db_path: Path) -> CLIContext:
@@ -83,6 +85,7 @@ def create_context(db_path: Path) -> CLIContext:
         data_quality_analyzer=DataQualityAnalyzer(price_store, metadata_store),
         data_refresh_manager=DataRefreshManager(price_store, price_service.data_source),
         agent_exporter=AgentExporter(),
+        walk_forward_engine=WalkForwardEngine(price_store),
     )
 
 

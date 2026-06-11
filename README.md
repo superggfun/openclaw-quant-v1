@@ -644,6 +644,17 @@ pytest
 
 The core tests use temporary SQLite databases and a fake market data source, so they do not need network access.
 
+## v0.20.0 Walk Forward Validation
+
+v0.20.0 adds walk-forward and rolling validation for `alpha` and `factor_long_short` strategies. It is a validation layer only: no new factors, no ML, no broker integration, and no live trading.
+
+```bash
+python -m quant.cli walk-forward --strategy alpha
+python -m quant.cli walk-forward --strategy factor_long_short --factor momentum_20d
+```
+
+Reports are written to `reports/walk_forward_YYYYMMDD_HHMMSS.json` and include folds, train/test metrics, rolling validation, factor stability ranking, warnings, and recommendations.
+
 ## v0.19.0 Factor Expansion
 
 v0.19.0 adds a deterministic price-history factor library under `quant/factors/` plus the `factor-list` CLI command. New supported factors include `value_score`, `quality_score`, `growth_score`, `reversal_5d`, `reversal_20d`, and `low_volatility_score` alongside the original momentum and volatility factors.

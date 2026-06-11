@@ -77,6 +77,8 @@ class AgentExporter:
         return builder(report, generated_from)
 
     def detect_report_type(self, report: dict[str, Any]) -> str:
+        if {"strategy", "folds", "stability_analysis", "summary"}.issubset(report):
+            return "walk_forward"
         if {"summary_metrics", "attribution", "robustness_diagnostics"}.issubset(report):
             return "strategy_eval"
         if "factor" in report and "holding_period" in report and "long_short_return" in report:
@@ -371,6 +373,43 @@ class AgentExporter:
             ["backtest completed"],
             warnings,
             ["run strategy evaluation", "review drawdown", "compare benchmark"],
+            [],
+            [],
+        )
+
+    def _export_walk_forward(self, report: dict[str, Any], generated_from: str) -> AgentExport:
+        summary = report.get("summary") or {}
+        warnings = self._clean_warnings(report.get("warnings"))
+        stability = (report.get("stability_analysis") or {}).get("factor_stability_ranking") or []
+        top_stable = stability[0] if stability else {}
+        metrics = {
+            "strategy": report.get("strategy"),
+            "fold_count": summary.get("fold_count"),
+            "average_train_return": summary.get("average_train_return"),
+            "average_test_return": summary.get("average_test_return"),
+            "average_train_sharpe": summary.get("average_train_sharpe"),
+            "average_test_sharpe": summary.get("average_test_sharpe"),
+            "average_ic": summary.get("average_ic"),
+            "average_rank_ic": summary.get("average_rank_ic"),
+            "top_stable_factor": top_stable.get("factor"),
+            "top_stable_factor_classification": top_stable.get("classification"),
+        }
+        findings = []
+        if top_stable:
+            findings.append(f"{top_stable.get('factor')} classified as {top_stable.get('classification')}")
+        if any("WARN_OVERFIT" in warning for warning in warnings):
+            findings.append("overfitting detected")
+        if any("WARN_FACTOR_DECAY" in warning for warning in warnings):
+            findings.append("factor decay detected")
+        assessment = "walk-forward validation completed"
+        return self._base_export(
+            "walk_forward",
+            generated_from,
+            assessment,
+            metrics,
+            findings or [assessment],
+            warnings,
+            ["compare folds", "review factor stability", "inspect out-of-sample drawdowns"],
             [],
             [],
         )

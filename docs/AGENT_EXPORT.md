@@ -95,3 +95,7 @@ Recommendations are deterministic and report-type specific, for example:
 - evaluate risk parity allocation
 
 The exporter does not invent external facts. It only uses fields in the input report.
+
+## Walk Forward Reports
+
+Agent Export supports `reports/walk_forward_*.json`. Summaries include fold count, average train/test return and Sharpe, factor stability ranking, warnings such as `WARN_OVERFIT` and `WARN_FACTOR_DECAY`, and deterministic next steps like reviewing out-of-sample folds or comparing factor stability.

@@ -229,3 +229,7 @@ The execution simulator is side-effect free for portfolio state. It models fills
 - Factor Evaluation, Factor Pipeline, and Factor Backtest resolve supported factors through the same registry.
 
 All v0.19 factors are computed from stored rows at or before the signal date. Future returns remain labels for evaluation/backtest only.
+
+## v0.20 Walk Forward Validation
+
+`quant/walk_forward` is the out-of-sample validation boundary. It orchestrates existing Alpha, PortfolioBacktest, FactorEvaluation, FactorBacktest, and rolling-validation helpers. It does not change strategy, factor, or no-lookahead semantics. It produces `reports/walk_forward_*.json` for downstream Strategy Evaluation and Agent Export consumption.

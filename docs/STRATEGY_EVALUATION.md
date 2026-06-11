@@ -11,6 +11,8 @@ It answers:
 
 It does not create new alpha factors, introduce new strategies, connect to brokers, modify portfolio state, or execute live trades.
 
+Walk-forward validation is a separate v0.20 layer. Use `python -m quant.cli walk-forward` to generate out-of-sample fold reports before or after strategy evaluation when checking robustness.
+
 ## Inputs
 
 Supported inputs:

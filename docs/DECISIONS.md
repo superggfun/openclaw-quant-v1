@@ -123,3 +123,7 @@ The `v0.18.0` agent export layer converts existing reports into compact summarie
 ## 2026-06-12: Factor Expansion Is Price-Only
 
 The `v0.19.0` factor library adds value, quality, growth, reversal, and low-volatility proxies using stored price history only. These are deterministic research factors, not paid-fundamental, sentiment, machine-learning, or live-trading features. New factors must be registered centrally and tested through factor evaluation/backtest compatibility.
+
+## 2026-06-12: Walk Forward Is Validation Only
+
+The `v0.20.0` walk-forward layer orchestrates existing alpha, backtest, factor evaluation, and factor backtest engines to measure out-of-sample behavior. It must not add factors, change strategy semantics, connect brokers, place trades, or weaken no-lookahead guarantees.

@@ -426,3 +426,17 @@ Alpha factor rows may include:
 - `factor_values`: raw registered factor values by symbol.
 - `factor_contributions`: weighted normalized factor contributions when composite alpha is enabled.
 - `composite_alpha_score`: final blended score used for ranking when `factor_weights` are configured.
+
+## reports/walk_forward_*.json
+
+Walk-forward reports are generated files, not database tables. Top-level keys:
+
+- `metadata`: engine, creation time, validation-only flags, and no-lookahead marker.
+- `strategy`: `alpha` or `factor_long_short`.
+- `parameters`: universe, windows, factor, cash, rebalance frequency, and fold limits.
+- `folds`: train/test windows and fold metrics.
+- `summary`: average train/test metrics plus best and worst folds.
+- `rolling_validation`: rolling return, Sharpe, IC, Rank IC, and drawdown.
+- `stability_analysis`: factor stability ranking.
+- `warnings`: deterministic diagnostics.
+- `recommendations`: deterministic follow-up suggestions.

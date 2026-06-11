@@ -35,6 +35,7 @@ EXPECTED_COMMANDS = {
     "factor-pipeline",
     "factor-backtest",
     "strategy-eval",
+    "walk-forward",
     "cost",
     "execute-sim",
     "backtest",

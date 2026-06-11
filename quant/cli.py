@@ -24,6 +24,7 @@ from quant.cli_commands import (
     rebalance,
     risk,
     strategy_eval,
+    walk_forward,
 )
 from quant.cli_commands.common import create_context
 from quant.config import DB_PATH
@@ -44,6 +45,7 @@ COMMAND_MODULES = [
     factor_pipeline,
     factor_backtest,
     strategy_eval,
+    walk_forward,
     cost,
     execution,
     backtest,
@@ -76,6 +78,7 @@ COMMAND_HANDLERS = {
     "factor-pipeline": factor_pipeline.handle,
     "factor-backtest": factor_backtest.handle,
     "strategy-eval": strategy_eval.handle,
+    "walk-forward": walk_forward.handle,
     "cost": cost.handle,
     "execute-sim": execution.handle,
     "backtest": backtest.handle,
