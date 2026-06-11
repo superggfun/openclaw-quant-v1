@@ -19,7 +19,7 @@ Symbols are ranked by `risk_adjusted_momentum`, highest first.
 
 Alpha is calculated with an inclusive `as_of_date` cutoff. The engine only reads price rows where `date <= as_of_date`. When `as_of_date` is `null`, the latest stored date available for each symbol is used.
 
-Alpha-generated targets are signals for the next tradable session. Rebalance planning may inspect the target file immediately, but execution and backtest fills should default to the next trading day after the signal date. The alpha report includes `suggested_execution_date` when a next stored price row is available.
+Alpha-generated targets are signals for the next tradable session. Rebalance planning may inspect the target file immediately, but execution and backtest fills should default to the next trading day after the signal date. The alpha report includes `suggested_execution_date` when a next stored price row is available. The V1.0 alpha backtest path follows this rule and records both `signal_date` and `execution_date` for every trade.
 
 This avoids lookahead bias: prices after the signal date are not used to rank symbols or size target weights.
 

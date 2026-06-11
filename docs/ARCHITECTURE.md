@@ -108,6 +108,14 @@ CLI backtest -> PortfolioBacktestEngine -> prices -> optimizer-style targets -> 
 
 The portfolio backtest engine is deterministic and runs in memory. It does not modify live simulated portfolio state.
 
+No-lookahead alpha backtest flow:
+
+```text
+CLI backtest --strategy alpha -> PortfolioBacktestEngine -> AlphaEngine on signal date T -> next trading day execution -> CostEngine -> reports/backtest_*.json
+```
+
+The alpha backtest path uses only T and earlier rows for signal generation, then executes on the next available trading day. It records signal and execution dates in trades and equity snapshots.
+
 Execution simulation flow:
 
 ```text

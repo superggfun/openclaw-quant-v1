@@ -79,3 +79,7 @@ The V0.9 alpha engine calculates deterministic factors from stored prices and pr
 ## 2026-06-11: Alpha Uses Signal-Date Data Only
 
 Alpha factors use rows at or before `as_of_date`. Alpha targets are treated as next-session targets, and the report exposes `suggested_execution_date` when stored data can identify the following trading date.
+
+## 2026-06-11: Alpha Backtests Must Execute After Signal Date
+
+The V1.0 alpha backtest path generates signals on T with T-and-earlier data and executes on the next available trading day. Legacy same-day-close portfolio modes remain available only as simple smoke paths.

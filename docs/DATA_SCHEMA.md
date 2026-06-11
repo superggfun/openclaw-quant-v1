@@ -77,9 +77,14 @@ Top-level keys:
 - `initial_cash`: initial simulated cash.
 - `mode`: optimizer mode.
 - `rebalance_frequency`: monthly, weekly, or daily.
+- `strategy`: `portfolio` or `alpha`.
+- `no_lookahead`: true for the alpha strategy path.
+- `signal_execution_lag`: signal and execution timing description.
+- `alpha_config`: alpha config used for alpha strategy runs.
+- `excluded_symbols_per_rebalance`: per-signal-date excluded symbols and reasons.
 - `metrics`: final value, returns, drawdown, volatility, Sharpe ratio, trade count, turnover, total cost, and cash ratio.
-- `trades`: deterministic simulated backtest executions with costs.
-- `equity_curve`: daily cash, positions, and equity values.
+- `trades`: deterministic simulated backtest executions with costs. Alpha strategy trades include `signal_date`, `execution_date`, `signal_price`, and `execution_price`.
+- `equity_curve`: daily cash, positions, equity values, `last_signal_date`, and `last_execution_date`.
 
 ## reports/rebalance_*.json
 

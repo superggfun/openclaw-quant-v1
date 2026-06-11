@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -27,6 +28,18 @@ def seed_price_series(db_path: Path, symbols: list[str], days: int = 45) -> None
                 }
             )
     SQLitePriceStore(db_path).upsert_prices(pd.DataFrame(rows))
+
+
+def alpha_config(symbols: list[str]) -> dict:
+    return {
+        "universe": symbols,
+        "lookback_short": 5,
+        "lookback_long": 10,
+        "top_n": len(symbols),
+        "weighting_mode": "equal_weight",
+        "min_cash_weight": 0.1,
+        "max_position_weight": 0.5,
+    }
 
 
 def test_portfolio_backtest_runs_to_completion(tmp_path: Path) -> None:
@@ -132,3 +145,129 @@ def test_portfolio_backtest_no_data_has_clear_error(tmp_path: Path) -> None:
             symbols=["SPY"],
         )
 
+
+def test_alpha_backtest_signal_date_precedes_execution_date(tmp_path: Path) -> None:
+    db_path = tmp_path / "quant.db"
+    seed_price_series(db_path, ["SPY", "QQQ"], days=90)
+    engine = PortfolioBacktestEngine(SQLitePriceStore(db_path), report_dir=tmp_path / "reports")
+
+    result = engine.run(
+        start="2024-01-01",
+        end="2024-03-30",
+        initial_cash=100000,
+        rebalance_frequency="monthly",
+        strategy="alpha",
+        alpha_config=alpha_config(["SPY", "QQQ"]),
+    )
+
+    assert result.strategy == "alpha"
+    assert result.no_lookahead is True
+    assert result.signal_execution_lag == "next_trading_day"
+    assert result.trades
+    assert all(trade.signal_date < trade.execution_date for trade in result.trades)
+    assert all(trade.signal_price is not None for trade in result.trades)
+    assert all(trade.execution_price is not None for trade in result.trades)
+    assert any(point["last_signal_date"] for point in result.equity_curve)
+    assert any(point["last_execution_date"] for point in result.equity_curve)
+
+
+def test_alpha_backtest_future_prices_do_not_change_existing_signal_trades(tmp_path: Path) -> None:
+    db_path = tmp_path / "quant.db"
+    seed_price_series(db_path, ["SPY", "QQQ"], days=65)
+    store = SQLitePriceStore(db_path)
+    engine = PortfolioBacktestEngine(store, report_dir=tmp_path / "reports")
+    config = alpha_config(["SPY", "QQQ"])
+
+    first = engine.run(
+        start="2024-01-01",
+        end="2024-02-03",
+        initial_cash=100000,
+        rebalance_frequency="monthly",
+        strategy="alpha",
+        alpha_config=config,
+    )
+    store.upsert_prices(
+        pd.DataFrame(
+            [
+                {
+                    "symbol": "SPY",
+                    "date": "2024-02-03",
+                    "open": 10000,
+                    "high": 10000,
+                    "low": 10000,
+                    "close": 10000,
+                    "adj_close": 10000,
+                    "volume": 1000,
+                }
+            ]
+        )
+    )
+    second = engine.run(
+        start="2024-01-01",
+        end="2024-02-03",
+        initial_cash=100000,
+        rebalance_frequency="monthly",
+        strategy="alpha",
+        alpha_config=config,
+    )
+
+    first_execution_date = first.trades[0].execution_date
+    first_trades = [trade for trade in first.trades if trade.execution_date == first_execution_date]
+    second_trades = [trade for trade in second.trades if trade.execution_date == first_execution_date]
+
+    assert [(t.symbol, t.side, t.shares, t.signal_price, t.execution_price) for t in first_trades] == [
+        (t.symbol, t.side, t.shares, t.signal_price, t.execution_price) for t in second_trades
+    ]
+
+
+def test_alpha_backtest_costs_reduce_final_value(tmp_path: Path) -> None:
+    db_path = tmp_path / "quant.db"
+    seed_price_series(db_path, ["SPY", "QQQ"], days=90)
+    engine = PortfolioBacktestEngine(SQLitePriceStore(db_path), report_dir=tmp_path / "reports")
+    config = alpha_config(["SPY", "QQQ"])
+
+    no_cost = engine.run(
+        start="2024-01-01",
+        end="2024-03-30",
+        initial_cash=100000,
+        rebalance_frequency="monthly",
+        strategy="alpha",
+        alpha_config=config,
+        cost_config={"model": "fixed", "fixed_fee": 0, "slippage_bps": 0},
+    )
+    with_cost = engine.run(
+        start="2024-01-01",
+        end="2024-03-30",
+        initial_cash=100000,
+        rebalance_frequency="monthly",
+        strategy="alpha",
+        alpha_config=config,
+        cost_config={"model": "combined", "fixed_fee": 1, "commission_rate": 0.001, "slippage_bps": 5},
+    )
+
+    assert with_cost.metrics.total_cost > no_cost.metrics.total_cost
+    assert with_cost.metrics.final_value < no_cost.metrics.final_value
+
+
+def test_alpha_backtest_report_contains_no_lookahead_fields(tmp_path: Path) -> None:
+    db_path = tmp_path / "quant.db"
+    seed_price_series(db_path, ["SPY", "QQQ"], days=90)
+    engine = PortfolioBacktestEngine(SQLitePriceStore(db_path), report_dir=tmp_path / "reports")
+
+    result = engine.run(
+        start="2024-01-01",
+        end="2024-03-30",
+        initial_cash=100000,
+        rebalance_frequency="monthly",
+        strategy="alpha",
+        execution_price="close",
+        alpha_config=alpha_config(["SPY", "QQQ"]),
+    )
+    report = json.loads(Path(result.report_path).read_text(encoding="utf-8"))
+
+    assert report["strategy"] == "alpha"
+    assert report["no_lookahead"] is True
+    assert report["signal_execution_lag"] == "next_trading_day"
+    assert report["alpha_config"]["lookback_long"] == 10
+    assert "excluded_symbols_per_rebalance" in report
+    assert report["trades"][0]["signal_date"] < report["trades"][0]["execution_date"]

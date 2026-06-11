@@ -45,6 +45,7 @@ The project intentionally does not include:
 - Future OpenClaw integrations should call only stable CLI commands or explicitly designed API boundaries.
 - Future Risk Engine, OpenClaw, and AI research agents should call the Rebalance Engine rather than duplicate allocation logic.
 - Alpha features must avoid lookahead bias: factor calculations may use only rows at or before `as_of_date`, and generated targets are next-trading-day signals.
+- Alpha backtest features must keep `signal_date < execution_date`; do not use the same close to create a signal and execute a trade.
 
 ## Important Files
 

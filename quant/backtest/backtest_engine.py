@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from quant.alpha.alpha_engine import AlphaEngine
 from quant.config import DEFAULT_SYMBOLS
 from quant.cost.cost_engine import CostEngine, TradeInput
 from quant.optimizer.optimizer_engine import DEFAULT_CONSTRAINTS
@@ -27,6 +28,10 @@ class PortfolioBacktestTrade:
     notional: float
     total_cost: float
     cash_after: float
+    signal_date: str | None = None
+    execution_date: str | None = None
+    signal_price: float | None = None
+    execution_price: float | None = None
 
 
 @dataclass(frozen=True)
@@ -54,14 +59,24 @@ class PortfolioBacktestResult:
     trades: list[PortfolioBacktestTrade]
     equity_curve: list[dict]
     report_path: str
+    strategy: str = "portfolio"
+    no_lookahead: bool = False
+    signal_execution_lag: str | None = None
+    alpha_config: dict | None = None
+    excluded_symbols_per_rebalance: dict[str, dict[str, str]] | None = None
 
     def to_report(self) -> dict:
         return {
             "start": self.start,
             "end": self.end,
             "initial_cash": self.initial_cash,
+            "strategy": self.strategy,
             "mode": self.mode,
             "rebalance_frequency": self.rebalance_frequency,
+            "no_lookahead": self.no_lookahead,
+            "signal_execution_lag": self.signal_execution_lag,
+            "alpha_config": self.alpha_config,
+            "excluded_symbols_per_rebalance": self.excluded_symbols_per_rebalance or {},
             "metrics": asdict(self.metrics),
             "trades": [asdict(trade) for trade in self.trades],
             "equity_curve": self.equity_curve,
@@ -91,8 +106,22 @@ class PortfolioBacktestEngine:
         symbols: list[str] | None = None,
         constraints: dict | None = None,
         cost_config: dict | None = None,
+        strategy: str = "portfolio",
+        execution_price: str = "close",
+        alpha_config: dict | None = None,
     ) -> PortfolioBacktestResult:
-        self._validate(start, end, initial_cash, mode, rebalance_frequency)
+        self._validate(start, end, initial_cash, mode, rebalance_frequency, strategy, execution_price)
+        if strategy == "alpha":
+            return self._run_alpha_strategy(
+                start=start,
+                end=end,
+                initial_cash=initial_cash,
+                rebalance_frequency=rebalance_frequency,
+                cost_config=cost_config,
+                execution_price=execution_price,
+                alpha_config=alpha_config or {},
+            )
+
         universe = self._normalize_symbols(symbols or list(DEFAULT_SYMBOLS))
         price_frame = self._load_price_frame(universe, start, end)
         active_symbols = list(price_frame.columns)
@@ -138,6 +167,8 @@ class PortfolioBacktestEngine:
                     "cash": cash,
                     "equity": equity,
                     "positions": dict(positions),
+                    "last_signal_date": date_text,
+                    "last_execution_date": date_text,
                 }
             )
 
@@ -158,6 +189,11 @@ class PortfolioBacktestEngine:
             trades=trades,
             equity_curve=equity_curve,
             report_path="",
+            strategy=strategy,
+            no_lookahead=False,
+            signal_execution_lag="same_day_close_simple_mode",
+            alpha_config=None,
+            excluded_symbols_per_rebalance={},
         )
         report_path = self._write_report(result)
         return PortfolioBacktestResult(
@@ -170,6 +206,150 @@ class PortfolioBacktestEngine:
             trades=result.trades,
             equity_curve=result.equity_curve,
             report_path=str(report_path),
+            strategy=result.strategy,
+            no_lookahead=result.no_lookahead,
+            signal_execution_lag=result.signal_execution_lag,
+            alpha_config=result.alpha_config,
+            excluded_symbols_per_rebalance=result.excluded_symbols_per_rebalance,
+        )
+
+    def _run_alpha_strategy(
+        self,
+        start: str,
+        end: str,
+        initial_cash: float,
+        rebalance_frequency: str,
+        cost_config: dict | None,
+        execution_price: str,
+        alpha_config: dict,
+    ) -> PortfolioBacktestResult:
+        merged_alpha_config = dict(alpha_config)
+        universe = self._normalize_symbols(merged_alpha_config.get("universe") or list(DEFAULT_SYMBOLS))
+        price_frame = self._load_price_frame(universe, start, end)
+        active_symbols = list(price_frame.columns)
+        if not active_symbols:
+            raise ValueError("no price data found for backtest universe")
+
+        price_lookup = self._load_price_lookup(active_symbols, start, end)
+        alpha_engine = AlphaEngine(self.price_store, report_dir=self.report_dir)
+        cost_engine = CostEngine(cost_config or {})
+        cash = float(initial_cash)
+        positions = {symbol: 0 for symbol in active_symbols}
+        trades: list[PortfolioBacktestTrade] = []
+        equity_curve: list[dict] = []
+        gross_trade_value = 0.0
+        total_cost = 0.0
+        pending_rebalances: list[dict] = []
+        excluded_symbols_per_rebalance: dict[str, dict[str, str]] = {}
+        last_signal_date: str | None = None
+        last_execution_date: str | None = None
+
+        for index, (date_value, prices) in enumerate(price_frame.iterrows()):
+            date_text = date_value.strftime("%Y-%m-%d")
+
+            due = [event for event in pending_rebalances if event["execution_date"] == date_text]
+            pending_rebalances = [event for event in pending_rebalances if event["execution_date"] != date_text]
+            for event in due:
+                execution_prices = {
+                    symbol: price_lookup[date_text][symbol][execution_price]
+                    for symbol in active_symbols
+                }
+                day_trades, cash, positions = self._rebalance_alpha(
+                    signal_date=event["signal_date"],
+                    execution_date=date_text,
+                    cash=cash,
+                    positions=positions,
+                    signal_prices=event["signal_prices"],
+                    execution_prices=execution_prices,
+                    target_weights=event["target_weights"],
+                    cost_engine=cost_engine,
+                )
+                trades.extend(day_trades)
+                gross_trade_value += sum(trade.notional for trade in day_trades)
+                total_cost += sum(trade.total_cost for trade in day_trades)
+                if day_trades:
+                    last_execution_date = date_text
+
+            if self._is_rebalance_date(price_frame.index, index, rebalance_frequency) and index + 1 < len(price_frame.index):
+                signal_date = date_text
+                execution_date = price_frame.index[index + 1].strftime("%Y-%m-%d")
+                signal_alpha_config = dict(merged_alpha_config)
+                signal_alpha_config["universe"] = active_symbols
+                signal_alpha_config["as_of_date"] = signal_date
+                try:
+                    alpha_result = alpha_engine.generate(config=signal_alpha_config)
+                except ValueError:
+                    alpha_result = None
+
+                if alpha_result is not None:
+                    target_weights = {
+                        symbol: weight
+                        for symbol, weight in alpha_result.target_weights.items()
+                        if symbol == "cash" or symbol in active_symbols
+                    }
+                    excluded_symbols_per_rebalance[signal_date] = dict(alpha_result.exclusion_reasons)
+                    pending_rebalances.append(
+                        {
+                            "signal_date": signal_date,
+                            "execution_date": execution_date,
+                            "target_weights": target_weights,
+                            "signal_prices": {symbol: float(prices[symbol]) for symbol in active_symbols},
+                        }
+                    )
+                    last_signal_date = signal_date
+
+            price_map = {symbol: float(prices[symbol]) for symbol in active_symbols}
+            equity = cash + sum(positions[symbol] * price_map[symbol] for symbol in active_symbols)
+            equity_curve.append(
+                {
+                    "date": date_text,
+                    "cash": cash,
+                    "equity": equity,
+                    "positions": dict(positions),
+                    "last_signal_date": last_signal_date,
+                    "last_execution_date": last_execution_date,
+                }
+            )
+
+        metrics = self._metrics(
+            equity_curve=equity_curve,
+            initial_cash=initial_cash,
+            gross_trade_value=gross_trade_value,
+            total_cost=total_cost,
+            trade_count=len(trades),
+        )
+        result = PortfolioBacktestResult(
+            start=start,
+            end=end,
+            initial_cash=float(initial_cash),
+            mode="alpha",
+            rebalance_frequency=rebalance_frequency,
+            metrics=metrics,
+            trades=trades,
+            equity_curve=equity_curve,
+            report_path="",
+            strategy="alpha",
+            no_lookahead=True,
+            signal_execution_lag="next_trading_day",
+            alpha_config=merged_alpha_config,
+            excluded_symbols_per_rebalance=excluded_symbols_per_rebalance,
+        )
+        report_path = self._write_report(result)
+        return PortfolioBacktestResult(
+            start=result.start,
+            end=result.end,
+            initial_cash=result.initial_cash,
+            mode=result.mode,
+            rebalance_frequency=result.rebalance_frequency,
+            metrics=result.metrics,
+            trades=result.trades,
+            equity_curve=result.equity_curve,
+            report_path=str(report_path),
+            strategy=result.strategy,
+            no_lookahead=result.no_lookahead,
+            signal_execution_lag=result.signal_execution_lag,
+            alpha_config=result.alpha_config,
+            excluded_symbols_per_rebalance=result.excluded_symbols_per_rebalance,
         )
 
     def _load_price_frame(self, symbols: list[str], start: str, end: str) -> pd.DataFrame:
@@ -191,6 +371,18 @@ class PortfolioBacktestEngine:
         if prices.empty:
             raise ValueError("no complete price data found for backtest universe")
         return prices
+
+    def _load_price_lookup(self, symbols: list[str], start: str, end: str) -> dict[str, dict[str, dict[str, float]]]:
+        lookup: dict[str, dict[str, dict[str, float]]] = {}
+        for symbol in symbols:
+            history = self.price_store.get_price_history(symbol, start=start, end=end)
+            for row in history.to_dict("records"):
+                date_text = str(row["date"])
+                lookup.setdefault(date_text, {})[symbol] = {
+                    "open": float(row["open"]),
+                    "close": float(row["close"]),
+                }
+        return lookup
 
     def _target_weights(
         self,
@@ -299,6 +491,90 @@ class PortfolioBacktestEngine:
 
         return trades, cash, updated_positions
 
+    def _rebalance_alpha(
+        self,
+        signal_date: str,
+        execution_date: str,
+        cash: float,
+        positions: dict[str, int],
+        signal_prices: dict[str, float],
+        execution_prices: dict[str, float],
+        target_weights: dict[str, float],
+        cost_engine: CostEngine,
+    ) -> tuple[list[PortfolioBacktestTrade], float, dict[str, int]]:
+        total_value = cash + sum(positions[symbol] * signal_prices[symbol] for symbol in positions)
+        trades: list[PortfolioBacktestTrade] = []
+        updated_positions = dict(positions)
+
+        for symbol in sorted(positions):
+            current_value = updated_positions[symbol] * signal_prices[symbol]
+            target_value = total_value * target_weights.get(symbol, 0.0)
+            difference = target_value - current_value
+            if difference >= 0:
+                continue
+            signal_price = signal_prices[symbol]
+            execution_price = execution_prices[symbol]
+            shares = min(updated_positions[symbol], math.floor(abs(difference) / signal_price))
+            if shares <= 0:
+                continue
+            trade_input = TradeInput(symbol=symbol, side="SELL", shares=shares, price=execution_price)
+            cost = cost_engine.estimate([trade_input], write_report=False).trades[0].total_cost
+            notional = shares * execution_price
+            cash += notional - cost
+            updated_positions[symbol] -= shares
+            trades.append(
+                self._trade(
+                    date_text=execution_date,
+                    trade_input=trade_input,
+                    notional=notional,
+                    total_cost=cost,
+                    cash_after=cash,
+                    signal_date=signal_date,
+                    execution_date=execution_date,
+                    signal_price=signal_price,
+                    execution_price=execution_price,
+                )
+            )
+
+        for symbol in sorted(positions):
+            current_value = updated_positions[symbol] * signal_prices[symbol]
+            target_value = total_value * target_weights.get(symbol, 0.0)
+            difference = target_value - current_value
+            if difference <= 0:
+                continue
+            signal_price = signal_prices[symbol]
+            execution_price = execution_prices[symbol]
+            shares = math.floor(difference / signal_price)
+            while shares > 0:
+                trade_input = TradeInput(symbol=symbol, side="BUY", shares=shares, price=execution_price)
+                cost = cost_engine.estimate([trade_input], write_report=False).trades[0].total_cost
+                notional = shares * execution_price
+                if notional + cost <= cash:
+                    break
+                shares -= 1
+            if shares <= 0:
+                continue
+            trade_input = TradeInput(symbol=symbol, side="BUY", shares=shares, price=execution_price)
+            cost = cost_engine.estimate([trade_input], write_report=False).trades[0].total_cost
+            notional = shares * execution_price
+            cash -= notional + cost
+            updated_positions[symbol] += shares
+            trades.append(
+                self._trade(
+                    date_text=execution_date,
+                    trade_input=trade_input,
+                    notional=notional,
+                    total_cost=cost,
+                    cash_after=cash,
+                    signal_date=signal_date,
+                    execution_date=execution_date,
+                    signal_price=signal_price,
+                    execution_price=execution_price,
+                )
+            )
+
+        return trades, cash, updated_positions
+
     @staticmethod
     def _trade(
         date_text: str,
@@ -306,6 +582,10 @@ class PortfolioBacktestEngine:
         notional: float,
         total_cost: float,
         cash_after: float,
+        signal_date: str | None = None,
+        execution_date: str | None = None,
+        signal_price: float | None = None,
+        execution_price: float | None = None,
     ) -> PortfolioBacktestTrade:
         return PortfolioBacktestTrade(
             date=date_text,
@@ -316,6 +596,10 @@ class PortfolioBacktestEngine:
             notional=notional,
             total_cost=total_cost,
             cash_after=cash_after,
+            signal_date=signal_date,
+            execution_date=execution_date,
+            signal_price=signal_price,
+            execution_price=execution_price,
         )
 
     @staticmethod
@@ -372,6 +656,8 @@ class PortfolioBacktestEngine:
         initial_cash: float,
         mode: str,
         rebalance_frequency: str,
+        strategy: str,
+        execution_price: str,
     ) -> None:
         if not start or not end:
             raise ValueError("start and end are required")
@@ -383,6 +669,10 @@ class PortfolioBacktestEngine:
             raise ValueError("mode must be one of: equal_weight, risk_adjusted, constrained")
         if rebalance_frequency not in {"monthly", "weekly", "daily"}:
             raise ValueError("rebalance_frequency must be one of: monthly, weekly, daily")
+        if strategy not in {"portfolio", "alpha"}:
+            raise ValueError("strategy must be one of: portfolio, alpha")
+        if execution_price not in {"close", "open"}:
+            raise ValueError("execution_price must be one of: close, open")
 
     @staticmethod
     def _normalize_symbols(symbols: list[str]) -> list[str]:

@@ -117,8 +117,11 @@ def build_parser() -> argparse.ArgumentParser:
     backtest.add_argument("--end", required=True, help="Inclusive end date YYYY-MM-DD.")
     backtest.add_argument("--cash", type=float, default=100000.0)
     backtest.add_argument("--initial-cash", type=float, default=None)
+    backtest.add_argument("--strategy", choices=["portfolio", "alpha"], default="portfolio")
     backtest.add_argument("--mode", choices=["equal_weight", "risk_adjusted", "constrained"], default="equal_weight")
     backtest.add_argument("--rebalance-frequency", choices=["monthly", "weekly", "daily"], default="monthly")
+    backtest.add_argument("--execution-price", choices=["close", "open"], default="close")
+    backtest.add_argument("--alpha-config", default="examples/alpha_config.json")
     backtest.add_argument("--short-window", type=int, default=20)
     backtest.add_argument("--long-window", type=int, default=50)
     backtest.add_argument("--commission", type=float, default=0.0)
@@ -420,18 +423,25 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "backtest":
             initial_cash = args.initial_cash if args.initial_cash is not None else args.cash
             if args.symbol is None:
+                alpha_config = _load_alpha_config(Path(args.alpha_config)) if args.strategy == "alpha" else None
                 result = portfolio_backtest_engine.run(
                     start=args.start,
                     end=args.end,
                     initial_cash=initial_cash,
                     mode=args.mode,
                     rebalance_frequency=args.rebalance_frequency,
+                    strategy=args.strategy,
+                    execution_price=args.execution_price,
+                    alpha_config=alpha_config,
                 )
                 metrics = result.metrics
                 print("Portfolio Backtest Summary")
                 print(f"period: {result.start} to {result.end}")
+                print(f"strategy: {result.strategy}")
                 print(f"mode: {result.mode}")
                 print(f"rebalance_frequency: {result.rebalance_frequency}")
+                print(f"no_lookahead: {str(result.no_lookahead).lower()}")
+                print(f"signal_execution_lag: {result.signal_execution_lag}")
                 print(f"initial_cash: {result.initial_cash:.2f}")
                 print(f"final_value: {metrics.final_value:.2f}")
                 print(f"total_return: {metrics.total_return:.4f}")

@@ -116,6 +116,21 @@ The execution simulator turns rebalance suggestions into simulated fills, unfill
 
 Backtests use existing rows in the `prices` table. Load prices first:
 
+No-lookahead alpha strategy:
+
+```bash
+python -m quant.cli backtest \
+  --strategy alpha \
+  --start 2024-01-01 \
+  --end 2025-01-01 \
+  --initial-cash 100000 \
+  --rebalance-frequency monthly \
+  --alpha-config examples/alpha_config.json \
+  --execution-price close
+```
+
+Simple portfolio smoke mode:
+
 ```bash
 python -m quant.cli update-prices --symbols SPY --start 2023-01-01 --end 2024-12-31
 python -m quant.cli backtest --start 2023-01-01 --end 2024-12-31 --initial-cash 100000 --mode equal_weight --rebalance-frequency monthly
@@ -133,6 +148,8 @@ python -m quant.cli backtest \
 ```
 
 Legacy SMA single-symbol backtests remain available with `--symbol`.
+
+The alpha strategy path records `signal_date` and `execution_date` and executes on the next available trading day. Simple portfolio modes use a same-day close assumption and are intended for smoke checks.
 
 ## Failure Behavior
 

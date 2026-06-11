@@ -92,6 +92,16 @@
 - CLI command: `python -m quant.cli alpha`.
 - Tests for factor generation, target generation, rebalance compatibility, invalid config, and missing price data.
 
+## v1.0.0-backtest-no-lookahead
+
+- Alpha strategy integration in the Backtest Engine.
+- Signal generation uses only signal-date and earlier prices.
+- Execution occurs on the next available trading date.
+- Trade records include signal date, execution date, signal price, execution price, costs, and cash after trade.
+- Equity curve records last signal and execution dates.
+- Reports include `no_lookahead`, `signal_execution_lag`, `alpha_config`, and excluded symbols per rebalance.
+- Legacy simple portfolio modes remain available but are documented as same-day-close smoke modes.
+
 ## Next
 
 - Add richer portfolio reporting.

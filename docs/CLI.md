@@ -19,5 +19,6 @@ python -m quant.cli optimize
 python -m quant.cli cost
 python -m quant.cli rebalance --targets examples/optimized_targets.json --with-costs
 python -m quant.cli execute-sim --targets examples/optimized_targets.json
+python -m quant.cli backtest --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --alpha-config examples/alpha_config.json --execution-price close
 python -m quant.cli backtest --start 2023-01-01 --end 2024-12-31 --initial-cash 100000 --mode equal_weight --rebalance-frequency monthly
 ```
