@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from quant.config import DB_PATH, DEFAULT_SYMBOLS
+from quant.cost.cost_engine import CostEngine, TradeInput
 from quant.optimizer.optimizer_engine import DEFAULT_CONSTRAINTS, OptimizerEngine
 from quant.rebalance.rebalance_engine import DEFAULT_COMMISSION_RATE, RebalanceEngine
 from quant.risk.risk_engine import RiskEngine
@@ -68,6 +69,8 @@ def build_parser() -> argparse.ArgumentParser:
     rebalance = subparsers.add_parser("rebalance", help="Calculate a portfolio rebalance plan.")
     rebalance.add_argument("--targets", required=True, help="Path to target allocation JSON.")
     rebalance.add_argument("--commission", type=float, default=DEFAULT_COMMISSION_RATE)
+    rebalance.add_argument("--with-costs", action="store_true", help="Include transaction cost estimate.")
+    rebalance.add_argument("--cost-config", default="examples/cost_config.json")
 
     subparsers.add_parser("risk", help="Calculate portfolio risk metrics.")
 
@@ -78,6 +81,16 @@ def build_parser() -> argparse.ArgumentParser:
     optimize.add_argument("--max-position-weight", type=float, default=None)
     optimize.add_argument("--min-cash-weight", type=float, default=None)
     optimize.add_argument("--max-sector-weight", type=float, default=None)
+
+    cost = subparsers.add_parser("cost", help="Estimate transaction costs for rebalance suggestions.")
+    cost.add_argument("--targets", default="examples/optimized_targets.json")
+    cost.add_argument("--config", default="examples/cost_config.json")
+    cost.add_argument("--model", choices=["fixed", "linear", "combined"], default=None)
+    cost.add_argument("--fixed-fee", type=float, default=None)
+    cost.add_argument("--commission-rate", type=float, default=None)
+    cost.add_argument("--min-commission", type=float, default=None)
+    cost.add_argument("--slippage-bps", type=float, default=None)
+    cost.add_argument("--min-trade-notional", type=float, default=None)
 
     backtest = subparsers.add_parser("backtest", help="Run an SMA crossover backtest.")
     backtest.add_argument("--symbol", required=True)
@@ -225,6 +238,10 @@ def main(argv: list[str] | None = None) -> int:
                 print("suggestions: no trades")
             for warning in plan.warnings:
                 print(f"warning: {warning}", file=sys.stderr)
+            if args.with_costs:
+                cost_config = _load_cost_config(Path(args.cost_config))
+                cost_report = CostEngine(cost_config).estimate(_trades_from_rebalance_plan(plan))
+                _print_cost_report(cost_report)
             print(f"report: {plan.report_path}")
             return 0
 
@@ -286,6 +303,15 @@ def main(argv: list[str] | None = None) -> int:
             print(f"report: {result.report_path}")
             return 0
 
+        if args.command == "cost":
+            targets = _load_targets(Path(args.targets))
+            plan = rebalance_engine.plan(targets)
+            cost_config = _load_cost_config(Path(args.config))
+            _apply_cost_overrides(cost_config, args)
+            cost_report = CostEngine(cost_config).estimate(_trades_from_rebalance_plan(plan))
+            _print_cost_report(cost_report)
+            return 0
+
         if args.command == "backtest":
             result = backtest_service.run_sma_crossover(
                 symbol=args.symbol,
@@ -320,6 +346,40 @@ def _format_optional_money(value: float | None) -> str:
     return "N/A" if value is None else f"{value:.2f}"
 
 
+def _trades_from_rebalance_plan(plan) -> list[TradeInput]:
+    return [
+        TradeInput(
+            symbol=item.symbol,
+            side=item.action,
+            shares=item.qty,
+            price=float(item.price),
+        )
+        for item in plan.items
+        if item.action in {"BUY", "SELL"} and item.qty > 0 and item.price is not None
+    ]
+
+
+def _print_cost_report(report) -> None:
+    print("cost_estimate:")
+    print(f"model: {report.model}")
+    print(f"currency: {report.currency}")
+    print(f"gross_trade_value: {report.gross_trade_value:.2f}")
+    print(f"total_commission: {report.total_commission:.2f}")
+    print(f"total_slippage: {report.total_slippage:.2f}")
+    print(f"total_cost: {report.total_cost:.2f}")
+    print(f"total_cost_ratio: {report.total_cost_ratio:.6f}")
+    print("trades:")
+    for trade in report.trades:
+        print(
+            f"{trade.side:<4} {trade.symbol:<6} shares={trade.shares} "
+            f"notional={trade.notional:.2f} total_cost={trade.total_cost:.2f} "
+            f"cost_ratio={trade.cost_ratio:.6f}"
+        )
+    for warning in report.warnings:
+        print(f"warning: {warning}", file=sys.stderr)
+    print(f"cost_report: {report.report_path}")
+
+
 def _load_targets(path: Path) -> dict:
     try:
         with path.open("r", encoding="utf-8") as file:
@@ -332,6 +392,36 @@ def _load_targets(path: Path) -> dict:
     if not isinstance(targets, dict):
         raise ValueError("targets file must contain a JSON object")
     return targets
+
+
+def _load_cost_config(path: Path) -> dict:
+    if not path.exists():
+        return {}
+
+    try:
+        with path.open("r", encoding="utf-8") as file:
+            config = json.load(file)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"cost config is not valid JSON: {path}") from exc
+
+    if not isinstance(config, dict):
+        raise ValueError("cost config must contain a JSON object")
+    return config
+
+
+def _apply_cost_overrides(config: dict, args) -> None:
+    if args.model is not None:
+        config["model"] = args.model
+    if args.fixed_fee is not None:
+        config["fixed_fee"] = args.fixed_fee
+    if args.commission_rate is not None:
+        config["commission_rate"] = args.commission_rate
+    if args.min_commission is not None:
+        config["min_commission"] = args.min_commission
+    if args.slippage_bps is not None:
+        config["slippage_bps"] = args.slippage_bps
+    if args.min_trade_notional is not None:
+        config["min_trade_notional"] = args.min_trade_notional
 
 
 def _load_optimizer_config(path: Path) -> dict:

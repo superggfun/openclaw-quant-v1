@@ -50,6 +50,16 @@
 - CLI command: `python -m quant.cli optimize`.
 - Tests for optimizer modes, constraints, rebalance compatibility, and missing price data.
 
+## v0.6.0-cost-engine
+
+- Cost Engine module.
+- Fixed, linear, and combined cost models.
+- Per-trade fixed fee, commission, slippage, total cost, and cost ratio.
+- Summary gross trade value, commission, slippage, total cost, and warnings.
+- CLI command: `python -m quant.cli cost`.
+- Rebalance integration through `--with-costs`.
+- Tests for models, slippage, minimum commission, warnings, and rebalance cost output.
+
 ## Next
 
 - Add richer portfolio reporting.
@@ -61,6 +71,7 @@
 - Add risk checks for max position size, cash usage, and symbol allowlists.
 - Add configurable industry maps and risk score thresholds.
 - Add optimizer modes based on expected returns, volatility budgets, and drawdown constraints.
+- Feed cost estimates into Backtest Engine and future Execution Engine.
 - Add CSV export for prices, trades, allocation snapshots, and rebalance plans.
 
 ## Later

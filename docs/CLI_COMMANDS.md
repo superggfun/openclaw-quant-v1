@@ -33,6 +33,7 @@ python -m quant.cli allocation
 python -m quant.cli rebalance --targets examples/targets.json
 python -m quant.cli risk
 python -m quant.cli optimize
+python -m quant.cli cost
 ```
 
 ## Rebalance
@@ -77,6 +78,17 @@ python -m quant.cli rebalance --targets examples/optimized_targets.json
 
 The optimize command reads `examples/optimizer_config.json` by default, writes `examples/optimized_targets.json`, and writes a JSON report. It does not modify the simulated account.
 
+## Cost
+
+```bash
+python -m quant.cli cost
+python -m quant.cli cost --model fixed
+python -m quant.cli cost --targets examples/optimized_targets.json --config examples/cost_config.json
+python -m quant.cli rebalance --targets examples/optimized_targets.json --with-costs
+```
+
+The cost command estimates costs for current rebalance suggestions. It writes a JSON report and does not modify the simulated account.
+
 ## Backtest
 
 Backtests use existing rows in the `prices` table. Load prices first:
@@ -110,3 +122,4 @@ python -m quant.cli backtest \
 - Rebalance requires latest prices for target symbols and held symbols.
 - Risk requires latest prices for held symbols.
 - Optimize requires at least one symbol in the optimizer universe with stored price data.
+- Cost requires a target allocation that can produce rebalance suggestions.

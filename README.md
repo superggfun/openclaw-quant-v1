@@ -1,12 +1,12 @@
 # openclaw-quant-v1
 
-`openclaw-quant-v1` is an early OpenClaw-oriented quant system skeleton. It currently includes a market data layer, a simulated portfolio state module, a minimal backtest engine, a portfolio rebalance engine, a risk engine, and a portfolio optimizer. It does not make AI decisions, place live orders, connect to brokers, or perform automated trading.
+`openclaw-quant-v1` is an early OpenClaw-oriented quant system skeleton. It currently includes a market data layer, a simulated portfolio state module, a minimal backtest engine, a portfolio rebalance engine, a risk engine, a portfolio optimizer, and a cost engine. It does not make AI decisions, place live orders, connect to brokers, or perform automated trading.
 
 This project is for research and simulation only. It is not investment advice.
 
 ## Current Version
 
-`v0.5.0-portfolio-optimizer`
+`v0.6.0-cost-engine`
 
 This release includes:
 
@@ -18,6 +18,7 @@ This release includes:
 - Portfolio allocation and rebalance calculation engine.
 - Portfolio risk metrics and risk score.
 - Portfolio optimizer that generates target allocations.
+- Transaction cost estimation for rebalance suggestions.
 - JSON backtest and rebalance reports under `reports/`.
 - CLI commands for data, portfolio, backtest, allocation, and rebalance workflows.
 - pytest coverage for core state transitions.
@@ -82,6 +83,7 @@ Key modules:
 - `quant/rebalance/rebalance_engine.py`: allocation and rebalance calculations.
 - `quant/risk/risk_engine.py`: concentration, cash, Top 5, and risk score calculations.
 - `quant/optimizer/optimizer_engine.py`: target allocation generation for rebalance.
+- `quant/cost/cost_engine.py`: fixed, linear, and combined transaction cost estimates.
 - `quant/storage/sqlite_store.py`: price persistence.
 - `quant/storage/portfolio_store.py`: account, position, and trade persistence.
 - `quant/data_source/yfinance_client.py`: yfinance adapter.
@@ -206,6 +208,7 @@ Run:
 ```bash
 python -m quant.cli optimize
 python -m quant.cli rebalance --targets examples/optimized_targets.json
+python -m quant.cli rebalance --targets examples/optimized_targets.json --with-costs
 ```
 
 The optimize command reads `examples/optimizer_config.json` by default and writes:
@@ -216,6 +219,37 @@ reports/optimize_YYYYMMDD_HHMMSS.json
 ```
 
 See `docs/OPTIMIZER.md` for details.
+
+## Cost Engine
+
+The cost engine estimates whether a rebalance is worth doing by calculating per-trade and total costs.
+
+Supported models:
+
+- `fixed`
+- `linear`
+- `combined`
+
+Run:
+
+```bash
+python -m quant.cli cost
+python -m quant.cli rebalance --targets examples/optimized_targets.json --with-costs
+```
+
+Default config:
+
+```text
+examples/cost_config.json
+```
+
+Reports:
+
+```text
+reports/cost_YYYYMMDD_HHMMSS.json
+```
+
+See `docs/COST.md` for details.
 
 ## Backtest Engine
 
@@ -277,6 +311,7 @@ export OPENCLAW_QUANT_DB_PATH=/tmp/openclaw-quant.db
 - `reports/rebalance_*.json`: generated rebalance reports, ignored by git
 - `reports/risk_*.json`: generated risk reports, ignored by git
 - `reports/optimize_*.json`: generated optimizer reports, ignored by git
+- `reports/cost_*.json`: generated cost reports, ignored by git
 
 ## Roadmap
 
@@ -289,6 +324,7 @@ Near-term work:
 - Add risk checks for max position size, cash usage, symbol allowlists, and rebalance suggestions.
 - Add configurable sector maps and risk thresholds.
 - Add optimizer modes that use return estimates and risk budgets.
+- Feed Cost Engine estimates into future Backtest and Execution Engines.
 
 Out of scope until explicitly designed:
 
@@ -312,6 +348,7 @@ Important docs:
 - `docs/REBALANCE.md`
 - `docs/RISK.md`
 - `docs/OPTIMIZER.md`
+- `docs/COST.md`
 - `docs/CLI.md`
 - `docs/CLI_COMMANDS.md`
 - `docs/DECISIONS.md`

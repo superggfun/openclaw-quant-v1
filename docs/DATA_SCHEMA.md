@@ -123,3 +123,20 @@ Top-level keys:
 - `estimated_risk_score_after`: estimated score using optimized target weights.
 - `rationale`: human-readable explanation of the optimizer path.
 - `targets_path`: target allocation JSON path.
+
+## reports/cost_*.json
+
+Cost reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `model`: `fixed`, `linear`, or `combined`.
+- `currency`: reporting currency.
+- `config`: cost model parameters.
+- `trades`: per-trade symbol, side, shares, price, notional, fees, slippage, total cost, and cost ratio.
+- `gross_trade_value`: sum of trade notionals.
+- `total_commission`: fixed plus linear commissions.
+- `total_slippage`: slippage cost.
+- `total_cost`: all estimated costs.
+- `total_cost_ratio`: total cost divided by gross trade value.
+- `warnings`: small trades or poor cost efficiency warnings.

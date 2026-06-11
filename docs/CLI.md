@@ -15,6 +15,7 @@ python -m quant.cli allocation
 python -m quant.cli rebalance --targets examples/targets.json
 python -m quant.cli risk
 python -m quant.cli optimize
+python -m quant.cli cost
+python -m quant.cli rebalance --targets examples/optimized_targets.json --with-costs
 python -m quant.cli backtest --symbol SPY --start 2023-01-01 --end 2024-12-31
 ```
-

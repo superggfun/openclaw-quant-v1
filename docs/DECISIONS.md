@@ -55,3 +55,11 @@ The V0.5 optimizer produces target allocations only. Rebalance Engine remains re
 ## 2026-06-11: Optimizer Avoids Heavy Math Dependencies
 
 V0.5 uses deterministic rules for equal-weight, risk-adjusted, and constrained target generation. It does not introduce complex optimization libraries yet.
+
+## 2026-06-11: Cost Engine Estimates Only
+
+The V0.6 cost engine estimates transaction costs from suggested trades. It does not filter, execute, or modify trades.
+
+## 2026-06-11: Cost Models Stay Simple
+
+V0.6 supports fixed, linear, and combined costs with simple slippage in basis points. Complex market impact is intentionally out of scope.

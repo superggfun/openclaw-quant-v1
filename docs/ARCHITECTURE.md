@@ -23,6 +23,7 @@ SQLite / External APIs
 - `quant.rebalance.rebalance_engine`: Calculates current allocation and rebalance suggestions from account, position, and price state.
 - `quant.risk.risk_engine`: Calculates portfolio concentration, cash, Top 5, industry, and risk score metrics.
 - `quant.optimizer.optimizer_engine`: Generates target allocations for the Rebalance Engine.
+- `quant.cost.cost_engine`: Estimates transaction costs for suggested trades.
 - `quant.storage.sqlite_store`: Owns the `prices` table.
 - `quant.storage.portfolio_store`: Owns `accounts`, `positions`, and `trades`.
 - `quant.data_source.yfinance_client`: Wraps yfinance and normalizes downloaded prices.
@@ -79,6 +80,15 @@ CLI optimize -> OptimizerEngine -> prices + allocation + risk -> examples/optimi
 
 The optimizer is side-effect free for portfolio state. It generates target allocations, not trades.
 
+Cost flow:
+
+```text
+CLI cost -> RebalanceEngine suggestions -> CostEngine -> reports/cost_*.json
+CLI rebalance --with-costs -> RebalanceEngine -> CostEngine -> reports/cost_*.json
+```
+
+The cost engine is side-effect free for portfolio state. It estimates costs only.
+
 ## Extension Points
 
 - `quant/backtesting`: future historical simulation module.
@@ -88,3 +98,4 @@ The optimizer is side-effect free for portfolio state. It generates target alloc
 - `quant/rebalance`: stable calculation boundary for future Risk Engine, OpenClaw, and AI research callers.
 - `quant/risk`: stable calculation boundary for future OpenClaw Risk Agent callers.
 - `quant/optimizer`: stable target-allocation boundary for future research and OpenClaw callers.
+- `quant/cost`: stable cost-estimation boundary for future Backtest and Execution Engines.

@@ -1,0 +1,11 @@
+{
+  "model": "combined",
+  "fixed_fee": 1.0,
+  "commission_rate": 0.001,
+  "min_commission": 1.0,
+  "slippage_bps": 5,
+  "currency": "USD",
+  "min_trade_notional": 50,
+  "min_cost_efficiency_ratio": null
+}
+
