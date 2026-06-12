@@ -1,5 +1,15 @@
 # Roadmap
 
+## v0.32.0-regime-detection
+
+- Adds `quant/regime_detection` for deterministic market regime classification from stored benchmark prices.
+- Supports `BULL`, `BEAR`, `HIGH_VOL`, `LOW_VOL`, `TRENDING`, `RANGE_BOUND`, `CRISIS`, `RECOVERY`, and `UNKNOWN`.
+- Adds SQLite `regime_history` and `factor_regime_history` storage.
+- Adds CLI commands: `detect-regime`, `regime-history`, `regime-report`, and `regime-rank`.
+- Adds optional `--save-regime-history` persistence for `factor-eval` and `factor-backtest`.
+- Adds Agent Export and Visualization support for regime reports and regime-aware rankings.
+- Diagnostic-only: no ML, news sentiment, broker/live trading, automatic factor disabling, or no-lookahead semantic changes.
+
 ## v0.31.0-factor-store
 
 - Adds `quant/factor_store` as a persistent SQLite factor research database.

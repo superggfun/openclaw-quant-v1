@@ -17,6 +17,7 @@ def register_parser(subparsers) -> None:
     factor_eval.add_argument("--forward-days", type=int, default=20)
     factor_eval.add_argument("--pipeline", default=None, help="Optional factor pipeline config JSON.")
     factor_eval.add_argument("--save-factor-history", action="store_true", help="Persist factor values and evaluation history.")
+    factor_eval.add_argument("--save-regime-history", action="store_true", help="Persist factor diagnostics by current regime history.")
 
 
 def handle(args, context) -> int:
@@ -71,5 +72,11 @@ def handle(args, context) -> int:
         print(f"factor_values: {saved['saved_factor_values']}")
         print(f"coverage: {format_optional_pct(saved.get('coverage'))}")
         print(f"confidence: {format_optional_number(saved.get('confidence'))}")
+    if args.save_regime_history:
+        if context.regime_history_store.latest() is None:
+            context.regime_analytics.detect_and_save()
+        saved = context.regime_analytics.save_factor_evaluation_by_regime(result)
+        print("saved_regime_history:")
+        print(f"regime_rows: {saved['saved_regime_rows']}")
     print(f"report: {result.report_path}")
     return 0

@@ -6,17 +6,18 @@ This project is research infrastructure only. It is not investment advice, does 
 
 ## Current Version
 
-`v0.31.0-factor-store`
+`v0.32.0-regime-detection`
 
-This release adds a persistent factor research database:
+This release adds deterministic market regime detection and regime-aware factor diagnostics:
 
-- factor definitions
-- factor values by symbol and signal date
-- IC / RankIC / ICIR history
-- factor backtest and walk-forward history
-- factor stability, coverage, confidence, and version records
+- current market regime classification
+- persisted regime history
+- factor performance by regime
+- regime-aware factor rankings
+- Agent Export and Visualization support for regime reports
 
-No alpha factors, data providers, broker integrations, live trading, machine learning, or no-lookahead rules are intentionally changed in v0.31.
+No alpha factors, data providers, broker integrations, live trading, machine learning, or no-lookahead rules are intentionally changed in v0.32.
+Regime detection is heuristic and diagnostic. It is not a market forecast, not a timing signal, and not investment advice.
 
 ## Quick Start
 
@@ -61,6 +62,8 @@ python -m quant.cli factor-backtest --factor fundamental_value_score
 python -m quant.cli factor-eval --factor momentum_20d --save-factor-history
 python -m quant.cli factor-history --factor momentum_20d
 python -m quant.cli factor-rank
+python -m quant.cli detect-regime
+python -m quant.cli regime-rank
 python -m quant.cli alpha
 python -m quant.cli walk-forward --strategy alpha --max-folds 1
 ```
@@ -96,6 +99,7 @@ See `docs/CLI.md` and `docs/CLI_COMMANDS.md` for the full command reference.
 - Alpha target generation with no-lookahead signal dates.
 - Factor pipeline, factor evaluation, long-short factor backtest, and walk-forward validation.
 - Persistent factor store for definitions, values, IC history, backtest history, walk-forward folds, stability, coverage, and versions.
+- Deterministic regime detection and factor-by-regime diagnostics.
 - Portfolio construction methods including equal weight, inverse volatility, risk parity, and minimum variance.
 - Simulated portfolio state, rebalance planning, cost estimation, execution simulation, historical trading simulation, and market realism constraints.
 - Unified account/order/fill/position protocol objects for future MCP/OpenClaw integration.
@@ -171,6 +175,7 @@ Generated local artifacts are intentionally ignored:
 - `docs/MARKET_REALISM.md`
 - `docs/FACTOR_LIBRARY.md`
 - `docs/FACTOR_STORE.md`
+- `docs/REGIME_DETECTION.md`
 - `docs/FACTOR_PIPELINE.md`
 - `docs/FACTOR_EVALUATION.md`
 - `docs/FACTOR_BACKTEST.md`

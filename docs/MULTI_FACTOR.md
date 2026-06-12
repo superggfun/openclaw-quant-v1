@@ -48,6 +48,10 @@ Supported weighting modes:
 
 `stability_weighted` does not invent stability history. Missing stability inputs emit a warning; if no usable stability scores are supplied, the factor weights fall back to equal weight with an explicit warning.
 
+`v0.32.0` regime diagnostics can report whether a factor has historically been stronger or weaker in the current market regime. This is diagnostic context only. The multi-factor model does not automatically disable factors or change weights from regime labels.
+
+Regime labels are heuristic historical classifications. They are not forecasts or timing signals, and multi-factor confidence remains diagnostic rather than a return guarantee.
+
 ## Output
 
 Reports are written as:

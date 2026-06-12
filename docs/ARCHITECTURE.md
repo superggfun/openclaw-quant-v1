@@ -37,6 +37,7 @@ SQLite / External APIs
 - `quant.factor_store`: Persists factor definitions, values, evaluation history, backtest history, walk-forward fold history, stability, coverage, and versions.
 - `quant.factor_pipeline.factor_pipeline`: Preprocesses same-date factor cross-sections before alpha generation or evaluation.
 - `quant.factor_eval.factor_evaluation`: Evaluates factor predictive quality with no-lookahead IC, Rank IC, quintile, and decay metrics.
+- `quant.regime_detection`: Classifies deterministic market regimes, persists regime history, and summarizes factor performance by regime.
 - `quant.strategy_eval.strategy_evaluation`: Explains returns, risk, drawdowns, rolling metrics, and attribution from generated reports.
 - `quant.trading_simulation`: Runs offline account-style historical simulations with in-memory cash, positions, trades, costs, and equity curves.
 - `quant.market_realism`: Applies deterministic slippage, ADV liquidity, marketability, and position-size constraints to simulated execution.
@@ -103,6 +104,16 @@ factor-eval / factor-backtest / walk-forward --save-factor-history -> FactorStor
 ```
 
 The Factor Store persists outputs from existing no-lookahead engines. It does not recompute factors independently and does not change factor evaluation, factor backtest, walk-forward, alpha, or trading simulation semantics.
+
+Regime detection flow:
+
+```text
+detect-regime -> RegimeDetector -> prices(SPY by default, date-and-earlier rolling metrics) -> regime_history -> regime reports
+
+factor-eval/factor-backtest --save-regime-history -> RegimeAnalytics -> factor_regime_history -> regime-rank
+```
+
+The regime layer is diagnostic only. It does not disable factors, adjust target weights automatically, or execute trades.
 
 Agent export flow:
 

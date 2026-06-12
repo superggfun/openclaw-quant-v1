@@ -34,6 +34,10 @@ Report type is auto-detected from schema keys:
 - `factor_store_summary`
 - `factor_history`
 - `factor_rank`
+- `regime_detection`
+- `regime_history`
+- `regime_report`
+- `regime_rank`
 
 ## Outputs
 
@@ -67,6 +71,8 @@ The summary dashboard includes:
 Multi-factor reports generate charts for family contribution, factor contribution, confidence, and stability ranking.
 
 Factor Store reports generate charts for stored table counts, IC history, Rank IC history, factor rankings, stability history, coverage history, and coverage rankings when those fields exist.
+
+Regime reports generate charts for regime timeline, regime frequency, regime confidence, factor performance by regime, and regime-aware ranking diagnostics when those fields exist.
 
 Trade simulation reports with v0.30 market realism fields can also generate charts for slippage, cost breakdown, rejected trades, and liquidity usage. Missing fields skip those charts with warnings rather than crashing.
 

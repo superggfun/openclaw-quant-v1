@@ -46,6 +46,10 @@ python -m quant.cli factor-backtest --factor momentum_20d --pipeline examples/fa
 python -m quant.cli factor-store-summary
 python -m quant.cli factor-history --factor momentum_20d
 python -m quant.cli factor-rank
+python -m quant.cli detect-regime
+python -m quant.cli regime-history
+python -m quant.cli regime-report
+python -m quant.cli regime-rank
 python -m quant.cli strategy-eval --factor-backtest-report reports/factor_backtest_YYYYMMDD_HHMMSS.json
 python -m quant.cli strategy-eval --strategy factor_long_short --factor momentum_20d
 python -m quant.cli strategy-eval --strategy alpha --pipeline examples/factor_pipeline_config.json
@@ -76,6 +80,18 @@ python -m quant.cli alpha
 `factor-list` prints registered factor names, categories, descriptions, required inputs, no-lookahead metadata, `fundamental_data_required`, and lookback windows. Registered factors work with factor evaluation, factor pipeline, factor backtest, and composite alpha generation. Fundamental factors use `report_date <= signal_date` and include coverage fields in factor reports.
 
 `factor-eval`, `factor-backtest`, and `walk-forward` can persist reusable research history with `--save-factor-history`. The Factor Store commands read that SQLite history and write generated summary reports under `reports/`.
+
+## Regime Detection
+
+```bash
+python -m quant.cli detect-regime
+python -m quant.cli regime-history
+python -m quant.cli regime-report
+python -m quant.cli regime-rank
+python -m quant.cli factor-eval --factor momentum_20d --save-regime-history
+```
+
+Regime commands classify market states from stored daily benchmark prices, defaulting to SPY. The output is diagnostic only; it does not change factor weights, portfolio targets, or trading simulation behavior.
 
 `alpha` supports the v0.27 formal multi-factor model through `examples/alpha_config.json`. Multi-factor reports are written to `reports/multi_factor_*.json` and include coverage, confidence, stability, factor contributions, and family contributions.
 

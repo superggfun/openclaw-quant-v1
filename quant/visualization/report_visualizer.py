@@ -27,6 +27,10 @@ SUPPORTED_REPORT_TYPES = {
     "factor_store_summary",
     "factor_history",
     "factor_rank",
+    "regime_detection",
+    "regime_history",
+    "regime_report",
+    "regime_rank",
 }
 
 EXPECTED_CHARTS_BY_REPORT_TYPE = {
@@ -44,6 +48,10 @@ EXPECTED_CHARTS_BY_REPORT_TYPE = {
     "factor_store_summary": {"factor_store_counts"},
     "factor_history": {"ic_history", "rank_ic_history", "stability_history", "coverage_history"},
     "factor_rank": {"factor_ranking", "stability_ranking", "coverage_ranking"},
+    "regime_detection": {"regime_timeline", "regime_frequency", "regime_confidence"},
+    "regime_history": {"regime_timeline", "regime_frequency", "regime_confidence"},
+    "regime_report": {"regime_frequency", "factor_performance_by_regime"},
+    "regime_rank": {"factor_performance_by_regime", "regime_stability"},
 }
 
 
@@ -306,6 +314,34 @@ class ReportVisualizer:
             builder.bar_chart(prefix, "coverage_ranking", "Coverage Ranking", coverage),
         )
 
+    def _charts_regime_detection(self, builder: ChartBuilder, prefix: str, report: dict[str, Any]) -> list[ChartArtifact]:
+        observations = report.get("observations") or []
+        return self._keep(
+            builder.line_chart(prefix, "regime_timeline", "Regime Timeline", self._regime_timeline(observations)),
+            builder.bar_chart(prefix, "regime_frequency", "Regime Frequency", report.get("regime_counts") or {}),
+            builder.line_chart(prefix, "regime_confidence", "Regime Confidence", self._series(observations, "date", "confidence")),
+        )
+
+    def _charts_regime_history(self, builder: ChartBuilder, prefix: str, report: dict[str, Any]) -> list[ChartArtifact]:
+        history = list(reversed(report.get("history") or []))
+        return self._keep(
+            builder.line_chart(prefix, "regime_timeline", "Regime Timeline", self._regime_timeline(history)),
+            builder.bar_chart(prefix, "regime_frequency", "Regime Frequency", report.get("regime_counts") or {}),
+            builder.line_chart(prefix, "regime_confidence", "Regime Confidence", self._series(history, "date", "confidence")),
+        )
+
+    def _charts_regime_report(self, builder: ChartBuilder, prefix: str, report: dict[str, Any]) -> list[ChartArtifact]:
+        return self._keep(
+            builder.bar_chart(prefix, "regime_frequency", "Regime Frequency", report.get("regime_counts") or {}),
+            builder.bar_chart(prefix, "factor_performance_by_regime", "Factor Performance By Regime", self._factor_regime_mapping(report)),
+        )
+
+    def _charts_regime_rank(self, builder: ChartBuilder, prefix: str, report: dict[str, Any]) -> list[ChartArtifact]:
+        return self._keep(
+            builder.bar_chart(prefix, "factor_performance_by_regime", "Best Factor By Regime", self._best_by_regime_mapping(report)),
+            builder.bar_chart(prefix, "regime_stability", "Regime Stability", self._items_to_mapping(report.get("most_stable_across_regimes"), "factor_name", "stability")),
+        )
+
     @staticmethod
     def _series(items: Any, label_key: str, value_key: str) -> list[tuple[str, float]]:
         output = []
@@ -554,6 +590,14 @@ class ReportVisualizer:
                 "top_factor_health": top.get("health_score"),
                 "ranked_count": len(report.get("top_factors") or []),
             }
+        if report_type in {"regime_detection", "regime_history", "regime_report", "regime_rank"}:
+            current = report.get("current_regime") or {}
+            return {
+                "current_regime": current.get("regime"),
+                "date": current.get("date"),
+                "confidence": current.get("confidence"),
+                "regime_count": len(report.get("regime_counts") or {}),
+            }
         return {key: report.get(key) for key in keys if key in report}
 
     @staticmethod
@@ -592,3 +636,47 @@ class ReportVisualizer:
     @staticmethod
     def _prefix(path: Path) -> str:
         return "".join(char if char.isalnum() or char in {"-", "_"} else "_" for char in path.stem)
+
+    @staticmethod
+    def _regime_timeline(items: list[dict[str, Any]]) -> list[tuple[str, float]]:
+        order = {
+            "UNKNOWN": 0,
+            "LOW_VOL": 1,
+            "RANGE_BOUND": 2,
+            "BULL": 3,
+            "TRENDING": 4,
+            "RECOVERY": 5,
+            "HIGH_VOL": 6,
+            "BEAR": 7,
+            "CRISIS": 8,
+        }
+        return [
+            (str(item.get("date")), float(order.get(str(item.get("regime") or "UNKNOWN"), 0)))
+            for item in items
+            if item.get("date")
+        ]
+
+    @staticmethod
+    def _factor_regime_mapping(report: dict[str, Any]) -> dict[str, float]:
+        output = {}
+        for regime, rows in (report.get("factor_performance_by_regime") or {}).items():
+            if isinstance(rows, list) and rows:
+                best = max(rows, key=lambda row: ReportVisualizer._safe_float(row.get("icir")))
+                output[str(regime)] = ReportVisualizer._safe_float(best.get("icir"))
+        return output
+
+    @staticmethod
+    def _best_by_regime_mapping(report: dict[str, Any]) -> dict[str, float]:
+        output = {}
+        for regime, rows in (report.get("best_by_regime") or {}).items():
+            if isinstance(rows, list) and rows:
+                output[str(regime)] = ReportVisualizer._safe_float(rows[0].get("health_score"))
+        return output
+
+    @staticmethod
+    def _safe_float(value: Any) -> float:
+        try:
+            number = float(value)
+            return number if math.isfinite(number) else 0.0
+        except (TypeError, ValueError):
+            return 0.0

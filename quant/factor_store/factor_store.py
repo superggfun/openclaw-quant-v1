@@ -111,6 +111,23 @@ class FactorStore:
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     PRIMARY KEY (factor_name, version)
                 );
+
+                CREATE TABLE IF NOT EXISTS factor_regime_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    factor_name TEXT NOT NULL,
+                    regime TEXT NOT NULL,
+                    ic REAL,
+                    rank_ic REAL,
+                    icir REAL,
+                    coverage REAL,
+                    stability REAL,
+                    samples INTEGER,
+                    evaluation_date TEXT NOT NULL,
+                    report_path TEXT
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_factor_regime_history_factor
+                ON factor_regime_history (factor_name, regime, evaluation_date);
                 """
             )
 
@@ -348,6 +365,7 @@ class FactorStore:
                     "factor_walk_forward_history",
                     "factor_stability_history",
                     "factor_versions",
+                    "factor_regime_history",
                 )
             }
             factors = [row["factor_name"] for row in connection.execute("SELECT factor_name FROM factor_definitions ORDER BY factor_name").fetchall()]
@@ -468,6 +486,112 @@ class FactorStore:
         }
         return self._with_report_path(report, "factor_rank", write_report)
 
+    def save_factor_regime_history(
+        self,
+        factor_name: str,
+        rows: list[dict],
+        report_path: str = "",
+    ) -> dict:
+        if not rows:
+            return {"factor": factor_name, "saved_regime_rows": 0}
+        self._ensure_column("factor_regime_history", "samples", "INTEGER")
+        evaluation_date = self._now()
+        payload = [
+            (
+                factor_name,
+                row.get("regime"),
+                row.get("ic"),
+                row.get("rank_ic"),
+                row.get("icir"),
+                row.get("coverage"),
+                row.get("stability"),
+                row.get("samples"),
+                evaluation_date,
+                report_path,
+            )
+            for row in rows
+            if row.get("regime")
+        ]
+        with self.connect() as connection:
+            connection.executemany(
+                """
+                INSERT INTO factor_regime_history (
+                    factor_name, regime, ic, rank_ic, icir, coverage, stability, samples, evaluation_date, report_path
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                payload,
+            )
+        return {"factor": factor_name, "saved_regime_rows": len(payload)}
+
+    def factor_regime_rank(self, limit: int = 10) -> dict:
+        self._ensure_column("factor_regime_history", "samples", "INTEGER")
+        with self.connect() as connection:
+            rows = self._fetch_all(
+                connection,
+                """
+                SELECT factor_name, regime,
+                       AVG(ic) AS ic,
+                       AVG(rank_ic) AS rank_ic,
+                       AVG(icir) AS icir,
+                       AVG(coverage) AS coverage,
+                       AVG(stability) AS stability,
+                       SUM(COALESCE(samples, 0)) AS samples,
+                       COUNT(*) AS history_rows
+                FROM factor_regime_history
+                GROUP BY factor_name, regime
+                ORDER BY regime, factor_name
+                """,
+                [],
+            )
+        scored = []
+        for row in rows:
+            item = dict(row)
+            support = min(max(float(item.get("samples") or 0.0) / 30.0, 0.0), 1.0)
+            item["sample_support"] = round(support, 6)
+            item["health_score"] = FactorAnalytics.health_score(
+                {
+                    "icir": item.get("icir"),
+                    "coverage": item.get("coverage"),
+                    "stability_score": item.get("stability"),
+                    "drawdown": None,
+                }
+            ) * item["sample_support"]
+            item["health_score"] = round(item["health_score"], 6)
+            scored.append(item)
+        by_regime: dict[str, list[dict]] = {}
+        for row in scored:
+            by_regime.setdefault(row["regime"], []).append(row)
+        best = {
+            regime: sorted(items, key=lambda item: (item["health_score"], item["factor_name"]), reverse=True)[:limit]
+            for regime, items in by_regime.items()
+        }
+        worst = {
+            regime: sorted(items, key=lambda item: (item["health_score"], item["factor_name"]))[:limit]
+            for regime, items in by_regime.items()
+        }
+        stable = sorted(
+            scored,
+            key=lambda item: (item.get("stability") or 0.0, item["factor_name"]),
+            reverse=True,
+        )[:limit]
+        return {
+            "metadata": {"report_type": "regime_rank", "generated_at": self._now()},
+            "best_by_regime": best,
+            "worst_by_regime": worst,
+            "most_stable_across_regimes": stable,
+            "warnings": ([] if scored else ["WARN_REGIME_FACTOR_HISTORY_EMPTY"]) + [
+                f"WARN_LOW_REGIME_SAMPLE: {row['regime']} {row['factor_name']} has {row.get('samples', 0)} samples"
+                for row in scored
+                if (row.get("samples") or 0) < 30
+            ],
+            "interpretation_notes": [
+                "Regime rankings are diagnostics from stored factor/regime history, not return guarantees.",
+                "Low coverage and weak stability reduce factor health scores.",
+                "Low regime sample counts reduce factor health through sample_support.",
+            ],
+        }
+
     def _save_factor_values(self, factor: str, observations: list, coverage: float | None, version: str) -> int:
         rows = [
             (
@@ -508,6 +632,15 @@ class FactorStore:
     def _fetch_all(connection: sqlite3.Connection, query: str, params: list[Any]) -> list[dict]:
         rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
+
+    def _ensure_column(self, table: str, column: str, column_type: str) -> None:
+        with self.connect() as connection:
+            columns = {
+                row["name"]
+                for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
+            }
+            if column not in columns:
+                connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")
 
     @staticmethod
     def _coverage_pct(coverage: dict | None) -> float | None:

@@ -72,6 +72,10 @@ Full alpha walk-forward validation keeps the existing default fold behavior. Mul
 
 `--save-factor-history` stores fold-level train/test metrics and warnings in the Factor Store. It does not change fold generation, signal dates, execution dates, or return calculations.
 
+Regime Detection in `v0.32.0` can be used after walk-forward runs to inspect whether factor behavior differs by persisted market regime. It does not change walk-forward fold boundaries, train/test separation, or no-lookahead guarantees.
+
+Regime labels are heuristic diagnostics, not forecasts. They should be used to review robustness, not to time markets automatically.
+
 ## Factor Stability
 
 The report evaluates registered factors across folds and classifies them as `stable`, `moderate`, `unstable`, or `insufficient_data`.

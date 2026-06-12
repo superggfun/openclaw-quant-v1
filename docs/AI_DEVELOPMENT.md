@@ -4,7 +4,7 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v0.31.0-factor-store`
+`v0.32.0-regime-detection`
 
 The project currently includes:
 
@@ -20,6 +20,7 @@ The project currently includes:
 - A factor evaluation framework that calculates no-lookahead IC, Rank IC, ICIR, quintile, and decay metrics.
 - A long-short factor backtest that checks single-factor return streams without modifying portfolio state.
 - A persistent factor store for definitions, factor values, IC/Rank IC history, backtest history, walk-forward history, stability, coverage, confidence, and versions.
+- A deterministic regime detection layer for market-state history and factor-by-regime diagnostics.
 - A strategy evaluation layer that explains return, risk, drawdown, rolling metrics, and attribution from generated reports.
 - A minimal SMA crossover backtest engine that uses stored prices.
 - A portfolio rebalance engine that calculates allocation drift and suggested trades.
@@ -95,6 +96,7 @@ The project intentionally does not include:
 - `quant/alpha/alpha_engine.py`: pure factor and target-weight engine.
 - `quant/factor_backtest/factor_backtest.py`: pure long-short factor backtest engine.
 - `quant/factor_store/`: persistent factor research history, registry sync, rankings, stability, coverage, and confidence analytics.
+- `quant/regime_detection/`: deterministic regime classification, regime history, factor-by-regime analytics, and regime-aware rankings.
 - `quant/factor_pipeline/factor_pipeline.py`: pure factor preprocessing pipeline.
 - `quant/factor_eval/factor_evaluation.py`: pure no-lookahead factor evaluation framework.
 - `quant/strategy_eval/strategy_evaluation.py`: pure strategy explanation and attribution engine.
@@ -176,3 +178,7 @@ Protocol work belongs under `quant/core_protocols`. It may add JSON-safe objects
 ## v0.31 Factor Store Notes
 
 Factor Store work belongs under `quant/factor_store`. It may persist factor definitions, values, evaluation history, backtest history, walk-forward folds, stability scores, coverage, confidence, and versions. It must not add new factors, change factor evaluation semantics, change factor backtest semantics, alter walk-forward no-lookahead behavior, or generate trades. Persistence through `--save-factor-history` is opt-in.
+
+## v0.32 Regime Detection Notes
+
+Regime Detection work belongs under `quant/regime_detection`. It may classify stored benchmark price history into deterministic market regimes and persist factor-by-regime diagnostics. It must not add ML, news sentiment, broker integration, live trading, automatic factor disabling, or automatic portfolio changes. Regime diagnostics must preserve signal-date no-lookahead alignment.

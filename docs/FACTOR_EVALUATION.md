@@ -64,6 +64,7 @@ Factor decay evaluates IC and Rank IC for:
 python -m quant.cli factor-eval --factor momentum_20d
 python -m quant.cli factor-eval --factor momentum_20d --pipeline examples/factor_pipeline_config.json
 python -m quant.cli factor-eval --factor momentum_20d --save-factor-history
+python -m quant.cli factor-eval --factor momentum_20d --save-regime-history
 python -m quant.cli factor-eval --factor risk_adjusted_momentum
 python -m quant.cli factor-eval --factor momentum_60d --start 2024-01-01 --end 2024-12-31 --forward-days 20
 ```
@@ -79,6 +80,8 @@ The CLI prints:
 - Excluded symbols and reasons
 
 With `--save-factor-history`, the command also persists factor values, IC, Rank IC, ICIR, coverage, missing percentage, warnings, and version metadata into the Factor Store. Persistence is optional and does not change the generated factor evaluation report.
+
+With `--save-regime-history`, the command groups no-lookahead factor observations by the persisted market regime active on each `signal_date` and stores regime-level diagnostics. This does not change factor values or future-return labels.
 
 ## Reports
 

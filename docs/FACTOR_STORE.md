@@ -27,6 +27,7 @@ The store creates:
 - `factor_walk_forward_history`
 - `factor_stability_history`
 - `factor_versions`
+- `factor_regime_history`
 
 `factor_values` uses:
 
@@ -100,6 +101,19 @@ The health score blends:
 - drawdown diagnostics
 
 The score is a research diagnostic, not a return guarantee or trading instruction.
+
+## Regime Integration
+
+`v0.32.0` adds optional factor-by-regime diagnostics. `factor-eval` and `factor-backtest` can persist regime statistics with:
+
+```bash
+python -m quant.cli factor-eval --factor momentum_20d --save-regime-history
+python -m quant.cli factor-backtest --factor momentum_20d --save-regime-history
+```
+
+These rows are stored in `factor_regime_history`. They are grouped by the regime active on each factor `signal_date`, preserving no-lookahead alignment. Regime rankings are diagnostics only and do not change factor weights or trading behavior.
+
+`factor_regime_history` appends one set of rows per research run. Low-sample regime groups emit warnings and reduce ranking support; a high IC in a thin regime should be treated as fragile evidence.
 
 ## Reports
 

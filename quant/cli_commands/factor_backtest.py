@@ -21,6 +21,7 @@ def register_parser(subparsers) -> None:
     factor_backtest.add_argument("--pipeline", default=None, help="Optional factor pipeline config JSON.")
     factor_backtest.add_argument("--report", action="store_true", help="Write JSON report. Reports are written by default.")
     factor_backtest.add_argument("--save-factor-history", action="store_true", help="Persist factor backtest history.")
+    factor_backtest.add_argument("--save-regime-history", action="store_true", help="Persist factor backtest diagnostics by current regime history.")
 
 
 def handle(args, context) -> int:
@@ -81,5 +82,11 @@ def handle(args, context) -> int:
         print(f"backtest_rows: {saved['saved_backtest_history']}")
         print(f"coverage: {format_optional_pct(saved.get('coverage'))}")
         print(f"confidence: {format_optional_number(saved.get('confidence'))}")
+    if args.save_regime_history:
+        if context.regime_history_store.latest() is None:
+            context.regime_analytics.detect_and_save()
+        saved = context.regime_analytics.save_factor_backtest_by_regime(result)
+        print("saved_regime_history:")
+        print(f"regime_rows: {saved['saved_regime_rows']}")
     print(f"report: {result.report_path}")
     return 0

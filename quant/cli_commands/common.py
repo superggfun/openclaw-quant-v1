@@ -28,6 +28,9 @@ from quant.fundamental_data.fundamental_store import FundamentalStore
 from quant.optimizer.optimizer_engine import OptimizerEngine
 from quant.portfolio_construction.portfolio_construction import PortfolioConstructionEngine
 from quant.rebalance.rebalance_engine import RebalanceEngine
+from quant.regime_detection.regime_analytics import RegimeAnalytics
+from quant.regime_detection.regime_detector import RegimeDetector
+from quant.regime_detection.regime_history import RegimeHistoryStore
 from quant.risk.risk_engine import RiskEngine
 from quant.services.backtest_service import BacktestService
 from quant.services.portfolio_service import PortfolioService
@@ -64,6 +67,9 @@ class CLIContext:
     factor_store: FactorStore
     factor_history: FactorHistory
     factor_registry_store: FactorRegistryStore
+    regime_detector: RegimeDetector
+    regime_history_store: RegimeHistoryStore
+    regime_analytics: RegimeAnalytics
     strategy_evaluation: StrategyEvaluation
     universe_manager: UniverseManager
     data_quality_analyzer: DataQualityAnalyzer
@@ -84,6 +90,8 @@ def create_context(db_path: Path) -> CLIContext:
     data_provider = provider_registry.default_provider()
     price_service = PriceService(price_store, data_source=data_provider)
     factor_store = FactorStore(db_path)
+    regime_detector = RegimeDetector(price_store)
+    regime_history_store = RegimeHistoryStore(db_path)
     return CLIContext(
         db_path=db_path,
         price_store=price_store,
@@ -107,6 +115,9 @@ def create_context(db_path: Path) -> CLIContext:
         factor_store=factor_store,
         factor_history=FactorHistory(factor_store),
         factor_registry_store=FactorRegistryStore(factor_store),
+        regime_detector=regime_detector,
+        regime_history_store=regime_history_store,
+        regime_analytics=RegimeAnalytics(regime_detector, regime_history_store, factor_store),
         strategy_evaluation=StrategyEvaluation(),
         universe_manager=UniverseManager(metadata_store, data_provider),
         data_quality_analyzer=DataQualityAnalyzer(price_store, metadata_store),

@@ -116,6 +116,10 @@ python -m quant.cli factor-backtest --factor momentum_20d --save-factor-history
 python -m quant.cli factor-store-summary
 python -m quant.cli factor-history --factor momentum_20d
 python -m quant.cli factor-rank
+python -m quant.cli detect-regime
+python -m quant.cli regime-history
+python -m quant.cli regime-report
+python -m quant.cli regime-rank
 python -m quant.cli strategy-eval --factor-backtest-report reports/factor_backtest_YYYYMMDD_HHMMSS.json
 python -m quant.cli strategy-eval --strategy factor_long_short --factor momentum_20d
 python -m quant.cli optimize
@@ -215,6 +219,20 @@ python -m quant.cli factor-rank --limit 20
 ```
 
 The Factor Store commands read persisted research history from SQLite. `factor-store-summary` reports table counts, latest evaluation timestamps, and coverage diagnostics. `factor-history` shows stored evaluation, backtest, walk-forward, and stability rows for one factor. `factor-rank` ranks factors by IC, Rank IC, ICIR, stability, coverage, and confidence. These commands are storage and analytics only; they do not recompute factors, change alpha behavior, or execute trades.
+
+## Regime Detection
+
+```bash
+python -m quant.cli detect-regime
+python -m quant.cli detect-regime --benchmark SPY
+python -m quant.cli regime-history
+python -m quant.cli regime-report
+python -m quant.cli regime-rank
+python -m quant.cli factor-eval --factor momentum_20d --save-regime-history
+python -m quant.cli factor-backtest --factor momentum_20d --save-regime-history
+```
+
+Regime Detection reads stored daily benchmark prices and writes deterministic market-state diagnostics. `detect-regime` persists `regime_history`, `regime-report` summarizes current regime and factor-by-regime history, and `regime-rank` ranks persisted factor diagnostics by regime. The layer is diagnostic only and does not disable factors, alter alpha weights, or execute trades.
 
 ## Strategy Evaluation
 

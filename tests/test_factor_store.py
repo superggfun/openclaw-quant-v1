@@ -51,6 +51,7 @@ def test_factor_store_table_creation(tmp_path: Path) -> None:
         "factor_walk_forward_history",
         "factor_stability_history",
         "factor_versions",
+        "factor_regime_history",
     } <= tables
 
 

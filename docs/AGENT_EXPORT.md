@@ -44,12 +44,18 @@ Supported report types:
 - `factor_store_summary`
 - `factor_history`
 - `factor_rank`
+- `regime_detection`
+- `regime_history`
+- `regime_report`
+- `regime_rank`
 
 Factor evaluation and factor backtest exports include `factor_coverage` when source reports evaluate fundamental factors. Agent summaries do not recompute the factors; they only compact existing report fields such as coverage percentage, missing percentage, metrics used, and warnings.
 
 Multi-factor exports summarize top symbols, factor/family weights, coverage, confidence, warnings, and recommended validation checks. They do not embed chart bytes and do not make allocation decisions.
 
 Factor Store exports summarize persisted factor definitions, IC/Rank IC/ICIR history, coverage, stability, confidence, and rankings. They read stored research history only; they do not recompute factors and do not generate trade decisions.
+
+Regime exports summarize current regime, regime counts, factor performance by regime, regime-aware rankings, and deterministic follow-up checks. They are diagnostics only and do not provide investment advice.
 
 ## Common Output Schema
 
@@ -142,3 +148,7 @@ Agent Export supports `reports/fundamental_import_*.json`, `reports/fundamental_
 ## Factor Store Reports
 
 Agent Export supports `reports/factor_store_summary_*.json`, `reports/factor_history_*.json`, and `reports/factor_rank_*.json`. Summaries include stored row counts, latest factor metrics, top and weak factors, stability and coverage notes, and deterministic next steps such as expanding coverage or rerunning walk-forward validation.
+
+## Regime Reports
+
+Agent Export supports `reports/regime_detection_*.json`, `reports/regime_history_*.json`, `reports/regime_report_*.json`, and `reports/regime_rank_*.json`. Summaries include current regime, regime confidence, factor-by-regime diagnostics, and next steps such as reviewing momentum exposure or comparing factor stability. These are not trading instructions.

@@ -198,6 +198,41 @@ Columns:
 - `change_reason`
 - `created_at`
 
+## regime_history
+
+Persisted deterministic market regime classifications.
+
+Primary key:
+
+- `date`
+
+Columns:
+
+- `date`: benchmark price date.
+- `regime`: primary market regime label.
+- `volatility`: realized volatility as of that date.
+- `trend_strength`: trailing trend return as of that date.
+- `drawdown`: drawdown from prior peak as of that date.
+- `market_return`: daily benchmark return.
+- `confidence`: deterministic rule confidence.
+- `created_at`, `updated_at`: persistence timestamps.
+
+## factor_regime_history
+
+Persisted factor diagnostics grouped by regime.
+
+Columns:
+
+- `factor_name`
+- `regime`
+- `ic`
+- `rank_ic`
+- `icir`
+- `coverage`
+- `stability`
+- `evaluation_date`
+- `report_path`
+
 ## accounts
 
 Simulated account state.
@@ -448,6 +483,62 @@ Top-level keys:
 - `most_stable_factors`: factors with the strongest stored stability score.
 - `most_unstable_factors`: factors with the weakest stored stability score.
 - `warnings`: non-blocking warnings such as insufficient stored history.
+
+## reports/regime_detection_*.json
+
+Regime detection reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `metadata`
+- `benchmark`
+- `parameters`
+- `current_regime`
+- `observations`
+- `regime_counts`
+- `saved_rows`
+- `no_lookahead`
+- `warnings`
+- `interpretation_notes`
+
+## reports/regime_history_*.json
+
+Regime history reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `metadata`
+- `current_regime`
+- `history`
+- `regime_counts`
+- `warnings`
+
+## reports/regime_report_*.json
+
+Regime diagnostic reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `metadata`
+- `current_regime`
+- `regime_counts`
+- `factor_performance_by_regime`
+- `warnings`
+- `interpretation_notes`
+
+## reports/regime_rank_*.json
+
+Regime ranking reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `metadata`
+- `current_regime`
+- `best_by_regime`
+- `worst_by_regime`
+- `most_stable_across_regimes`
+- `warnings`
+- `interpretation_notes`
 
 ## reports/strategy_eval_*.json
 

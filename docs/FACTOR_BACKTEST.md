@@ -54,6 +54,7 @@ Default settings:
 ```bash
 python -m quant.cli factor-backtest --factor momentum_20d
 python -m quant.cli factor-backtest --factor momentum_20d --pipeline examples/factor_pipeline_config.json
+python -m quant.cli factor-backtest --factor momentum_20d --save-regime-history
 python -m quant.cli factor-backtest --factor risk_adjusted_momentum --start 2024-01-01 --end 2024-12-31 --holding-period 20 --quantiles 5
 ```
 
@@ -68,8 +69,11 @@ Supported arguments:
 - `--short-quantile`
 - `--pipeline`
 - `--report`
+- `--save-regime-history`
 
 Reports are written by default.
+
+`--save-regime-history` stores factor spread diagnostics by the persisted market regime active on each signal date. It is diagnostic only and does not change long/short construction.
 
 ## Metrics
 
