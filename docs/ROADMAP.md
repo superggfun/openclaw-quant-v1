@@ -1,5 +1,14 @@
 # Roadmap
 
+## v0.31.0-factor-store
+
+- Adds `quant/factor_store` as a persistent SQLite factor research database.
+- Stores factor definitions, factor values, IC/RankIC/ICIR history, factor backtest metrics, walk-forward folds, stability, coverage, confidence, and versions.
+- Adds optional `--save-factor-history` persistence for `factor-eval`, `factor-backtest`, and `walk-forward`.
+- Adds CLI commands: `factor-store-summary`, `factor-history`, and `factor-rank`.
+- Adds Agent Export and Visualization support for factor store reports.
+- Storage and analytics only: no new alpha factors, ML, news sentiment, broker/live trading, or no-lookahead semantic changes.
+
 ## v0.30.0-market-realism
 
 - Adds `quant/market_realism` for deterministic slippage, ADV liquidity, marketability, and position-size constraints.

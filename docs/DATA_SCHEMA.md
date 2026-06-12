@@ -87,6 +87,117 @@ Fundamental factors must select rows using `report_date <= signal_date`; `fiscal
 
 Append-only import log for CSV imports. It stores file path, statement override, force flag, inserted/updated/skipped/error counts, and warnings.
 
+## factor_definitions
+
+Persistent registry metadata for factor lifecycle tracking.
+
+Primary key:
+
+- `factor_name`
+
+Columns:
+
+- `factor_name`: registered factor name.
+- `category`: factor category or family label.
+- `description`: registry description.
+- `higher_is_better`: whether higher factor values are preferred by default.
+- `fundamental_required`: whether the factor requires report-date-filtered fundamental data.
+- `created_at`: insertion timestamp.
+- `updated_at`: update timestamp.
+
+## factor_values
+
+Persisted no-lookahead factor observations.
+
+Primary key:
+
+- `(factor_name, symbol, signal_date, version)`
+
+Columns:
+
+- `factor_name`: registered factor name.
+- `symbol`: ticker symbol.
+- `signal_date`: factor signal date.
+- `value`: factor value calculated from signal-date-and-earlier data.
+- `coverage`: optional coverage/confidence value for the observation.
+- `version`: factor implementation version.
+- `created_at`: insertion timestamp.
+
+## factor_evaluation_history
+
+Persisted Factor Evaluation summaries from `factor-eval --save-factor-history`.
+
+Columns:
+
+- `factor_name`
+- `ic`, `rank_ic`, `icir`
+- `coverage`, `missing_pct`
+- `warnings`: JSON-encoded warning list.
+- `evaluation_date`: persistence timestamp.
+- `report_path`: generated source report path when available.
+- `version`
+
+## factor_backtest_history
+
+Persisted long-short Factor Backtest summaries from `factor-backtest --save-factor-history`.
+
+Columns:
+
+- `factor_name`
+- `long_short_return`
+- `sharpe`
+- `drawdown`
+- `turnover`
+- `coverage`
+- `warnings`
+- `evaluation_date`
+- `report_path`
+- `version`
+
+## factor_walk_forward_history
+
+Persisted fold-level Walk Forward history from `walk-forward --save-factor-history`.
+
+Columns:
+
+- `factor_name`
+- `fold`
+- `train_return`, `test_return`
+- `train_sharpe`, `test_sharpe`
+- `warnings`
+- `evaluation_date`
+- `report_path`
+
+## factor_stability_history
+
+Persisted factor analytics scores.
+
+Columns:
+
+- `factor_name`
+- `stability_score`
+- `coverage_score`
+- `confidence_score`
+- `factor_decay_score`
+- `overall_score`
+- `timestamp`
+
+## factor_versions
+
+Version metadata for factor definitions.
+
+Primary key:
+
+- `(factor_name, version)`
+
+Columns:
+
+- `factor_name`
+- `version`
+- `description`
+- `change_reason`
+- `created_at`
+
 ## accounts
 
 Simulated account state.
@@ -298,6 +409,45 @@ Top-level keys:
 - `pipeline_config`: optional Factor Pipeline config applied before quantile grouping.
 - `periods`: per-signal-date long symbols, short symbols, weights, exposures, quantile returns, long-short return, and turnover.
 - `warnings`: non-blocking data quality warnings.
+
+## reports/factor_store_summary_*.json
+
+Factor Store summary reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `metadata`: report type, generated timestamp, and offline/storage-only flags.
+- `table_counts`: row counts for factor store tables.
+- `factor_count`: number of persisted definitions.
+- `latest_evaluation_date`: latest stored factor evaluation timestamp.
+- `latest_backtest_date`: latest stored factor backtest timestamp.
+- `warnings`: non-blocking warnings such as an empty store.
+
+## reports/factor_history_*.json
+
+Factor history reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `metadata`: report type, generated timestamp, and requested factor filter.
+- `factor`: requested factor name or `all`.
+- `evaluation_history`: stored IC, Rank IC, ICIR, coverage, and warnings.
+- `backtest_history`: stored long-short return, Sharpe, drawdown, turnover, coverage, and warnings.
+- `walk_forward_history`: stored fold-level train/test metrics and warnings.
+- `stability_history`: stored stability, coverage, confidence, decay, and overall scores.
+
+## reports/factor_rank_*.json
+
+Factor rank reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `metadata`: report type and generated timestamp.
+- `top_factors`: highest-ranked factors by health/confidence scoring.
+- `worst_factors`: lowest-ranked factors among stored rows.
+- `most_stable_factors`: factors with the strongest stored stability score.
+- `most_unstable_factors`: factors with the weakest stored stability score.
+- `warnings`: non-blocking warnings such as insufficient stored history.
 
 ## reports/strategy_eval_*.json
 

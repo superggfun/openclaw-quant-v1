@@ -31,6 +31,9 @@ Report type is auto-detected from schema keys:
 - `walk_forward`
 - `risk`
 - `multi_factor`
+- `factor_store_summary`
+- `factor_history`
+- `factor_rank`
 
 ## Outputs
 
@@ -62,6 +65,8 @@ The summary dashboard includes:
 - chart images
 
 Multi-factor reports generate charts for family contribution, factor contribution, confidence, and stability ranking.
+
+Factor Store reports generate charts for stored table counts, IC history, Rank IC history, factor rankings, stability history, coverage history, and coverage rankings when those fields exist.
 
 Trade simulation reports with v0.30 market realism fields can also generate charts for slippage, cost breakdown, rejected trades, and liquidity usage. Missing fields skip those charts with warnings rather than crashing.
 

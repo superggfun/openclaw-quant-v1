@@ -62,6 +62,7 @@ The system does not fill missing fundamentals with zero and does not invent valu
 ```bash
 python -m quant.cli factor-list
 python -m quant.cli factor-eval --factor fundamental_quality_score
+python -m quant.cli factor-eval --factor fundamental_quality_score --save-factor-history
 python -m quant.cli factor-backtest --factor fundamental_value_score
 python -m quant.cli alpha
 python -m quant.cli walk-forward --strategy alpha --max-folds 1
@@ -72,6 +73,8 @@ python -m quant.cli walk-forward --strategy alpha --max-folds 1
 Full alpha walk-forward validation keeps the existing default fold behavior. Fundamental composite alpha can be more expensive than price-only alpha, so smoke checks should pass `--max-folds 1` or `--max-folds 2` explicitly.
 
 `factor-list` marks these factors with `fundamental_data_required=true`.
+
+When persisted with `--save-factor-history`, fundamental factor coverage and missing-data diagnostics are stored with the factor evaluation or factor backtest summary. Missing fundamental values are still skipped or excluded; the Factor Store does not convert missing values to zero.
 
 ## Multi-Factor Integration
 

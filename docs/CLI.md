@@ -38,9 +38,14 @@ python -m quant.cli alpha
 python -m quant.cli alpha --pipeline examples/factor_pipeline_config.json
 python -m quant.cli factor-pipeline --factor momentum_20d
 python -m quant.cli factor-eval --factor momentum_20d
+python -m quant.cli factor-eval --factor momentum_20d --save-factor-history
 python -m quant.cli factor-eval --factor momentum_20d --pipeline examples/factor_pipeline_config.json
 python -m quant.cli factor-backtest --factor momentum_20d
+python -m quant.cli factor-backtest --factor momentum_20d --save-factor-history
 python -m quant.cli factor-backtest --factor momentum_20d --pipeline examples/factor_pipeline_config.json
+python -m quant.cli factor-store-summary
+python -m quant.cli factor-history --factor momentum_20d
+python -m quant.cli factor-rank
 python -m quant.cli strategy-eval --factor-backtest-report reports/factor_backtest_YYYYMMDD_HHMMSS.json
 python -m quant.cli strategy-eval --strategy factor_long_short --factor momentum_20d
 python -m quant.cli strategy-eval --strategy alpha --pipeline examples/factor_pipeline_config.json
@@ -62,10 +67,15 @@ python -m quant.cli factor-eval --factor quality_score
 python -m quant.cli factor-backtest --factor reversal_20d
 python -m quant.cli factor-eval --factor fundamental_quality_score
 python -m quant.cli factor-backtest --factor fundamental_value_score
+python -m quant.cli factor-store-summary
+python -m quant.cli factor-history --factor momentum_20d
+python -m quant.cli factor-rank
 python -m quant.cli alpha
 ```
 
 `factor-list` prints registered factor names, categories, descriptions, required inputs, no-lookahead metadata, `fundamental_data_required`, and lookback windows. Registered factors work with factor evaluation, factor pipeline, factor backtest, and composite alpha generation. Fundamental factors use `report_date <= signal_date` and include coverage fields in factor reports.
+
+`factor-eval`, `factor-backtest`, and `walk-forward` can persist reusable research history with `--save-factor-history`. The Factor Store commands read that SQLite history and write generated summary reports under `reports/`.
 
 `alpha` supports the v0.27 formal multi-factor model through `examples/alpha_config.json`. Multi-factor reports are written to `reports/multi_factor_*.json` and include coverage, confidence, stability, factor contributions, and family contributions.
 
@@ -73,6 +83,7 @@ python -m quant.cli alpha
 
 ```bash
 python -m quant.cli walk-forward --strategy alpha
+python -m quant.cli walk-forward --strategy alpha --save-factor-history
 python -m quant.cli walk-forward --strategy factor_long_short --factor momentum_20d
 python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --portfolio-method equal_weight
 python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --portfolio-method risk_parity

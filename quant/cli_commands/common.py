@@ -20,6 +20,9 @@ from quant.data_providers import DataProvider, ProviderRegistry, create_default_
 from quant.execution.execution_engine import ExecutionEngine
 from quant.factor_backtest.factor_backtest import FactorBacktest
 from quant.factor_eval.factor_evaluation import FactorEvaluation
+from quant.factor_store.factor_history import FactorHistory
+from quant.factor_store.factor_registry_store import FactorRegistryStore
+from quant.factor_store.factor_store import FactorStore
 from quant.fundamental_data.fundamental_service import FundamentalService
 from quant.fundamental_data.fundamental_store import FundamentalStore
 from quant.optimizer.optimizer_engine import OptimizerEngine
@@ -58,6 +61,9 @@ class CLIContext:
     alpha_engine: AlphaEngine
     factor_evaluation: FactorEvaluation
     factor_backtest_engine: FactorBacktest
+    factor_store: FactorStore
+    factor_history: FactorHistory
+    factor_registry_store: FactorRegistryStore
     strategy_evaluation: StrategyEvaluation
     universe_manager: UniverseManager
     data_quality_analyzer: DataQualityAnalyzer
@@ -77,6 +83,7 @@ def create_context(db_path: Path) -> CLIContext:
     provider_registry = create_default_registry()
     data_provider = provider_registry.default_provider()
     price_service = PriceService(price_store, data_source=data_provider)
+    factor_store = FactorStore(db_path)
     return CLIContext(
         db_path=db_path,
         price_store=price_store,
@@ -97,6 +104,9 @@ def create_context(db_path: Path) -> CLIContext:
         alpha_engine=AlphaEngine(price_store, fundamental_store),
         factor_evaluation=FactorEvaluation(price_store, fundamental_store),
         factor_backtest_engine=FactorBacktest(price_store, fundamental_store),
+        factor_store=factor_store,
+        factor_history=FactorHistory(factor_store),
+        factor_registry_store=FactorRegistryStore(factor_store),
         strategy_evaluation=StrategyEvaluation(),
         universe_manager=UniverseManager(metadata_store, data_provider),
         data_quality_analyzer=DataQualityAnalyzer(price_store, metadata_store),

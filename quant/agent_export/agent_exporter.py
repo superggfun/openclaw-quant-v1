@@ -111,6 +111,9 @@ class AgentExporter:
             or {"strategy", "portfolio_method", "equity_curve", "rebalance_events", "final_equity"}.issubset(report)
         ):
             return "trade_sim"
+        report_type = (report.get("metadata") or {}).get("report_type")
+        if report_type in {"factor_store_summary", "factor_history", "factor_rank"}:
+            return report_type
         if {"strategy", "folds", "stability_analysis", "summary"}.issubset(report):
             return "walk_forward"
         if {"summary_metrics", "attribution", "robustness_diagnostics"}.issubset(report):
@@ -133,7 +136,6 @@ class AgentExporter:
             return "execution"
         if "metrics" in report and ("equity_curve" in report or "trades" in report):
             return "backtest"
-        report_type = (report.get("metadata") or {}).get("report_type")
         if report_type in {"fundamental_import", "fundamental_coverage", "fundamental_quality"}:
             return report_type
         return "unknown"
@@ -631,6 +633,99 @@ class AgentExporter:
             ["fix stale reports", "review missing fields", "check currency consistency"],
             [],
             report.get("no_lookahead_notes") or [],
+        )
+
+    def _export_factor_store_summary(self, report: dict[str, Any], generated_from: str) -> AgentExport:
+        counts = report.get("counts") or {}
+        metrics = {
+            "factor_definitions": counts.get("factor_definitions"),
+            "factor_values": counts.get("factor_values"),
+            "factor_evaluation_history": counts.get("factor_evaluation_history"),
+            "factor_backtest_history": counts.get("factor_backtest_history"),
+            "factor_walk_forward_history": counts.get("factor_walk_forward_history"),
+            "factor_stability_history": counts.get("factor_stability_history"),
+            "factor_count": len(report.get("factors") or []),
+        }
+        warnings = []
+        if not counts.get("factor_values"):
+            warnings.append("WARN_FACTOR_STORE_EMPTY_VALUES")
+        return self._base_export(
+            "factor_store_summary",
+            generated_from,
+            "Factor store summary generated for persisted research history.",
+            metrics,
+            ["factor store is available for reproducible research"],
+            warnings,
+            ["save factor-eval with --save-factor-history", "review factor-rank", "compare factor history over time"],
+            [],
+            [],
+        )
+
+    def _export_factor_history(self, report: dict[str, Any], generated_from: str) -> AgentExport:
+        evaluations = report.get("evaluation_history") or []
+        backtests = report.get("backtest_history") or []
+        stability = report.get("stability_history") or []
+        latest_eval = evaluations[0] if evaluations else {}
+        latest_backtest = backtests[0] if backtests else {}
+        latest_stability = stability[0] if stability else {}
+        metrics = {
+            "factor": report.get("factor"),
+            "evaluation_rows": len(evaluations),
+            "backtest_rows": len(backtests),
+            "walk_forward_rows": len(report.get("walk_forward_history") or []),
+            "stability_rows": len(stability),
+            "latest_ic": latest_eval.get("ic"),
+            "latest_rank_ic": latest_eval.get("rank_ic"),
+            "latest_icir": latest_eval.get("icir"),
+            "latest_coverage": latest_eval.get("coverage"),
+            "latest_long_short_return": latest_backtest.get("long_short_return"),
+            "latest_sharpe": latest_backtest.get("sharpe"),
+            "latest_stability": latest_stability.get("stability_score"),
+        }
+        warnings = []
+        if not evaluations and not backtests:
+            warnings.append("WARN_FACTOR_HISTORY_EMPTY")
+        if self._num(latest_eval.get("coverage")) is not None and self._num(latest_eval.get("coverage")) < 0.5:
+            warnings.append("WARN_FACTOR_COVERAGE_LOW")
+        return self._base_export(
+            "factor_history",
+            generated_from,
+            f"Persisted history for factor {report.get('factor') or 'all factors'} summarized.",
+            metrics,
+            ["historical factor diagnostics are persisted"],
+            warnings,
+            ["compare IC history", "review coverage trend", "run factor-rank"],
+            [],
+            [],
+        )
+
+    def _export_factor_rank(self, report: dict[str, Any], generated_from: str) -> AgentExport:
+        top = report.get("top_factors") or []
+        worst = report.get("worst_factors") or []
+        stable = report.get("most_stable_factors") or []
+        top_factor = top[0] if top else {}
+        metrics = {
+            "top_factor": top_factor.get("factor_name"),
+            "top_factor_health": top_factor.get("health_score"),
+            "top_factor_ic": top_factor.get("ic"),
+            "top_factor_coverage": top_factor.get("coverage"),
+            "top_factors": [row.get("factor_name") for row in top[:5]],
+            "worst_factors": [row.get("factor_name") for row in worst[:5]],
+            "most_stable_factors": [row.get("factor_name") for row in stable[:5]],
+        }
+        warnings = []
+        if top_factor and self._num(top_factor.get("coverage")) is not None and self._num(top_factor.get("coverage")) < 0.5:
+            warnings.append("WARN_TOP_FACTOR_LOW_COVERAGE")
+        return self._base_export(
+            "factor_rank",
+            generated_from,
+            "Factor ranking report summarized persisted factor quality diagnostics.",
+            metrics,
+            [f"top factor: {top_factor.get('factor_name')}" if top_factor else "no ranked factors available"],
+            warnings,
+            ["increase coverage before production use", "inspect worst factors", "run walk-forward validation"],
+            [],
+            [],
         )
 
     def _base_export(

@@ -24,6 +24,9 @@ SUPPORTED_REPORT_TYPES = {
     "fundamental_coverage",
     "fundamental_quality",
     "multi_factor",
+    "factor_store_summary",
+    "factor_history",
+    "factor_rank",
 }
 
 EXPECTED_CHARTS_BY_REPORT_TYPE = {
@@ -38,6 +41,9 @@ EXPECTED_CHARTS_BY_REPORT_TYPE = {
     "fundamental_coverage": {"statement_coverage"},
     "fundamental_quality": {"warnings_by_reason"},
     "multi_factor": {"family_contribution", "factor_contribution", "confidence", "stability_ranking"},
+    "factor_store_summary": {"factor_store_counts"},
+    "factor_history": {"ic_history", "rank_ic_history", "stability_history", "coverage_history"},
+    "factor_rank": {"factor_ranking", "stability_ranking", "coverage_ranking"},
 }
 
 
@@ -275,6 +281,31 @@ class ReportVisualizer:
             builder.bar_chart(prefix, "stability_ranking", "Stability Ranking", stability),
         )
 
+    def _charts_factor_store_summary(self, builder: ChartBuilder, prefix: str, report: dict[str, Any]) -> list[ChartArtifact]:
+        return self._keep(
+            builder.bar_chart(prefix, "factor_store_counts", "Factor Store Counts", report.get("counts") or {}),
+        )
+
+    def _charts_factor_history(self, builder: ChartBuilder, prefix: str, report: dict[str, Any]) -> list[ChartArtifact]:
+        evaluations = report.get("evaluation_history") or []
+        stability = report.get("stability_history") or []
+        return self._keep(
+            builder.line_chart(prefix, "ic_history", "IC History", self._series(evaluations, "evaluation_date", "ic")),
+            builder.line_chart(prefix, "rank_ic_history", "RankIC History", self._series(evaluations, "evaluation_date", "rank_ic")),
+            builder.line_chart(prefix, "stability_history", "Stability History", self._series(stability, "timestamp", "stability_score")),
+            builder.line_chart(prefix, "coverage_history", "Coverage History", self._series(evaluations, "evaluation_date", "coverage")),
+        )
+
+    def _charts_factor_rank(self, builder: ChartBuilder, prefix: str, report: dict[str, Any]) -> list[ChartArtifact]:
+        top = self._items_to_mapping(report.get("top_factors"), "factor_name", "health_score")
+        stable = self._items_to_mapping(report.get("most_stable_factors"), "factor_name", "stability_score")
+        coverage = self._items_to_mapping(report.get("top_factors"), "factor_name", "coverage")
+        return self._keep(
+            builder.bar_chart(prefix, "factor_ranking", "Factor Ranking", top),
+            builder.bar_chart(prefix, "stability_ranking", "Stability Ranking", stable),
+            builder.bar_chart(prefix, "coverage_ranking", "Coverage Ranking", coverage),
+        )
+
     @staticmethod
     def _series(items: Any, label_key: str, value_key: str) -> list[tuple[str, float]]:
         output = []
@@ -506,6 +537,22 @@ class ReportVisualizer:
                 "weighting_mode": report.get("weighting_mode"),
                 "overall_confidence": confidence.get("overall_confidence"),
                 "factor_count": len(report.get("factors") or []),
+            }
+        if report_type == "factor_store_summary":
+            return report.get("counts") or {}
+        if report_type == "factor_history":
+            return {
+                "factor": report.get("factor"),
+                "evaluation_rows": len(report.get("evaluation_history") or []),
+                "backtest_rows": len(report.get("backtest_history") or []),
+                "stability_rows": len(report.get("stability_history") or []),
+            }
+        if report_type == "factor_rank":
+            top = (report.get("top_factors") or [{}])[0]
+            return {
+                "top_factor": top.get("factor_name"),
+                "top_factor_health": top.get("health_score"),
+                "ranked_count": len(report.get("top_factors") or []),
             }
         return {key: report.get(key) for key in keys if key in report}
 

@@ -10,6 +10,7 @@ python -m quant.cli factor-eval --factor quality_score
 python -m quant.cli factor-backtest --factor reversal_20d
 python -m quant.cli factor-eval --factor fundamental_quality_score
 python -m quant.cli factor-backtest --factor fundamental_value_score
+python -m quant.cli factor-store-summary --sync-definitions
 python -m quant.cli alpha
 ```
 
@@ -49,6 +50,12 @@ Alpha reports include per-symbol `factor_values`, `factor_contributions`, and `c
 `v0.27.0` adds a formal Multi-Factor Model v2 in `quant/multi_factor`. It supports explicit families (`PRICE`, `VALUE`, `QUALITY`, `GROWTH`, `HEALTH`, `LOW_VOL`, `REVERSAL`), rank/z-score normalization, optional winsorization, equal/custom/IC/stability weighting, coverage-aware confidence, and factor/family contribution reporting.
 
 Multi-factor confidence is a deterministic diagnostic about coverage and supplied stability inputs. It is not a return guarantee.
+
+## Factor Store Integration
+
+`v0.31.0` adds a persistent Factor Store. `factor-store-summary --sync-definitions` records registry metadata such as category, description, `higher_is_better`, and whether fundamental data is required. `factor-eval`, `factor-backtest`, and `walk-forward` can opt in to persistence with `--save-factor-history`.
+
+This is lifecycle metadata and research history only; it does not create new factors and does not alter factor evaluation, factor backtest, alpha, or walk-forward semantics.
 
 ## No-Lookahead
 

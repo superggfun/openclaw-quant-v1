@@ -6,6 +6,7 @@ v0.20.0 adds an offline walk-forward and rolling validation layer. It validates 
 
 ```bash
 python -m quant.cli walk-forward --strategy alpha
+python -m quant.cli walk-forward --strategy alpha --save-factor-history
 python -m quant.cli walk-forward --strategy alpha --train-years 3 --test-years 1
 python -m quant.cli walk-forward --strategy factor_long_short --factor momentum_20d
 ```
@@ -26,6 +27,7 @@ Optional parameters:
 - `--alpha-config`
 - `--pipeline`
 - `--max-folds`
+- `--save-factor-history`
 
 ## Window Logic
 
@@ -67,6 +69,8 @@ For `factor_long_short`, returns are research spread returns. They may use overl
 The v0.27 multi-factor model can be used by `alpha` inside walk-forward runs. Stability-weighted alpha may use configured stability priors and coverage-aware confidence, but walk-forward validation itself still uses the existing no-lookahead signal/execution path.
 
 Full alpha walk-forward validation keeps the existing default fold behavior. Multi-factor alpha with fundamental factors can be more expensive than price-only alpha, so smoke checks may pass `--max-folds 1` or `--max-folds 2` explicitly without changing defaults.
+
+`--save-factor-history` stores fold-level train/test metrics and warnings in the Factor Store. It does not change fold generation, signal dates, execution dates, or return calculations.
 
 ## Factor Stability
 

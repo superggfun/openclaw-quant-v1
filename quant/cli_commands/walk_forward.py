@@ -26,6 +26,7 @@ def register_parser(subparsers) -> None:
     walk_forward.add_argument("--alpha-config", default="examples/alpha_config.json")
     walk_forward.add_argument("--pipeline", default=None, help="Optional factor pipeline config JSON.")
     walk_forward.add_argument("--max-folds", type=int, default=5, help="Limit folds for CLI runtime; use 0 for all folds.")
+    walk_forward.add_argument("--save-factor-history", action="store_true", help="Persist walk-forward factor history.")
 
 
 def handle(args, context) -> int:
@@ -78,5 +79,13 @@ def handle(args, context) -> int:
     print("recommendations:")
     for recommendation in result.recommendations:
         print(f"- {recommendation}")
+    if args.save_factor_history:
+        context.factor_registry_store.sync()
+        saved = context.factor_store.save_walk_forward(
+            result,
+            factor=args.factor if args.strategy == "factor_long_short" else "alpha",
+        )
+        print("saved_factor_history:")
+        print(f"walk_forward_folds: {saved['saved_walk_forward_folds']}")
     print(f"report: {result.report_path}")
     return 0

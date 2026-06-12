@@ -16,6 +16,7 @@ def register_parser(subparsers) -> None:
     factor_eval.add_argument("--end", default=None, help="Inclusive signal end date YYYY-MM-DD.")
     factor_eval.add_argument("--forward-days", type=int, default=20)
     factor_eval.add_argument("--pipeline", default=None, help="Optional factor pipeline config JSON.")
+    factor_eval.add_argument("--save-factor-history", action="store_true", help="Persist factor values and evaluation history.")
 
 
 def handle(args, context) -> int:
@@ -63,5 +64,12 @@ def handle(args, context) -> int:
             print(f"{symbol}: {result.exclusion_reasons[symbol]}")
     for warning in result.warnings:
         print(f"warning: {warning}", file=sys.stderr)
+    if args.save_factor_history:
+        context.factor_registry_store.sync()
+        saved = context.factor_store.save_factor_evaluation(result)
+        print("saved_factor_history:")
+        print(f"factor_values: {saved['saved_factor_values']}")
+        print(f"coverage: {format_optional_pct(saved.get('coverage'))}")
+        print(f"confidence: {format_optional_number(saved.get('confidence'))}")
     print(f"report: {result.report_path}")
     return 0

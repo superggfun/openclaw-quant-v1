@@ -63,6 +63,7 @@ Factor decay evaluates IC and Rank IC for:
 ```bash
 python -m quant.cli factor-eval --factor momentum_20d
 python -m quant.cli factor-eval --factor momentum_20d --pipeline examples/factor_pipeline_config.json
+python -m quant.cli factor-eval --factor momentum_20d --save-factor-history
 python -m quant.cli factor-eval --factor risk_adjusted_momentum
 python -m quant.cli factor-eval --factor momentum_60d --start 2024-01-01 --end 2024-12-31 --forward-days 20
 ```
@@ -76,6 +77,8 @@ The CLI prints:
 - Spread return
 - Decay curve
 - Excluded symbols and reasons
+
+With `--save-factor-history`, the command also persists factor values, IC, Rank IC, ICIR, coverage, missing percentage, warnings, and version metadata into the Factor Store. Persistence is optional and does not change the generated factor evaluation report.
 
 ## Reports
 
@@ -131,3 +134,14 @@ Use `python -m quant.cli factor-backtest --factor <factor>` to create a factor s
 Factor Evaluation resolves supported factors through `FactorRegistry`. In addition to the original momentum and volatility factors, registered factors include `value_score`, `quality_score`, `growth_score`, `reversal_5d`, `reversal_20d`, and `low_volatility_score`.
 
 Reports include `factor_family`, `factor_type`, `factor_category`, `factor_description`, and `factor_inputs` so downstream tools can interpret factor results without filename assumptions.
+
+## Factor Store
+
+Use:
+
+```bash
+python -m quant.cli factor-history --factor momentum_20d
+python -m quant.cli factor-rank
+```
+
+to inspect saved evaluation history and factor rankings. These commands read stored research history; they do not recompute factors or change no-lookahead semantics.

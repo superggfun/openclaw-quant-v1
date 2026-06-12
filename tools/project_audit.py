@@ -39,6 +39,7 @@ REQUIRED_MODULE_DOCS = {
     "docs/FACTOR_BACKTEST.md",
     "docs/FACTOR_EVALUATION.md",
     "docs/FACTOR_LIBRARY.md",
+    "docs/FACTOR_STORE.md",
     "docs/FACTOR_PIPELINE.md",
     "docs/FUNDAMENTAL_DATA.md",
     "docs/FUNDAMENTAL_FACTORS.md",

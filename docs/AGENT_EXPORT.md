@@ -41,10 +41,15 @@ Supported report types:
 - `fundamental_import`
 - `fundamental_coverage`
 - `fundamental_quality`
+- `factor_store_summary`
+- `factor_history`
+- `factor_rank`
 
 Factor evaluation and factor backtest exports include `factor_coverage` when source reports evaluate fundamental factors. Agent summaries do not recompute the factors; they only compact existing report fields such as coverage percentage, missing percentage, metrics used, and warnings.
 
 Multi-factor exports summarize top symbols, factor/family weights, coverage, confidence, warnings, and recommended validation checks. They do not embed chart bytes and do not make allocation decisions.
+
+Factor Store exports summarize persisted factor definitions, IC/Rank IC/ICIR history, coverage, stability, confidence, and rankings. They read stored research history only; they do not recompute factors and do not generate trade decisions.
 
 ## Common Output Schema
 
@@ -133,3 +138,7 @@ Agent Export supports `reports/trade_sim_*.json`. Summaries include strategy, po
 ## Fundamental Reports
 
 Agent Export supports `reports/fundamental_import_*.json`, `reports/fundamental_coverage_*.json`, and `reports/fundamental_quality_*.json`. Summaries include import counts, readiness score, symbols covered, missing symbols, latest report date, and key quality warnings. These summaries are diagnostics only and do not create trading signals.
+
+## Factor Store Reports
+
+Agent Export supports `reports/factor_store_summary_*.json`, `reports/factor_history_*.json`, and `reports/factor_rank_*.json`. Summaries include stored row counts, latest factor metrics, top and weak factors, stability and coverage notes, and deterministic next steps such as expanding coverage or rerunning walk-forward validation.

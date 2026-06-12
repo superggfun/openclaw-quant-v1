@@ -34,6 +34,7 @@ SQLite / External APIs
 - `quant.services.backtest_service`: Runs SMA crossover backtests from stored prices and writes JSON reports.
 - `quant.alpha.alpha_engine`: Calculates alpha factors, ranks symbols, and generates target weights.
 - `quant.factor_backtest.factor_backtest`: Runs no-lookahead equal-weight long-short factor return backtests.
+- `quant.factor_store`: Persists factor definitions, values, evaluation history, backtest history, walk-forward fold history, stability, coverage, and versions.
 - `quant.factor_pipeline.factor_pipeline`: Preprocesses same-date factor cross-sections before alpha generation or evaluation.
 - `quant.factor_eval.factor_evaluation`: Evaluates factor predictive quality with no-lookahead IC, Rank IC, quintile, and decay metrics.
 - `quant.strategy_eval.strategy_evaluation`: Explains returns, risk, drawdowns, rolling metrics, and attribution from generated reports.
@@ -94,6 +95,14 @@ CLI alpha -> MultiFactorModel -> normalized factor/family contributions -> cover
 ```
 
 The fundamental data layer handles storage/import/query/quality. `v0.26.0` adds accounting-based factor calculations while preserving price-only factor behavior. `v0.27.0` adds the formal multi-factor combination layer. Fundamental factors always use `report_date <= signal_date`; `fiscal_period_end` alone is not a valid no-lookahead filter.
+
+Factor store flow:
+
+```text
+factor-eval / factor-backtest / walk-forward --save-factor-history -> FactorStore -> factor_* SQLite tables -> factor-history / factor-rank reports
+```
+
+The Factor Store persists outputs from existing no-lookahead engines. It does not recompute factors independently and does not change factor evaluation, factor backtest, walk-forward, alpha, or trading simulation semantics.
 
 Agent export flow:
 

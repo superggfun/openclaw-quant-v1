@@ -6,18 +6,17 @@ This project is research infrastructure only. It is not investment advice, does 
 
 ## Current Version
 
-`v0.30.0-market-realism`
+`v0.31.0-factor-store`
 
-This release adds a deterministic market realism layer for historical simulation:
+This release adds a persistent factor research database:
 
-- slippage models
-- ADV-based liquidity caps
-- position size constraints
-- explicit skipped-trade handling for missing prices
-- rejected and partially filled simulated trade fields
-- cost breakdowns for slippage, market impact, and liquidity
+- factor definitions
+- factor values by symbol and signal date
+- IC / RankIC / ICIR history
+- factor backtest and walk-forward history
+- factor stability, coverage, confidence, and version records
 
-No alpha factors, data providers, broker integrations, live trading, intraday data, machine learning, or no-lookahead rules are intentionally changed in v0.30.
+No alpha factors, data providers, broker integrations, live trading, machine learning, or no-lookahead rules are intentionally changed in v0.31.
 
 ## Quick Start
 
@@ -59,6 +58,9 @@ Factor and alpha research:
 python -m quant.cli factor-list
 python -m quant.cli factor-eval --factor fundamental_quality_score
 python -m quant.cli factor-backtest --factor fundamental_value_score
+python -m quant.cli factor-eval --factor momentum_20d --save-factor-history
+python -m quant.cli factor-history --factor momentum_20d
+python -m quant.cli factor-rank
 python -m quant.cli alpha
 python -m quant.cli walk-forward --strategy alpha --max-folds 1
 ```
@@ -93,6 +95,7 @@ See `docs/CLI.md` and `docs/CLI_COMMANDS.md` for the full command reference.
 - Formal multi-factor model with factor families, normalization, coverage-aware confidence, and contribution reporting.
 - Alpha target generation with no-lookahead signal dates.
 - Factor pipeline, factor evaluation, long-short factor backtest, and walk-forward validation.
+- Persistent factor store for definitions, values, IC history, backtest history, walk-forward folds, stability, coverage, and versions.
 - Portfolio construction methods including equal weight, inverse volatility, risk parity, and minimum variance.
 - Simulated portfolio state, rebalance planning, cost estimation, execution simulation, historical trading simulation, and market realism constraints.
 - Unified account/order/fill/position protocol objects for future MCP/OpenClaw integration.
@@ -114,6 +117,7 @@ Important package areas:
 - `quant/multi_factor/`: formal factor combination, confidence, and contribution model.
 - `quant/alpha/`: signal and target-weight generation.
 - `quant/factor_eval/`, `quant/factor_backtest/`, `quant/walk_forward/`: research validation.
+- `quant/factor_store/`: persistent factor research database and lifecycle analytics.
 - `quant/portfolio_construction/`, `quant/rebalance/`, `quant/cost/`, `quant/execution/`: portfolio and execution simulation layers.
 - `quant/market_realism/`: slippage, ADV liquidity, marketability, and position-size constraints for historical simulation.
 - `quant/trading_simulation/`: account-style historical simulation.
@@ -166,6 +170,7 @@ Generated local artifacts are intentionally ignored:
 - `docs/MULTI_FACTOR.md`
 - `docs/MARKET_REALISM.md`
 - `docs/FACTOR_LIBRARY.md`
+- `docs/FACTOR_STORE.md`
 - `docs/FACTOR_PIPELINE.md`
 - `docs/FACTOR_EVALUATION.md`
 - `docs/FACTOR_BACKTEST.md`

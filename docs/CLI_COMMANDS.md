@@ -110,7 +110,12 @@ python -m quant.cli alpha
 python -m quant.cli alpha --pipeline examples/factor_pipeline_config.json
 python -m quant.cli factor-pipeline --factor momentum_20d
 python -m quant.cli factor-eval --factor momentum_20d
+python -m quant.cli factor-eval --factor momentum_20d --save-factor-history
 python -m quant.cli factor-backtest --factor momentum_20d
+python -m quant.cli factor-backtest --factor momentum_20d --save-factor-history
+python -m quant.cli factor-store-summary
+python -m quant.cli factor-history --factor momentum_20d
+python -m quant.cli factor-rank
 python -m quant.cli strategy-eval --factor-backtest-report reports/factor_backtest_YYYYMMDD_HHMMSS.json
 python -m quant.cli strategy-eval --strategy factor_long_short --factor momentum_20d
 python -m quant.cli optimize
@@ -179,23 +184,37 @@ The factor pipeline command reads stored prices up to `--as-of-date` when provid
 ```bash
 python -m quant.cli factor-eval --factor momentum_20d
 python -m quant.cli factor-eval --factor momentum_20d --pipeline examples/factor_pipeline_config.json
+python -m quant.cli factor-eval --factor momentum_20d --save-factor-history
 python -m quant.cli factor-eval --factor risk_adjusted_momentum
 python -m quant.cli factor-eval --factor volatility_20d --start 2024-01-01 --end 2024-12-31 --forward-days 20
 ```
 
-The factor evaluation command reads stored prices, calculates factor values using signal-date-and-earlier data, then compares them with future returns. It prints IC, Rank IC, ICIR, quintile returns, spread, and decay metrics, and writes `reports/factor_eval_*.json`.
+The factor evaluation command reads stored prices, calculates factor values using signal-date-and-earlier data, then compares them with future returns. It prints IC, Rank IC, ICIR, quintile returns, spread, and decay metrics, and writes `reports/factor_eval_*.json`. Use `--save-factor-history` to persist factor definitions, factor values, IC, Rank IC, ICIR, coverage, and warning metadata into the Factor Store.
 
 ## Long-Short Factor Backtest
 
 ```bash
 python -m quant.cli factor-backtest --factor momentum_20d
 python -m quant.cli factor-backtest --factor momentum_20d --pipeline examples/factor_pipeline_config.json
+python -m quant.cli factor-backtest --factor momentum_20d --save-factor-history
 python -m quant.cli factor-backtest --factor risk_adjusted_momentum --start 2024-01-01 --end 2024-12-31 --holding-period 20 --quantiles 5
 ```
 
-The factor-backtest command ranks each no-lookahead signal-date cross-section, longs the configured top quantile, shorts the configured bottom quantile, and prints long-short return metrics. It writes `reports/factor_backtest_*.json` and does not modify portfolio state.
+The factor-backtest command ranks each no-lookahead signal-date cross-section, longs the configured top quantile, shorts the configured bottom quantile, and prints long-short return metrics. It writes `reports/factor_backtest_*.json` and does not modify portfolio state. Use `--save-factor-history` to persist long-short return, Sharpe, drawdown, turnover, coverage, and warning metadata.
 
 This is not Strategy Evaluation or Performance Attribution. v0.14 adds those as a separate report-reading layer.
+
+## Factor Store
+
+```bash
+python -m quant.cli factor-store-summary
+python -m quant.cli factor-store-summary --sync-definitions
+python -m quant.cli factor-history --factor momentum_20d
+python -m quant.cli factor-rank
+python -m quant.cli factor-rank --limit 20
+```
+
+The Factor Store commands read persisted research history from SQLite. `factor-store-summary` reports table counts, latest evaluation timestamps, and coverage diagnostics. `factor-history` shows stored evaluation, backtest, walk-forward, and stability rows for one factor. `factor-rank` ranks factors by IC, Rank IC, ICIR, stability, coverage, and confidence. These commands are storage and analytics only; they do not recompute factors, change alpha behavior, or execute trades.
 
 ## Strategy Evaluation
 
@@ -327,6 +346,7 @@ python -m quant.cli factor-eval --factor quality_score
 python -m quant.cli factor-backtest --factor reversal_20d
 python -m quant.cli factor-eval --factor fundamental_quality_score
 python -m quant.cli factor-backtest --factor fundamental_value_score
+python -m quant.cli factor-rank
 python -m quant.cli alpha
 ```
 
@@ -336,6 +356,7 @@ The factor library is registry-driven. `factor-list` shows each factor's categor
 
 ```bash
 python -m quant.cli walk-forward --strategy alpha
+python -m quant.cli walk-forward --strategy alpha --save-factor-history
 python -m quant.cli walk-forward --strategy factor_long_short --factor momentum_20d
 python -m quant.cli walk-forward --strategy factor_long_short --factor momentum_20d --train-years 3 --test-years 1 --max-folds 0
 ```
