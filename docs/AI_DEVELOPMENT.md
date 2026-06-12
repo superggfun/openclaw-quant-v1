@@ -105,6 +105,7 @@ The project intentionally does not include:
 - `quant/trading_simulation/`: offline historical account-style simulation.
 - `quant/walk_forward/`: offline walk-forward and rolling validation.
 - `quant/visualization/`: report charts and dashboards from existing JSON reports.
+- `quant/core_protocols/`: JSON-safe account, order, fill, position, signal, recommendation, trade, and snapshot protocol objects.
 - `quant/cli.py`: command line entry point and dispatcher.
 - `quant/cli_commands/`: command-specific parser registration and handlers.
 - `pyproject.toml`: packaging metadata, optional dependency groups, pytest defaults, and console script entry point.
@@ -163,3 +164,7 @@ Multi-factor code belongs under `quant/multi_factor`. It may combine registered 
 ## v0.28 Packaging And CI Notes
 
 Packaging work belongs in `pyproject.toml`, `requirements.txt`, `.github/`, repository templates, and documentation. It must not change quant calculations, report schemas, or no-lookahead behavior. Keep `requirements.txt` usable, add optional dependencies through packaging metadata, and run both `pytest` and `python tools/project_audit.py` before release.
+
+## v0.29 Protocol Notes
+
+Protocol work belongs under `quant/core_protocols`. It may add JSON-safe objects and internal validation, but it must not add live broker behavior, automatic trading, new alpha factors, new data providers, or report schema changes. Future MCP/OpenClaw work should consume these objects rather than scraping engine internals.

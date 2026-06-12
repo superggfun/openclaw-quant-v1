@@ -6,18 +6,20 @@ This project is research infrastructure only. It is not investment advice, does 
 
 ## Current Version
 
-`v0.28.0-packaging-ci`
+`v0.29.0-core-protocols`
 
-This release adds packaging and repository infrastructure:
+This release adds a unified internal protocol layer:
 
-- PEP 621 `pyproject.toml`
-- MIT `LICENSE`
-- GitHub Actions for `pytest` and project audit
-- issue templates and pull request template
-- lazy optional import behavior for `yfinance`
-- packaging docs in `docs/PACKAGING.md`
+- account state
+- positions
+- orders
+- fills
+- trade records
+- signals
+- recommendations
+- portfolio snapshots
 
-No quant behavior, factor semantics, trading logic, report schema, or no-lookahead rules are intentionally changed in v0.28.
+No alpha factors, data providers, broker integrations, live trading, report schemas, or no-lookahead rules are intentionally changed in v0.29.
 
 ## Quick Start
 
@@ -94,6 +96,7 @@ See `docs/CLI.md` and `docs/CLI_COMMANDS.md` for the full command reference.
 - Factor pipeline, factor evaluation, long-short factor backtest, and walk-forward validation.
 - Portfolio construction methods including equal weight, inverse volatility, risk parity, and minimum variance.
 - Simulated portfolio state, rebalance planning, cost estimation, execution simulation, and historical trading simulation.
+- Unified account/order/fill/position protocol objects for future MCP/OpenClaw integration.
 - Strategy evaluation, agent export, and visualization dashboards.
 
 ## Architecture Overview
@@ -114,6 +117,7 @@ Important package areas:
 - `quant/factor_eval/`, `quant/factor_backtest/`, `quant/walk_forward/`: research validation.
 - `quant/portfolio_construction/`, `quant/rebalance/`, `quant/cost/`, `quant/execution/`: portfolio and execution simulation layers.
 - `quant/trading_simulation/`: account-style historical simulation.
+- `quant/core_protocols/`: JSON-safe account, order, fill, position, signal, recommendation, and snapshot protocols.
 - `quant/agent_export/` and `quant/visualization/`: report summarization and visual review.
 
 ## No-Lookahead Contract
@@ -165,6 +169,7 @@ Generated local artifacts are intentionally ignored:
 - `docs/FACTOR_EVALUATION.md`
 - `docs/FACTOR_BACKTEST.md`
 - `docs/PORTFOLIO_CONSTRUCTION.md`
+- `docs/PROTOCOLS.md`
 - `docs/TRADING_SIMULATION.md`
 - `docs/WALK_FORWARD.md`
 - `docs/STRATEGY_EVALUATION.md`

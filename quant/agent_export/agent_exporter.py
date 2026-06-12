@@ -78,6 +78,33 @@ class AgentExporter:
             )
         return builder(report, generated_from)
 
+    def export_protocol(self, protocol_object: Any, generated_from: str = "<protocol>") -> AgentExport:
+        to_dict = getattr(protocol_object, "to_dict", None)
+        if not callable(to_dict):
+            raise ValueError("protocol object must expose to_dict()")
+        payload = to_dict()
+        protocol_type = protocol_object.__class__.__name__
+        warnings = []
+        validate = getattr(protocol_object, "validate", None)
+        if callable(validate):
+            warnings = [f"PROTOCOL_VALIDATION: {error}" for error in validate()]
+        metrics = {
+            key: payload.get(key)
+            for key in ("account_id", "cash", "equity", "market_value", "symbol", "side", "quantity", "status", "target_weight")
+            if key in payload
+        }
+        return self._base_export(
+            report_type=f"protocol_{protocol_type}",
+            generated_from=generated_from,
+            summary=f"{protocol_type} protocol object exported for agent context.",
+            key_metrics=metrics,
+            key_findings=["protocol object is JSON serializable"],
+            warnings=warnings,
+            recommended_next_steps=["use stable protocol fields for MCP/OpenClaw integration"],
+            action_candidates=[],
+            data_quality_notes=[],
+        )
+
     def detect_report_type(self, report: dict[str, Any]) -> str:
         if (
             report.get("metadata", {}).get("report_type") == "trade_sim"

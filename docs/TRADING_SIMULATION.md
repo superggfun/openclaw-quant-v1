@@ -6,6 +6,8 @@
 
 The simulator unifies signal generation, portfolio construction, rebalance planning, cost estimation, execution accounting, and mark-to-market portfolio state inside one historical loop.
 
+`v0.29.0` adds internal protocol conversion for account state, trade records, orders, fills, and portfolio snapshots. These protocol objects prepare the simulator for future MCP/OpenClaw integration while preserving the existing `trade_sim` report schema.
+
 The execution model is simulated. By default it fills on the next available historical close after a signal date. Results can differ from live trading, paper trading, broker fills, opening auction behavior, intraday execution, delayed data, liquidity limits, and real slippage.
 
 It is different from the existing backtest engine:

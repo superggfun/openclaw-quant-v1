@@ -1,5 +1,12 @@
 # Roadmap
 
+## v0.29.0-core-protocols
+
+- Adds `quant/core_protocols` with JSON-safe AccountState, Position, Order, Fill, TradeRecord, Signal, Recommendation, and PortfolioSnapshot objects.
+- Adds validation helpers for account reconciliation, weight checks, fill/order references, and `signal_date <= execution_date`.
+- Integrates protocol objects internally with PortfolioAccount, TradingSimulator, ExecutionEngine, and Agent Export while preserving existing CLI behavior and report schemas.
+- Protocol architecture only: no new alpha factors, data providers, ML, news sentiment, live broker integrations, or no-lookahead semantic changes.
+
 ## v0.28.0-packaging-ci
 
 - Adds `pyproject.toml`, MIT `LICENSE`, GitHub Actions workflows, issue templates, and a pull request template.

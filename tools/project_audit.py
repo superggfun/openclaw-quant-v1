@@ -45,6 +45,7 @@ REQUIRED_MODULE_DOCS = {
     "docs/MULTI_FACTOR.md",
     "docs/PACKAGING.md",
     "docs/PORTFOLIO_CONSTRUCTION.md",
+    "docs/PROTOCOLS.md",
     "docs/STRATEGY_EVALUATION.md",
     "docs/TRADING_SIMULATION.md",
     "docs/VISUALIZATION.md",

@@ -105,6 +105,12 @@ Recommendations are deterministic and report-type specific, for example:
 
 The exporter does not invent external facts. It only uses fields in the input report.
 
+## Protocol Objects
+
+`v0.29.0` adds direct protocol-object export through `AgentExporter.export_protocol()`. This supports JSON-safe objects such as `AccountState`, `Position`, `Order`, `Fill`, `Signal`, and `Recommendation` for future MCP/OpenClaw context passing.
+
+This direct protocol export is an in-process API, not a CLI report schema change. Existing `export-for-agent --report ...` behavior remains unchanged.
+
 ## Visualization Paths
 
 When `visualize-report` has generated charts for the same source report, Agent Export includes those files in `visualization_paths`. The source JSON report is not modified.

@@ -123,3 +123,27 @@ def test_execution_costs_are_included(tmp_path: Path) -> None:
     assert result.execution_costs["total_cost"] > 0
     assert result.slippage_estimate > 0
     assert all(trade.total_cost > 0 for trade in result.executed_trades)
+
+
+def test_execution_report_schema_unchanged_by_protocol_integration(tmp_path: Path) -> None:
+    db_path = tmp_path / "quant.db"
+    engine = make_engine(db_path, tmp_path / "reports")
+
+    result = engine.run({"SPY": 0.5, "cash": 0.5}, mode="immediate")
+    report = Path(result.report_path).read_text(encoding="utf-8")
+
+    payload = __import__("json").loads(report)
+    assert set(payload) == {
+        "mode",
+        "target_allocation",
+        "intended_trades",
+        "executed_trades",
+        "unfilled_trades",
+        "execution_costs",
+        "slippage_estimate",
+        "final_cash",
+        "final_positions",
+        "warnings",
+    }
+    assert "protocol_orders" not in payload
+    assert "protocol_fills" not in payload

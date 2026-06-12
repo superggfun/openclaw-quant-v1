@@ -13,6 +13,8 @@ import pandas as pd
 from quant.alpha.alpha_engine import AlphaEngine
 from quant.config import DEFAULT_SYMBOLS
 from quant.cost.cost_engine import CostEngine, DEFAULT_COST_CONFIG, TradeInput
+from quant.core_protocols.fill import Fill
+from quant.core_protocols.order import Order
 from quant.fundamental_data.fundamental_store import FundamentalStore
 from quant.portfolio_construction.portfolio_construction import (
     SUPPORTED_METHODS,
@@ -284,11 +286,14 @@ class TradingSimulator:
                 buys.append(trade)
 
         executed = []
+        protocol_orders: list[Order] = []
+        protocol_fills: list[Fill] = []
         cost_engine = CostEngine(dict(cost_config), report_dir=self.report_dir)
         for trade in sells:
             cost_report = cost_engine.estimate([trade], write_report=False)
             event["warnings"].extend(cost_report.warnings)
             estimate = cost_report.trades[0]
+            order = self._protocol_order(event, trade, len(protocol_orders) + 1)
             applied = account.apply_trade(
                 trade.symbol,
                 trade.side,
@@ -299,6 +304,8 @@ class TradingSimulator:
                 signal_date=event["signal_date"],
                 execution_date=event["execution_date"],
             )
+            protocol_orders.append(order)
+            protocol_fills.append(self._protocol_fill(event, order, applied, len(protocol_fills) + 1))
             executed.append(applied.to_dict() | {"total_cost": estimate.total_cost})
 
         for trade in buys:
@@ -315,6 +322,7 @@ class TradingSimulator:
             if affordable <= 0 or estimate is None:
                 event["warnings"].append(f"insufficient cash to buy {trade.symbol}")
                 continue
+            order = self._protocol_order(event, TradeInput(trade.symbol, trade.side, affordable, trade.price), len(protocol_orders) + 1)
             applied = account.apply_trade(
                 trade.symbol,
                 trade.side,
@@ -325,9 +333,19 @@ class TradingSimulator:
                 signal_date=event["signal_date"],
                 execution_date=event["execution_date"],
             )
+            protocol_orders.append(order)
+            protocol_fills.append(self._protocol_fill(event, order, applied, len(protocol_fills) + 1))
             executed.append(applied.to_dict() | {"total_cost": estimate.total_cost})
 
         after = account.mark_to_market(event["execution_date"], prices)
+        account_state = account.to_protocol_state(
+            event["execution_date"],
+            prices,
+            account_id="trade-sim",
+            orders=protocol_orders,
+            fills=protocol_fills,
+        )
+        event["warnings"].extend(f"protocol validation: {error}" for error in account_state.validate())
         return event | {
             "executed_trades": executed,
             "cash_before": before.cash,
@@ -337,6 +355,36 @@ class TradingSimulator:
             "cost_paid": round(sum(trade.get("total_cost", 0.0) for trade in executed), 6),
             "warnings": self._dedupe(event["warnings"]),
         }
+
+    @staticmethod
+    def _protocol_order(event: dict, trade: TradeInput, sequence: int) -> Order:
+        return Order(
+            order_id=f"{event['signal_date']}-{event['execution_date']}-{sequence}-{trade.symbol}-{trade.side}",
+            symbol=trade.symbol,
+            side=trade.side,
+            quantity=float(trade.shares),
+            target_weight=float((event.get("target_weights") or {}).get(trade.symbol, 0.0)),
+            signal_date=event["signal_date"],
+            created_at=event["signal_date"],
+            status="FILLED",
+            reason="historical rebalance simulation",
+            metadata={"source": "TradingSimulator"},
+        )
+
+    @staticmethod
+    def _protocol_fill(event: dict, order: Order, trade: object, sequence: int) -> Fill:
+        return Fill(
+            fill_id=f"{order.order_id}-fill-{sequence}",
+            order_id=order.order_id,
+            symbol=order.symbol,
+            side=order.side,
+            quantity=float(getattr(trade, "shares")),
+            price=float(getattr(trade, "price")),
+            cost=float(getattr(trade, "cost")),
+            fill_time=event["execution_date"],
+            signal_date=event["signal_date"],
+            execution_date=event["execution_date"],
+        )
 
     def _load_price_frame(self, symbols: list[str], start: str, end: str, price_column: str) -> pd.DataFrame:
         frames = []

@@ -19,6 +19,7 @@ SQLite / External APIs
 - `quant.cli`: Main CLI entry point. It builds the top-level parser, creates shared context, and dispatches to command modules.
 - `quant.cli_commands`: Dedicated parser registration and command handlers for data, data layer, agent export, visualization, portfolio, rebalance, risk, optimizer, portfolio construction, alpha, factor, strategy evaluation, trading simulation, cost, execution, and backtest commands.
 - `pyproject.toml`: PEP 621 packaging metadata, optional dependency groups, pytest defaults, and the `openclaw-quant` console entry point.
+- `quant.core_protocols`: JSON-safe account, position, order, fill, trade, signal, recommendation, and portfolio snapshot protocol objects for future MCP/OpenClaw interfaces.
 - `quant.agent_export.agent_exporter`: Converts detailed JSON reports into compact agent-friendly text, Markdown, or JSON summaries.
 - `quant.visualization`: Converts existing JSON reports into PNG, SVG, and HTML visual dashboards.
 - `quant.data_providers`: Defines the `DataProvider` interface, provider registry, yfinance provider, CSV provider, mock provider, and future-provider placeholders.
@@ -100,6 +101,14 @@ CLI export-for-agent -> AgentExporter -> existing reports/*.json -> compact text
 ```
 
 The agent export layer is read-only and export-only. It does not modify source reports, quant logic, factor evaluation, backtest behavior, portfolio state, or execution behavior.
+
+Protocol export flow:
+
+```text
+Protocol object -> AgentExporter.export_protocol -> compact AgentExport object
+```
+
+Protocol export does not replace existing report export. It gives future MCP/OpenClaw callers a stable JSON-safe object boundary without changing report schemas.
 
 Visualization flow:
 
@@ -244,8 +253,11 @@ CLI trade-sim -> TradingSimulator -> AlphaEngine signal date T -> PortfolioConst
 
 The trading simulator is offline and deterministic. It does not write to SQLite portfolio state, does not connect to brokers, and does not alter existing backtest semantics.
 
+`v0.29.0` adds internal Order/Fill/AccountState protocol creation and validation inside execution and trade simulation paths. Existing reports are intentionally unchanged.
+
 ## Extension Points
 
+- `quant/core_protocols`: stable JSON-safe protocol boundary for future MCP/OpenClaw, broker adapter, and agent integrations.
 - `quant/data_layer`: stable universe, metadata, coverage, and data quality boundary for future factor research.
 - `quant/agent_export`: stable report-to-agent context boundary for future OpenClaw and LLM agent integrations.
 - `quant/risk`: future portfolio and strategy risk checks.

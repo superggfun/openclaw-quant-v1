@@ -61,4 +61,6 @@ reports/execution_YYYYMMDD_HHMMSS.json
 
 The simulator is side-effect free for portfolio state. It reads account and price data, but it does not write `accounts`, `positions`, or `trades`.
 
+`v0.29.0` adds internal Order and Fill protocol creation and validation for executed simulated trades. The public execution report schema is preserved.
+
 Future OpenClaw Execution Agent work should consume this report shape before any real execution API is designed.

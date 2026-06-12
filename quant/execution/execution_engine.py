@@ -10,6 +10,9 @@ from pathlib import Path
 from typing import Mapping
 
 from quant.cost.cost_engine import CostEngine, TradeInput
+from quant.core_protocols.fill import Fill
+from quant.core_protocols.order import Order
+from quant.core_protocols.protocol_validation import validate_fill_references_order
 from quant.rebalance.rebalance_engine import RebalanceEngine
 from quant.storage.portfolio_store import DEFAULT_ACCOUNT_NAME, SQLitePortfolioStore
 from quant.storage.sqlite_store import SQLitePriceStore
@@ -128,6 +131,8 @@ class ExecutionEngine:
         executed_trades: list[ExecutedTrade] = []
         unfilled_trades: list[UnfilledTrade] = []
         warnings = list(plan.warnings)
+        protocol_orders: list[Order] = []
+        protocol_fills: list[Fill] = []
 
         for intended in intended_trades:
             price, executed_at = self._execution_details(intended, mode, execution_date, warnings)
@@ -178,6 +183,34 @@ class ExecutionEngine:
                 if trade_cost.warnings:
                     warnings.extend(trade_cost.warnings)
                 cost = trade_cost.trades[0]
+                order = Order(
+                    order_id=f"execution-{len(protocol_orders) + 1}-{intended.symbol}-{intended.side}",
+                    symbol=intended.symbol,
+                    side=intended.side,
+                    quantity=float(cost.shares),
+                    target_weight=normalized_targets.get(intended.symbol),
+                    signal_date=executed_at,
+                    created_at=executed_at,
+                    status="FILLED",
+                    reason=f"{mode} execution simulation",
+                    metadata={"source": "ExecutionEngine", "batch": batch},
+                )
+                fill = Fill(
+                    fill_id=f"{order.order_id}-fill",
+                    order_id=order.order_id,
+                    symbol=cost.symbol,
+                    side=cost.side,
+                    quantity=float(cost.shares),
+                    price=float(cost.price),
+                    cost=float(cost.total_cost),
+                    fill_time=executed_at,
+                    signal_date=executed_at,
+                    execution_date=executed_at,
+                )
+                validation_errors = order.validate() + fill.validate() + validate_fill_references_order(fill, [order])
+                warnings.extend(f"protocol validation: {error}" for error in validation_errors)
+                protocol_orders.append(order)
+                protocol_fills.append(fill)
                 executed_trades.append(
                     ExecutedTrade(
                         symbol=cost.symbol,

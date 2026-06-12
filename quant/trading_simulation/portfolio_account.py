@@ -4,6 +4,13 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 
+from quant.core_protocols.account import AccountState
+from quant.core_protocols.fill import Fill
+from quant.core_protocols.order import Order
+from quant.core_protocols.portfolio_snapshot import PortfolioSnapshot
+from quant.core_protocols.position import Position
+from quant.core_protocols.trade import TradeRecord
+
 
 @dataclass(frozen=True)
 class AccountTrade:
@@ -22,6 +29,23 @@ class AccountTrade:
     def to_dict(self) -> dict:
         return asdict(self)
 
+    def to_protocol(
+        self,
+        strategy: str = "",
+        portfolio_method: str = "",
+    ) -> TradeRecord:
+        return TradeRecord(
+            symbol=self.symbol,
+            side=self.side,
+            quantity=float(self.shares),
+            price=self.price,
+            cost=self.cost,
+            signal_date=self.signal_date or self.date,
+            execution_date=self.execution_date or self.date,
+            strategy=strategy,
+            portfolio_method=portfolio_method,
+        )
+
 
 @dataclass(frozen=True)
 class AccountSnapshot:
@@ -37,6 +61,42 @@ class AccountSnapshot:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+    def protocol_positions(self) -> list[Position]:
+        equity = self.total_equity if abs(self.total_equity) > 1e-12 else 0.0
+        positions = []
+        for symbol, shares in sorted(self.positions.items()):
+            price = float(self.prices.get(symbol, 0.0))
+            average_cost = price
+            market_value = float(shares) * price
+            positions.append(
+                Position(
+                    symbol=symbol,
+                    shares=float(shares),
+                    average_cost=average_cost,
+                    market_price=price,
+                    market_value=round(market_value, 6),
+                    unrealized_pnl=0.0,
+                    weight=round(market_value / equity, 10) if equity else 0.0,
+                    timestamp=self.date,
+                )
+            )
+        return positions
+
+    def to_protocol_snapshot(self, trade_count: int = 0) -> PortfolioSnapshot:
+        positions = self.protocol_positions()
+        weights = {"cash": round(self.cash / self.total_equity, 10)} if self.total_equity else {"cash": 0.0}
+        weights.update({position.symbol: position.weight for position in positions})
+        return PortfolioSnapshot(
+            date=self.date,
+            cash=self.cash,
+            equity=self.total_equity,
+            positions=positions,
+            weights=weights,
+            drawdown=None,
+            cost_paid=self.cost_paid,
+            trade_count=trade_count,
+        )
 
 
 class PortfolioAccount:
@@ -77,6 +137,46 @@ class PortfolioAccount:
             realized_pnl=round(self.realized_pnl, 6),
             unrealized_pnl=round(unrealized, 6),
             cost_paid=round(self.cost_paid, 6),
+        )
+
+    def to_protocol_state(
+        self,
+        date: str,
+        prices: dict[str, float],
+        account_id: str = "simulated-account",
+        orders: list[Order] | None = None,
+        fills: list[Fill] | None = None,
+    ) -> AccountState:
+        snapshot = self.mark_to_market(date, prices)
+        positions = []
+        for symbol, shares in sorted(self.positions.items()):
+            price = float(snapshot.prices.get(symbol, 0.0))
+            market_value = shares * price
+            positions.append(
+                Position(
+                    symbol=symbol,
+                    shares=float(shares),
+                    average_cost=float(self.average_cost.get(symbol, price)),
+                    market_price=price,
+                    market_value=round(market_value, 6),
+                    unrealized_pnl=round((price - self.average_cost.get(symbol, price)) * shares, 6),
+                    weight=round(market_value / snapshot.total_equity, 10) if snapshot.total_equity else 0.0,
+                    timestamp=str(date),
+                )
+            )
+        return AccountState(
+            account_id=account_id,
+            cash=snapshot.cash,
+            equity=snapshot.total_equity,
+            market_value=snapshot.market_value,
+            realized_pnl=snapshot.realized_pnl,
+            unrealized_pnl=snapshot.unrealized_pnl,
+            cost_paid=snapshot.cost_paid,
+            timestamp=str(date),
+            positions=positions,
+            orders=list(orders or []),
+            fills=list(fills or []),
+            metadata={"source": "PortfolioAccount"},
         )
 
     def apply_trade(
