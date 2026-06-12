@@ -85,6 +85,17 @@ python -m quant.cli export-for-agent --report reports/strategy_eval_YYYYMMDD_HHM
 
 The export-for-agent command reads an existing JSON report, auto-detects its report type from schema keys, and emits a compact text, Markdown, or JSON summary. It does not modify the source report, quant logic, factor evaluation logic, backtest logic, portfolio state, or execution behavior.
 
+## MCP Research Interface
+
+```bash
+python -m quant.cli mcp-list-tools
+python -m quant.cli mcp-tool-info
+python -m quant.cli mcp-tool-info detect_regime
+python -m quant.cli mcp-smoke
+```
+
+The MCP commands expose local JSON-safe research tool metadata and smoke checks for OpenClaw-style agent integration. The interface is read-only or offline-simulation only. Forbidden broker/live-trading tools such as `place_order`, `submit_order`, `connect_broker`, and `execute_trade` return `NOT_SUPPORTED_LIVE_TRADING_DISABLED` before runner execution.
+
 ## Visualization
 
 ```bash

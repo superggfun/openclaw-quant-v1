@@ -4,7 +4,7 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v0.34.0-architecture-layout`
+`v0.35.0-mcp-server-foundation`
 
 The project currently includes:
 
@@ -37,6 +37,7 @@ The project currently includes:
 - CLI commands for price updates, price inspection, account initialization, simulated buys and sells, portfolio snapshots, trade history, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtests, allocation, rebalance plans, cost estimates, optimization, risk, and execution simulation.
 - A modular CLI implementation under `quant/cli_commands/`.
 - A layered package layout under `quant/core`, `quant/data`, `quant/factors`, `quant/engines`, `quant/services`, `quant/reports`, `quant/interfaces`, and `quant/adapters`.
+- A local MCP-compatible research interface under `quant/interfaces/mcp_server`.
 
 The project intentionally does not include:
 
@@ -120,6 +121,7 @@ The project intentionally does not include:
 - `quant/cli.py`: command line entry point and dispatcher.
 - `quant/cli_commands/`: command-specific parser registration and handlers.
 - `quant/interfaces/cli_commands/`: layered CLI command namespace. `quant/cli_commands/` remains the compatibility import path in v0.34.
+- `quant/interfaces/mcp_server/`: JSON-safe local MCP research tools. It is not a live trading or broker interface.
 - `pyproject.toml`: packaging metadata, optional dependency groups, pytest defaults, and console script entry point.
 - `.github/workflows/`: CI and project audit workflows.
 - `docs/PACKAGING.md`: install, optional dependency, and CI guidance.
@@ -211,4 +213,12 @@ New code should prefer layered imports:
 - `quant.interfaces.*` for CLI/API/MCP boundaries.
 - `quant.adapters.*` for optional external framework adapters.
 
-v0.34 is phase 1 of the namespace refactor. Do not remove legacy imports during v0.34 work. Compatibility shims are intentional and should remain until a later release explicitly schedules their removal. Future physical module migration may happen gradually after new callers adopt the layered namespaces. The reserved MCP/API/OpenClaw/LangChain/QuantStats/PyFolio packages are placeholders only; do not add integrations under the architecture-refactor label.
+v0.34 is phase 1 of the namespace refactor. Do not remove legacy imports during v0.34 work. Compatibility shims are intentional and should remain until a later release explicitly schedules their removal. Future physical module migration may happen gradually after new callers adopt the layered namespaces. The reserved API/OpenClaw/LangChain/QuantStats/PyFolio packages are placeholders only; do not add those integrations under the architecture-refactor label.
+
+## v0.35 MCP Notes
+
+MCP code belongs under `quant/interfaces/mcp_server`. It may expose existing research capabilities through JSON-safe tool objects, but it must stay read-only or local offline simulation only. Do not add broker connectivity, live order submission, position mutation, automatic trading, ML, news sentiment, or new factors under the MCP label.
+
+Every MCP tool must declare exactly one `capability_level`: `READ_ONLY`, `OFFLINE_SIMULATION`, `PAPER_TRADING_RESERVED`, or `LIVE_TRADING_FORBIDDEN`. v0.35 may only enable `READ_ONLY` and `OFFLINE_SIMULATION`. Disabled capability levels must be blocked before runner execution.
+
+Forbidden trading/broker tool names must return `NOT_SUPPORTED`, including `place_order`, `submit_order`, `cancel_order`, `modify_position`, `connect_broker`, `execute_trade`, `live_trade`, `rebalance_live`, and `paper_trade_live`.

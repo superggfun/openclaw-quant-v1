@@ -1,5 +1,17 @@
-"""Reserved namespace for future MCP server interfaces.
+"""Safe MCP-compatible research interface.
 
-No MCP server is implemented in v0.34.0.
+The v0.35 interface is local, JSON-safe, and research-only. It does not expose
+live trading, broker connectivity, or order submission.
 """
+
+from quant.interfaces.mcp_server.mcp_models import MCPRequest, MCPResponse, MCPTool, MCPToolMetadata
+from quant.interfaces.mcp_server.tool_registry import create_default_mcp_registry
+
+__all__ = [
+    "MCPRequest",
+    "MCPResponse",
+    "MCPTool",
+    "MCPToolMetadata",
+    "create_default_mcp_registry",
+]
 

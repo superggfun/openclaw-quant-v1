@@ -74,7 +74,7 @@ def test_reserved_interface_and_adapter_packages_are_importable() -> None:
     import quant.interfaces.api
     import quant.interfaces.mcp_server
 
-    assert "future" in (quant.interfaces.mcp_server.__doc__ or "").lower()
+    assert "research" in (quant.interfaces.mcp_server.__doc__ or "").lower()
     assert "future" in (quant.adapters.openclaw.__doc__ or "").lower()
 
 

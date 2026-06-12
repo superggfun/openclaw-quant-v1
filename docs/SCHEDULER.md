@@ -53,6 +53,8 @@ Final status is `PASS` only when all enabled steps pass with no warnings and no 
 
 Agent Export supports `research_run`, `research_status`, and `research_history` reports. Visualization supports scheduler dashboards for pipeline status, trade simulation metrics, factor ICIR summaries, and artifact counts.
 
+`v0.35.0` exposes scheduler status/history/report and local `run_research_pipeline` through MCP tools. These MCP tools remain offline research orchestration only. They do not run a daemon, schedule cron jobs, connect to brokers, or place orders.
+
 ## Boundaries
 
 The scheduler automates offline research commands only. It does not place orders, connect to brokers, alter persistent portfolio state, or make autonomous trading decisions.

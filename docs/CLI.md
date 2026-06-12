@@ -26,6 +26,9 @@ python -m quant.cli export-for-agent --report reports/strategy_eval_YYYYMMDD_HHM
 python -m quant.cli visualize-report --report reports/trade_sim_YYYYMMDD_HHMMSS.json
 python -m quant.cli export-for-agent --report reports/factor_backtest_YYYYMMDD_HHMMSS.json --format markdown
 python -m quant.cli export-for-agent --report reports/portfolio_construction_YYYYMMDD_HHMMSS.json --format json
+python -m quant.cli mcp-list-tools
+python -m quant.cli mcp-tool-info detect_regime
+python -m quant.cli mcp-smoke
 python -m quant.cli init-account --cash 100000
 python -m quant.cli buy SPY --qty 10 --price 500
 python -m quant.cli sell SPY --qty 3 --price 510

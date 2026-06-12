@@ -6,13 +6,13 @@ This project is research infrastructure only. It is not investment advice, does 
 
 ## Current Version
 
-`v0.34.0-architecture-layout`
+`v0.35.0-mcp-server-foundation`
 
-This release is phase 1 of the layered namespace refactor. It adds a clearer package layout for future MCP, API, OpenClaw, LangChain, QuantStats, and PyFolio boundaries without implementing those adapters yet.
+This release adds a local MCP-compatible research interface foundation for OpenClaw-style agents.
 
-No alpha factors, data providers, broker integrations, live trading, machine learning, report schemas, CLI behavior, or no-lookahead rules are intentionally changed in v0.34.
+No alpha factors, data providers, broker integrations, live trading, order submission, machine learning, report schemas, quant calculation behavior, or no-lookahead rules are intentionally changed in v0.35.
 
-Existing import paths remain supported through lightweight compatibility shims. New internal code should prefer the layered paths documented below. Future physical module migration may happen gradually after these namespaces have settled.
+MCP tools declare capability levels. v0.35 enables only `READ_ONLY` and `OFFLINE_SIMULATION`; paper/live trading capabilities are reserved or forbidden and blocked before execution.
 
 ## Quick Start
 
@@ -78,6 +78,8 @@ Reports:
 ```bash
 python -m quant.cli export-for-agent --report reports/example.json
 python -m quant.cli visualize-report --report reports/example.json
+python -m quant.cli mcp-list-tools
+python -m quant.cli mcp-smoke
 ```
 
 See `docs/CLI.md` and `docs/CLI_COMMANDS.md` for the full command reference.
@@ -96,6 +98,7 @@ See `docs/CLI.md` and `docs/CLI_COMMANDS.md` for the full command reference.
 - Persistent factor store for definitions, values, IC history, backtest history, walk-forward folds, stability, coverage, and versions.
 - Deterministic regime detection and factor-by-regime diagnostics.
 - Daily Research Scheduler for offline pipeline automation.
+- Local MCP-compatible research interface for OpenClaw-style tool access.
 - Portfolio construction methods including equal weight, inverse volatility, risk parity, and minimum variance.
 - Simulated portfolio state, rebalance planning, cost estimation, execution simulation, historical trading simulation, and market realism constraints.
 - Unified account/order/fill/position protocol objects for future MCP/OpenClaw integration.
@@ -115,11 +118,11 @@ Layered package areas:
 - `quant/engines/`: pure quant/research/simulation engines.
 - `quant/services/`: application orchestration services.
 - `quant/reports/`: agent export and visualization.
-- `quant/interfaces/`: CLI boundary plus reserved MCP/API namespaces.
+- `quant/interfaces/`: CLI boundary, local MCP research interface, and reserved API namespace.
 - `quant/adapters/`: reserved external framework adapter namespaces.
 - `quant/scheduler/`: failure-isolated daily research pipeline automation.
 
-Legacy paths such as `quant/core_protocols`, `quant/data_providers`, `quant/alpha`, and `quant/agent_export` remain import-compatible for at least this release. MCP/API/adapters are placeholders only; there is no MCP server or external adapter implementation in v0.34.
+Legacy paths such as `quant/core_protocols`, `quant/data_providers`, `quant/alpha`, and `quant/agent_export` remain import-compatible for at least this release. API/adapters are placeholders only; the MCP interface in v0.35 is local research infrastructure, not a broker or execution API.
 
 ## No-Lookahead Contract
 
@@ -181,6 +184,7 @@ Generated local artifacts are intentionally ignored:
 - `docs/AGENT_EXPORT.md`
 - `docs/VISUALIZATION.md`
 - `docs/PACKAGING.md`
+- `docs/MCP_SERVER.md`
 - `docs/ROADMAP.md`
 - `docs/DECISIONS.md`
 

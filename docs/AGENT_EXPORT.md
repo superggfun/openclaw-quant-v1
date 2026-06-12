@@ -119,6 +119,10 @@ Recommendations are deterministic and report-type specific, for example:
 
 The exporter does not invent external facts. It only uses fields in the input report.
 
+## MCP Integration
+
+The v0.35 MCP foundation can call Agent Export through the `export_for_agent` and `get_report_summary` tools. MCP returns compact summaries, warnings, recommendations, and report paths only. It does not embed image bytes, mutate source reports, execute trades, or create investment advice.
+
 ## Protocol Objects
 
 `v0.29.0` adds direct protocol-object export through `AgentExporter.export_protocol()`. This supports JSON-safe objects such as `AccountState`, `Position`, `Order`, `Fill`, `Signal`, and `Recommendation` for future MCP/OpenClaw context passing.

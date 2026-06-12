@@ -57,9 +57,9 @@ Every protocol object supports:
 - `from_dict()` where reconstruction is useful
 - JSON-safe primitive fields
 
-These objects are intentionally small so future MCP tools, OpenClaw agents, broker adapters, and APIs can use stable payloads without depending on report-specific JSON schemas.
+These objects are intentionally small so MCP tools, future OpenClaw agents, broker adapters, and APIs can use stable payloads without depending on report-specific JSON schemas.
 
-No MCP server, broker adapter, or live execution interface is implemented in this release.
+`v0.35.0` adds a local MCP-compatible research interface that can return JSON-safe protocol-compatible payloads. No broker adapter, live execution interface, or live trading API is implemented.
 
 `v0.30.0` market realism fields such as requested quantity, executed quantity, rejected quantity, and execution reason are report diagnostics. They do not change the JSON-safe protocol object definitions.
 

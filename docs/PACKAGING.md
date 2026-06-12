@@ -80,7 +80,9 @@ Preferred new paths:
 - `quant.interfaces.*`
 - `quant.adapters.*`
 
-The `quant.interfaces.mcp_server`, `quant.interfaces.api`, and `quant.adapters.*` namespaces are packaging placeholders only. They do not add MCP, API, OpenClaw, LangChain, QuantStats, or PyFolio integrations.
+The `quant.interfaces.api` and `quant.adapters.*` namespaces are packaging placeholders only. They do not add API, OpenClaw, LangChain, QuantStats, or PyFolio integrations.
+
+`quant.interfaces.mcp_server` is implemented in v0.35 as a local MCP-compatible research interface. It does not add a network daemon, broker API, or live trading integration.
 
 Most implementation modules remain in their original locations in this phase. Future physical moves should be gradual and must preserve compatibility shims until a planned removal release.
 

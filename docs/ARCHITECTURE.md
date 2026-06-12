@@ -16,7 +16,7 @@ SQLite / External APIs
 
 ## Layered Package Layout
 
-`v0.34.0` is phase 1 of the layered namespace refactor. It introduces a clearer package layout before any MCP, API, OpenClaw, LangChain, QuantStats, or PyFolio adapters are implemented.
+`v0.34.0` is phase 1 of the layered namespace refactor. It introduces a clearer package layout before API, OpenClaw, LangChain, QuantStats, or PyFolio adapters are implemented.
 
 The new paths are structural boundaries only. They do not change CLI behavior, report schemas, factor calculations, backtest behavior, trading simulation semantics, or no-lookahead guarantees. Existing public import paths remain supported through lightweight compatibility shims for at least one release.
 
@@ -45,13 +45,16 @@ from quant.core_protocols.account import AccountState as LegacyAccountState
 assert AccountState is LegacyAccountState
 ```
 
-The reserved `quant.interfaces.mcp_server`, `quant.interfaces.api`, `quant.adapters.openclaw`, `quant.adapters.langchain`, `quant.adapters.quantstats`, and `quant.adapters.pyfolio` packages are placeholders only. They intentionally do not implement external integrations in v0.34.
+The reserved `quant.interfaces.api`, `quant.adapters.openclaw`, `quant.adapters.langchain`, `quant.adapters.quantstats`, and `quant.adapters.pyfolio` packages are placeholders only. They intentionally do not implement external integrations in v0.34.
+
+`v0.35.0` fills `quant.interfaces.mcp_server` with a local MCP-compatible research tool layer. It is not a network daemon, not a broker API, and not a trading interface.
 
 ## Components
 
 - `quant.cli`: Main CLI entry point. It builds the top-level parser, creates shared context, and dispatches to command modules.
 - `quant.cli_commands`: Dedicated parser registration and command handlers for data, data layer, scheduler, agent export, visualization, portfolio, rebalance, risk, optimizer, portfolio construction, alpha, factor, strategy evaluation, trading simulation, cost, execution, and backtest commands.
 - `quant.interfaces.cli_commands`: Layered alias for CLI command modules. `quant.cli_commands` remains the implementation path in v0.34.
+- `quant.interfaces.mcp_server`: Local MCP-compatible research interface that exposes safe JSON tools over existing offline engines.
 - `pyproject.toml`: PEP 621 packaging metadata, optional dependency groups, pytest defaults, and the `openclaw-quant` console entry point.
 - `quant.core.protocols`: Layered protocol namespace. `quant.core_protocols` remains supported.
 - `quant.reports.agent_export`: Layered report export namespace. `quant.agent_export` remains supported.

@@ -1,5 +1,13 @@
 # Roadmap
 
+## v0.35.0-mcp-server-foundation
+
+- Adds `quant.interfaces.mcp_server` with JSON-safe MCP tool models, registry, runner, schemas, categories, and a local server facade.
+- Adds CLI commands: `mcp-list-tools`, `mcp-tool-info`, and `mcp-smoke`.
+- Exposes read-only or local offline simulation tools for data, factors, regimes, research scheduler, trade simulation, Agent Export, and visualization metadata.
+- Explicitly blocks live/broker/order tools with `NOT_SUPPORTED`.
+- Infrastructure only: no broker integration, live trading, order submission, new factors, ML, news sentiment, report schema changes, or no-lookahead semantic changes.
+
 ## v0.34.0-architecture-layout
 
 - Adds a layered package layout under `quant/core`, `quant/data`, `quant/factors`, `quant/engines`, `quant/services`, `quant/reports`, `quant/interfaces`, and `quant/adapters`.

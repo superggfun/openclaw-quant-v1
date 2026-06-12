@@ -1,0 +1,26 @@
+"""MCP capability levels and permission gates."""
+
+from __future__ import annotations
+
+READ_ONLY = "READ_ONLY"
+OFFLINE_SIMULATION = "OFFLINE_SIMULATION"
+PAPER_TRADING_RESERVED = "PAPER_TRADING_RESERVED"
+LIVE_TRADING_FORBIDDEN = "LIVE_TRADING_FORBIDDEN"
+
+ENABLED_CAPABILITIES = {READ_ONLY, OFFLINE_SIMULATION}
+DISABLED_CAPABILITIES = {PAPER_TRADING_RESERVED, LIVE_TRADING_FORBIDDEN}
+
+ALL_CAPABILITIES = ENABLED_CAPABILITIES | DISABLED_CAPABILITIES
+
+
+def is_enabled(capability_level: str) -> bool:
+    return capability_level in ENABLED_CAPABILITIES
+
+
+def disabled_status(capability_level: str) -> str:
+    if capability_level == LIVE_TRADING_FORBIDDEN:
+        return "NOT_SUPPORTED_LIVE_TRADING_DISABLED"
+    if capability_level == PAPER_TRADING_RESERVED:
+        return "NOT_SUPPORTED_PAPER_TRADING_RESERVED"
+    return "NOT_SUPPORTED"
+
