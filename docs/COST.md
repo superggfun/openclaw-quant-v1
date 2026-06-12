@@ -34,6 +34,9 @@ Applies both fixed fee and linear commission.
   "commission_rate": 0.001,
   "min_commission": 1.0,
   "slippage_bps": 5,
+  "slippage_model": null,
+  "market_impact_bps": 0.0,
+  "liquidity_impact_rate": 0.0,
   "currency": "USD",
   "min_trade_notional": 50,
   "min_cost_efficiency_ratio": null
@@ -50,6 +53,8 @@ Applies both fixed fee and linear commission.
 - fixed fee
 - commission
 - slippage cost
+- market impact cost
+- liquidity cost
 - total cost
 - cost ratio
 
@@ -58,6 +63,8 @@ Applies both fixed fee and linear commission.
 - gross trade value
 - total commission
 - total slippage
+- total market impact
+- total liquidity cost
 - total cost
 - total cost ratio
 - warnings
@@ -76,3 +83,4 @@ Reports are written to:
 reports/cost_YYYYMMDD_HHMMSS.json
 ```
 
+`v0.30.0` keeps `slippage_bps` backward compatible and adds optional `slippage_model`, `market_impact_bps`, and `liquidity_impact_rate` fields. These are still offline estimates and do not represent broker quotes or live market impact.

@@ -8,6 +8,8 @@ The simulator unifies signal generation, portfolio construction, rebalance plann
 
 `v0.29.0` adds internal protocol conversion for account state, trade records, orders, fills, and portfolio snapshots. These protocol objects prepare the simulator for future MCP/OpenClaw integration while preserving the existing `trade_sim` report schema.
 
+`v0.30.0` adds deterministic market realism checks for slippage, ADV liquidity caps, position-size limits, minimum trade diagnostics, and missing-price skips. These are still historical simulation assumptions, not broker fills.
+
 The execution model is simulated. By default it fills on the next available historical close after a signal date. Results can differ from live trading, paper trading, broker fills, opening auction behavior, intraday execution, delayed data, liquidity limits, and real slippage.
 
 It is different from the existing backtest engine:
@@ -22,6 +24,7 @@ It is different from the existing backtest engine:
 ```bash
 python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --portfolio-method equal_weight
 python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --portfolio-method risk_parity
+python -m quant.cli trade-sim --strategy alpha --portfolio-method equal_weight --market-realism-config examples/market_realism_config.json
 ```
 
 Supported strategy:
@@ -65,6 +68,8 @@ reports/trade_sim_YYYYMMDD_HHMMSS.json
 ```
 
 Schema includes `metadata`, `parameters`, `strategy`, `portfolio_method`, `initial_cash`, `final_equity`, `total_return`, `annual_return`, `volatility`, `sharpe`, `max_drawdown`, `total_cost`, `turnover`, `trade_count`, `equity_curve`, `cash_curve`, `positions_by_date`, `trades`, `rebalance_events`, `warnings`, and `no_lookahead`.
+
+`v0.30.0` adds additive fields: `market_realism`, `rejected_trades`, per-trade requested/executed/rejected quantities, execution reasons, slippage cost, market impact cost, liquidity cost, ADV, and ADV participation.
 
 ## Agent Export
 

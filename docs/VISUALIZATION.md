@@ -63,6 +63,8 @@ The summary dashboard includes:
 
 Multi-factor reports generate charts for family contribution, factor contribution, confidence, and stability ranking.
 
+Trade simulation reports with v0.30 market realism fields can also generate charts for slippage, cost breakdown, rejected trades, and liquidity usage. Missing fields skip those charts with warnings rather than crashing.
+
 ## Agent Export
 
 Agent Export detects generated chart files next to the source report and includes them in `visualization_paths`. The source JSON report is not modified.

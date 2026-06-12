@@ -64,6 +64,12 @@ The V0.6 cost engine estimates transaction costs from suggested trades. It does 
 
 V0.6 supports fixed, linear, and combined costs with simple slippage in basis points. Complex market impact is intentionally out of scope.
 
+## V0.30 Market Realism Remains Historical Simulation
+
+`v0.30.0` adds deterministic slippage, ADV liquidity caps, market impact cost fields, missing-price skips, and position-size constraints. These checks improve offline historical simulation realism but do not create broker integration, live execution, intraday data, or high-frequency behavior.
+
+ADV caps are disabled at the code-default level for backward-compatible engine calls and enabled by example CLI config. Reports record requested, executed, and rejected quantities so users can inspect liquidity drag without silently changing target construction logic.
+
 ## 2026-06-11: Portfolio Backtests Are In-Memory And Deterministic
 
 The V0.7 portfolio backtest engine simulates cash, positions, rebalance decisions, and costs in memory. It does not modify the persistent simulated portfolio state, and the same stored prices and parameters produce the same metrics and trades.

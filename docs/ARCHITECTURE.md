@@ -38,6 +38,7 @@ SQLite / External APIs
 - `quant.factor_eval.factor_evaluation`: Evaluates factor predictive quality with no-lookahead IC, Rank IC, quintile, and decay metrics.
 - `quant.strategy_eval.strategy_evaluation`: Explains returns, risk, drawdowns, rolling metrics, and attribution from generated reports.
 - `quant.trading_simulation`: Runs offline account-style historical simulations with in-memory cash, positions, trades, costs, and equity curves.
+- `quant.market_realism`: Applies deterministic slippage, ADV liquidity, marketability, and position-size constraints to simulated execution.
 - `quant.backtest.backtest_engine`: Runs daily portfolio backtests from stored prices, optimizer targets, rebalance logic, and costs.
 - `quant.rebalance.rebalance_engine`: Calculates current allocation and rebalance suggestions from account, position, and price state.
 - `quant.risk.risk_engine`: Calculates portfolio concentration, cash, Top 5, industry, and risk score metrics.
@@ -117,6 +118,14 @@ CLI visualize-report -> ReportVisualizer -> existing reports/*.json -> reports/c
 ```
 
 The visualization layer is read-only with respect to source reports. It does not modify quant calculations, report schemas, portfolio state, or execution behavior.
+
+Market realism flow:
+
+```text
+target trade -> LiquidityModel -> ExecutionConstraints -> CostEngine -> simulated fill / rejected trade
+```
+
+`v0.30.0` adds this flow to historical simulation and execution simulation. It uses stored daily OHLCV rows only. It does not add intraday data, tick data, live broker connectivity, or high-frequency execution.
 
 Portfolio flow:
 

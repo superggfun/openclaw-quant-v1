@@ -1,5 +1,14 @@
 # Roadmap
 
+## v0.30.0-market-realism
+
+- Adds `quant/market_realism` for deterministic slippage, ADV liquidity, marketability, and position-size constraints.
+- Extends historical `trade-sim` and side-effect-free `execute-sim` with requested, executed, and rejected quantity diagnostics.
+- Adds explicit `SKIPPED_NO_PRICE` handling for missing execution prices.
+- Adds cost breakdown fields for slippage, market impact, and liquidity cost while preserving existing no-lookahead and trading simulation semantics.
+- Adds Agent Export and Visualization support for liquidity/cost diagnostics.
+- Realism-only: no new alpha factors, data providers, broker integrations, live trading, intraday/tick data, machine learning, or no-lookahead changes.
+
 ## v0.29.0-core-protocols
 
 - Adds `quant/core_protocols` with JSON-safe AccountState, Position, Order, Fill, TradeRecord, Signal, Recommendation, and PortfolioSnapshot objects.

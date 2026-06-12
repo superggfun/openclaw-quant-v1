@@ -309,7 +309,8 @@ def test_missing_execution_price_warns_without_corrupting_account(tmp_path: Path
     result = simulator._execute_rebalance_event(account, event, {}, {})
 
     assert result["executed_trades"] == []
-    assert result["warnings"] == ["missing execution price for SPY"]
+    assert result["warnings"] == ["WARN_NO_PRICE: missing execution price for SPY"]
+    assert result["rejected_trades"][0]["execution_status"] == "SKIPPED_NO_PRICE"
     assert account.positions == {"SPY": 10}
     assert account.cash == 1000
 

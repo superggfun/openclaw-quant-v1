@@ -63,4 +63,6 @@ The simulator is side-effect free for portfolio state. It reads account and pric
 
 `v0.29.0` adds internal Order and Fill protocol creation and validation for executed simulated trades. The public execution report schema is preserved.
 
+`v0.30.0` adds additive market realism fields for slippage, ADV liquidity, market impact, rejected quantities, and execution reasons. The engine remains side-effect free.
+
 Future OpenClaw Execution Agent work should consume this report shape before any real execution API is designed.

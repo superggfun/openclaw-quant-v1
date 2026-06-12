@@ -6,20 +6,18 @@ This project is research infrastructure only. It is not investment advice, does 
 
 ## Current Version
 
-`v0.29.0-core-protocols`
+`v0.30.0-market-realism`
 
-This release adds a unified internal protocol layer:
+This release adds a deterministic market realism layer for historical simulation:
 
-- account state
-- positions
-- orders
-- fills
-- trade records
-- signals
-- recommendations
-- portfolio snapshots
+- slippage models
+- ADV-based liquidity caps
+- position size constraints
+- explicit skipped-trade handling for missing prices
+- rejected and partially filled simulated trade fields
+- cost breakdowns for slippage, market impact, and liquidity
 
-No alpha factors, data providers, broker integrations, live trading, report schemas, or no-lookahead rules are intentionally changed in v0.29.
+No alpha factors, data providers, broker integrations, live trading, intraday data, machine learning, or no-lookahead rules are intentionally changed in v0.30.
 
 ## Quick Start
 
@@ -72,6 +70,7 @@ python -m quant.cli init-account --cash 100000
 python -m quant.cli portfolio
 python -m quant.cli portfolio-construct --method risk_parity
 python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --portfolio-method equal_weight
+python -m quant.cli trade-sim --strategy alpha --portfolio-method risk_parity --market-realism-config examples/market_realism_config.json
 ```
 
 Reports:
@@ -95,7 +94,7 @@ See `docs/CLI.md` and `docs/CLI_COMMANDS.md` for the full command reference.
 - Alpha target generation with no-lookahead signal dates.
 - Factor pipeline, factor evaluation, long-short factor backtest, and walk-forward validation.
 - Portfolio construction methods including equal weight, inverse volatility, risk parity, and minimum variance.
-- Simulated portfolio state, rebalance planning, cost estimation, execution simulation, and historical trading simulation.
+- Simulated portfolio state, rebalance planning, cost estimation, execution simulation, historical trading simulation, and market realism constraints.
 - Unified account/order/fill/position protocol objects for future MCP/OpenClaw integration.
 - Strategy evaluation, agent export, and visualization dashboards.
 
@@ -116,6 +115,7 @@ Important package areas:
 - `quant/alpha/`: signal and target-weight generation.
 - `quant/factor_eval/`, `quant/factor_backtest/`, `quant/walk_forward/`: research validation.
 - `quant/portfolio_construction/`, `quant/rebalance/`, `quant/cost/`, `quant/execution/`: portfolio and execution simulation layers.
+- `quant/market_realism/`: slippage, ADV liquidity, marketability, and position-size constraints for historical simulation.
 - `quant/trading_simulation/`: account-style historical simulation.
 - `quant/core_protocols/`: JSON-safe account, order, fill, position, signal, recommendation, and snapshot protocols.
 - `quant/agent_export/` and `quant/visualization/`: report summarization and visual review.
@@ -164,6 +164,7 @@ Generated local artifacts are intentionally ignored:
 - `docs/FUNDAMENTAL_DATA.md`
 - `docs/FUNDAMENTAL_FACTORS.md`
 - `docs/MULTI_FACTOR.md`
+- `docs/MARKET_REALISM.md`
 - `docs/FACTOR_LIBRARY.md`
 - `docs/FACTOR_PIPELINE.md`
 - `docs/FACTOR_EVALUATION.md`

@@ -421,8 +421,14 @@ class AgentExporter:
             "unfilled_count": len(unfilled),
             "total_cost": costs.get("total_cost"),
             "slippage_estimate": report.get("slippage_estimate", costs.get("total_slippage")),
+            "market_impact": costs.get("total_market_impact"),
+            "liquidity_cost": costs.get("total_liquidity_cost"),
+            "market_realism": report.get("market_realism"),
             "final_cash": report.get("final_cash"),
         }
+        realism = report.get("market_realism") or {}
+        if realism.get("total_rejected_quantity"):
+            warnings.append("WARN_LIQUIDITY_REJECTIONS")
         return self._base_export(
             "execution",
             generated_from,
@@ -518,6 +524,11 @@ class AgentExporter:
         total_cost = self._num(report.get("total_cost"))
         if final_equity is not None and total_cost is not None and total_cost / max(abs(final_equity), 1.0) > 0.02:
             warnings.append("WARN_COST_DRAG_HIGH")
+        realism = report.get("market_realism") or {}
+        if realism.get("total_rejected_quantity"):
+            warnings.append("WARN_LIQUIDITY_CAP")
+        if realism.get("total_slippage") and final_equity is not None and float(realism["total_slippage"]) / max(abs(final_equity), 1.0) > 0.01:
+            warnings.append("WARN_HIGH_SLIPPAGE")
         metrics = {
             "strategy": report.get("strategy"),
             "portfolio_method": report.get("portfolio_method"),
@@ -528,6 +539,11 @@ class AgentExporter:
             "sharpe": report.get("sharpe"),
             "max_drawdown": report.get("max_drawdown"),
             "total_cost": report.get("total_cost"),
+            "slippage": realism.get("total_slippage"),
+            "market_impact": realism.get("total_market_impact"),
+            "liquidity_cost": realism.get("total_liquidity_cost"),
+            "rejected_trade_count": len(report.get("rejected_trades") or []),
+            "largest_constrained_trades": realism.get("largest_constrained_trades"),
             "turnover": report.get("turnover"),
             "trade_count": report.get("trade_count"),
             "rebalance_events": len(report.get("rebalance_events") or []),
@@ -541,7 +557,7 @@ class AgentExporter:
             metrics,
             [assessment, "account-style cash and positions were tracked through time"],
             warnings,
-            ["run walk-forward validation", "compare portfolio methods", "inspect cost drag", "review drawdown"],
+            ["run walk-forward validation", "compare portfolio methods", "inspect cost drag", "review liquidity constraints"],
             ["run strategy evaluation", "export trade simulation report"],
             [],
         )

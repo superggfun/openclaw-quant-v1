@@ -49,6 +49,7 @@ python -m quant.cli portfolio-construct --method risk_parity --symbols SPY QQQ N
 python -m quant.cli cost
 python -m quant.cli rebalance --targets examples/optimized_targets.json --with-costs
 python -m quant.cli execute-sim --targets examples/optimized_targets.json
+python -m quant.cli trade-sim --strategy alpha --portfolio-method equal_weight --market-realism-config examples/market_realism_config.json
 python -m quant.cli backtest --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --alpha-config examples/alpha_config.json --execution-price close
 python -m quant.cli backtest --start 2023-01-01 --end 2024-12-31 --initial-cash 100000 --mode equal_weight --rebalance-frequency monthly
 ```
@@ -83,9 +84,12 @@ Use `--train-years`, `--test-years`, `--start`, `--end`, `--symbols`, and `--max
 
 ```bash
 python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --portfolio-method equal_weight
+python -m quant.cli trade-sim --strategy alpha --portfolio-method risk_parity --market-realism-config examples/market_realism_config.json
 ```
 
-`trade-sim` is an offline historical account simulation. It records signal dates and next execution dates, updates in-memory cash and positions, and writes `reports/trade_sim_*.json`.
+`trade-sim` is an offline historical account simulation. It records signal dates and next execution dates, updates in-memory cash and positions, applies deterministic market realism constraints when configured, and writes `reports/trade_sim_*.json`.
+
+If `--start` and `--end` are omitted, `trade-sim` uses the default smoke window `2024-01-01` to `2025-01-01`.
 
 ## Visualization
 

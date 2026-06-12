@@ -1,0 +1,10 @@
+{
+  "enabled": true,
+  "adv_lookback_days": 20,
+  "max_adv_participation": 0.05,
+  "max_position_notional": null,
+  "max_position_weight": null,
+  "min_trade_notional": 50.0,
+  "enforce_min_trade_notional": false,
+  "minimum_shares": 1
+}

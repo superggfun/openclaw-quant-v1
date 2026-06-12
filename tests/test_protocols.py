@@ -223,7 +223,7 @@ def seed_trade_sim_prices(db_path: Path) -> None:
     SQLitePriceStore(db_path).upsert_prices(pd.DataFrame(rows))
 
 
-def test_trade_simulation_integration_preserves_report_schema(tmp_path: Path) -> None:
+def test_trade_simulation_integration_extends_report_schema(tmp_path: Path) -> None:
     db_path = tmp_path / "quant.db"
     seed_trade_sim_prices(db_path)
     result = TradingSimulator(SQLitePriceStore(db_path), report_dir=tmp_path / "reports").run(
@@ -244,7 +244,7 @@ def test_trade_simulation_integration_preserves_report_schema(tmp_path: Path) ->
     report = json.loads(Path(result.report_path).read_text(encoding="utf-8"))
 
     assert result.trade_count > 0
-    assert set(report) == {
+    assert {
         "metadata",
         "parameters",
         "strategy",
@@ -267,7 +267,9 @@ def test_trade_simulation_integration_preserves_report_schema(tmp_path: Path) ->
         "warnings",
         "no_lookahead",
         "report_path",
-    }
+    } <= set(report)
+    assert "market_realism" in report
+    assert "rejected_trades" in report
     assert report["metadata"]["report_type"] == "trade_sim"
     assert "protocol_orders" not in report
     assert "protocol_fills" not in report

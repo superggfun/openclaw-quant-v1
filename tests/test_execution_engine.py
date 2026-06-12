@@ -125,7 +125,7 @@ def test_execution_costs_are_included(tmp_path: Path) -> None:
     assert all(trade.total_cost > 0 for trade in result.executed_trades)
 
 
-def test_execution_report_schema_unchanged_by_protocol_integration(tmp_path: Path) -> None:
+def test_execution_report_schema_extends_with_market_realism(tmp_path: Path) -> None:
     db_path = tmp_path / "quant.db"
     engine = make_engine(db_path, tmp_path / "reports")
 
@@ -133,7 +133,7 @@ def test_execution_report_schema_unchanged_by_protocol_integration(tmp_path: Pat
     report = Path(result.report_path).read_text(encoding="utf-8")
 
     payload = __import__("json").loads(report)
-    assert set(payload) == {
+    assert {
         "mode",
         "target_allocation",
         "intended_trades",
@@ -144,6 +144,7 @@ def test_execution_report_schema_unchanged_by_protocol_integration(tmp_path: Pat
         "final_cash",
         "final_positions",
         "warnings",
-    }
+    } <= set(payload)
+    assert "market_realism" in payload
     assert "protocol_orders" not in payload
     assert "protocol_fills" not in payload

@@ -27,7 +27,7 @@ SUPPORTED_REPORT_TYPES = {
 }
 
 EXPECTED_CHARTS_BY_REPORT_TYPE = {
-    "trade_sim": {"equity_curve", "cash_curve", "drawdown_curve", "monthly_returns", "cost_accumulation"},
+    "trade_sim": {"equity_curve", "cash_curve", "drawdown_curve", "monthly_returns", "cost_accumulation", "slippage", "cost_breakdown", "rejected_trades", "liquidity_usage"},
     "backtest": {"equity_curve", "drawdown_curve", "monthly_returns"},
     "strategy_eval": {"return_attribution", "top_contributors", "top_detractors", "risk_metrics_summary"},
     "factor_eval": {"ic_history", "rank_ic_history", "ic_distribution", "quintile_returns", "factor_decay"},
@@ -111,8 +111,10 @@ class ReportVisualizer:
         charts = []
         equity = self._series(report.get("equity_curve"), "date", "equity")
         cash = self._series(report.get("cash_curve"), "date", "cash")
-        costs = self._cumulative_costs(report.get("trades") or [])
+        trade_records = self._trade_sim_trade_records(report)
+        costs = self._cumulative_costs(trade_records)
         monthly = self._monthly_returns(equity)
+        realism = report.get("market_realism") or {}
         charts.extend(
             self._keep(
                 builder.line_chart(prefix, "equity_curve", "Equity Curve", equity),
@@ -120,6 +122,10 @@ class ReportVisualizer:
                 builder.line_chart(prefix, "drawdown_curve", "Drawdown Curve", self._drawdown(equity)),
                 builder.bar_chart(prefix, "monthly_returns", "Monthly Returns", monthly),
                 builder.line_chart(prefix, "cost_accumulation", "Cost Accumulation", costs),
+                builder.bar_chart(prefix, "slippage", "Slippage", self._cost_component_by_date(trade_records, "slippage_cost")),
+                builder.bar_chart(prefix, "cost_breakdown", "Cost Breakdown", self._cost_breakdown(report)),
+                builder.bar_chart(prefix, "rejected_trades", "Rejected Trades", self._rejected_by_symbol(report.get("rejected_trades") or [])),
+                builder.bar_chart(prefix, "liquidity_usage", "Liquidity Usage", self._liquidity_usage(trade_records, realism)),
             )
         )
         return charts
@@ -340,6 +346,69 @@ class ReportVisualizer:
             if ReportVisualizer._finite(cost):
                 total += float(cost)
                 output.append((str(trade.get("date") or trade.get("execution_date") or len(output) + 1), total))
+        return output
+
+    @staticmethod
+    def _trade_sim_trade_records(report: dict[str, Any]) -> list[dict]:
+        records: list[dict] = []
+        for trade in report.get("trades") or []:
+            if isinstance(trade, dict):
+                records.append(trade)
+        for event in report.get("rebalance_events") or []:
+            if not isinstance(event, dict):
+                continue
+            for trade in event.get("executed_trades") or []:
+                if isinstance(trade, dict):
+                    records.append(trade)
+        return records
+
+    @staticmethod
+    def _cost_component_by_date(trades: list[dict], key: str) -> dict[str, float]:
+        output: dict[str, float] = {}
+        for trade in trades:
+            if not isinstance(trade, dict):
+                continue
+            date = str(trade.get("date") or trade.get("execution_date") or "unknown")
+            if ReportVisualizer._finite(trade.get(key)):
+                output[date] = output.get(date, 0.0) + float(trade[key])
+        return output
+
+    @staticmethod
+    def _cost_breakdown(report: dict[str, Any]) -> dict[str, float]:
+        realism = report.get("market_realism") or {}
+        return {
+            "commission_and_fees": float(report.get("total_cost") or 0.0)
+            - float(realism.get("total_slippage") or 0.0)
+            - float(realism.get("total_market_impact") or 0.0)
+            - float(realism.get("total_liquidity_cost") or 0.0),
+            "slippage": float(realism.get("total_slippage") or 0.0),
+            "market_impact": float(realism.get("total_market_impact") or 0.0),
+            "liquidity": float(realism.get("total_liquidity_cost") or 0.0),
+        }
+
+    @staticmethod
+    def _rejected_by_symbol(rejected: list[dict]) -> dict[str, float]:
+        output: dict[str, float] = {}
+        for trade in rejected:
+            if not isinstance(trade, dict):
+                continue
+            symbol = str(trade.get("symbol") or "UNKNOWN")
+            output[symbol] = output.get(symbol, 0.0) + float(trade.get("rejected_quantity") or 0.0)
+        return output
+
+    @staticmethod
+    def _liquidity_usage(trades: list[dict], realism: dict[str, Any]) -> dict[str, float]:
+        output: dict[str, float] = {}
+        for trade in trades:
+            if isinstance(trade, dict) and ReportVisualizer._finite(trade.get("adv_participation")):
+                output[str(trade.get("symbol") or len(output) + 1)] = max(
+                    output.get(str(trade.get("symbol") or len(output) + 1), 0.0),
+                    float(trade["adv_participation"]),
+                )
+        if not output and realism.get("largest_constrained_trades"):
+            for trade in realism["largest_constrained_trades"]:
+                if isinstance(trade, dict) and ReportVisualizer._finite(trade.get("adv_participation")):
+                    output[str(trade.get("symbol") or len(output) + 1)] = float(trade["adv_participation"])
         return output
 
     @staticmethod

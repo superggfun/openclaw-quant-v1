@@ -29,6 +29,7 @@ The project currently includes:
 - A deterministic daily portfolio backtest engine that combines stored prices, optimizer targets, rebalance logic, and costs.
 - An execution simulator that models intended, executed, and unfilled trades with costs.
 - A historical trading simulator that tracks in-memory account cash, positions, costs, trades, and equity through time.
+- A market realism layer that estimates ADV liquidity, slippage, market impact, rejected quantities, and missing-price skips for historical simulation.
 - Walk-forward and rolling validation for offline research robustness checks.
 - A visualization layer that turns existing JSON reports into PNG, SVG, and HTML dashboards.
 - CLI commands for price updates, price inspection, account initialization, simulated buys and sells, portfolio snapshots, trade history, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtests, allocation, rebalance plans, cost estimates, optimization, risk, and execution simulation.
@@ -101,6 +102,7 @@ The project intentionally does not include:
 - `quant/optimizer/optimizer_engine.py`: pure target allocation optimizer.
 - `quant/portfolio_construction/portfolio_construction.py`: pure portfolio construction and risk contribution engine.
 - `quant/cost/cost_engine.py`: pure transaction cost estimator.
+- `quant/market_realism/`: deterministic slippage, liquidity, marketability, and position-size constraints.
 - `quant/execution/execution_engine.py`: pure simulated execution engine.
 - `quant/trading_simulation/`: offline historical account-style simulation.
 - `quant/walk_forward/`: offline walk-forward and rolling validation.
@@ -111,7 +113,7 @@ The project intentionally does not include:
 - `pyproject.toml`: packaging metadata, optional dependency groups, pytest defaults, and console script entry point.
 - `.github/workflows/`: CI and project audit workflows.
 - `docs/PACKAGING.md`: install, optional dependency, and CI guidance.
-- `tests/`: pytest coverage for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtest, rebalance, optimizer, risk, cost, and execution behavior.
+- `tests/`: pytest coverage for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtest, rebalance, optimizer, risk, cost, market realism, and execution behavior.
 
 ## Recommended Workflow
 

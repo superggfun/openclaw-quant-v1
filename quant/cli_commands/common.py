@@ -145,6 +145,12 @@ def load_cost_config(path: Path) -> dict:
     return _load_json_object(path, "cost config")
 
 
+def load_market_realism_config(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    return _load_json_object(path, "market realism config")
+
+
 def apply_cost_overrides(config: dict, args) -> None:
     if args.model is not None:
         config["model"] = args.model
@@ -199,6 +205,8 @@ def print_cost_report(report) -> None:
     print(f"gross_trade_value: {report.gross_trade_value:.2f}")
     print(f"total_commission: {report.total_commission:.2f}")
     print(f"total_slippage: {report.total_slippage:.2f}")
+    print(f"total_market_impact: {getattr(report, 'total_market_impact', 0.0):.2f}")
+    print(f"total_liquidity_cost: {getattr(report, 'total_liquidity_cost', 0.0):.2f}")
     print(f"total_cost: {report.total_cost:.2f}")
     print(f"total_cost_ratio: {report.total_cost_ratio:.6f}")
     print("trades:")

@@ -61,6 +61,8 @@ These objects are intentionally small so future MCP tools, OpenClaw agents, brok
 
 No MCP server, broker adapter, or live execution interface is implemented in this release.
 
+`v0.30.0` market realism fields such as requested quantity, executed quantity, rejected quantity, and execution reason are report diagnostics. They do not change the JSON-safe protocol object definitions.
+
 ## Integration Boundary
 
 Current integration is internal:

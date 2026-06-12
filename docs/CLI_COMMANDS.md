@@ -244,6 +244,8 @@ python -m quant.cli rebalance --targets examples/optimized_targets.json --with-c
 
 The cost command estimates costs for current rebalance suggestions. It writes a JSON report and does not modify the simulated account.
 
+`v0.30.0` cost estimates may include additive slippage, market impact, and liquidity cost fields when the input trade includes ADV or volatility context. Existing fixed, linear, and combined cost behavior remains available.
+
 ## Execution Simulation
 
 ```bash
@@ -253,7 +255,7 @@ python -m quant.cli execute-sim --targets examples/optimized_targets.json --mode
 python -m quant.cli execute-sim --targets examples/optimized_targets.json --mode partial_fill --fill-ratio 0.5
 ```
 
-The execution simulator turns rebalance suggestions into simulated fills, unfilled quantities, costs, final cash, and final positions. It writes a JSON report and does not modify the simulated account.
+The execution simulator turns rebalance suggestions into simulated fills, unfilled quantities, costs, final cash, and final positions. It writes a JSON report and does not modify the simulated account. Execution reports include additive market realism fields for requested/executed/rejected quantity, slippage, market impact, and liquidity diagnostics when available.
 
 ## Backtest
 
@@ -345,6 +347,9 @@ The command generates rolling train/test folds, computes out-of-sample metrics, 
 ```bash
 python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --portfolio-method equal_weight
 python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --portfolio-method risk_parity
+python -m quant.cli trade-sim --strategy alpha --portfolio-method equal_weight --market-realism-config examples/market_realism_config.json
 ```
 
-The command generates alpha signals on rebalance dates, constructs target weights, simulates next-trading-day execution with costs, updates an in-memory `PortfolioAccount`, and writes `reports/trade_sim_*.json`. It is offline research only and does not update persistent portfolio state or connect to brokers.
+The command generates alpha signals on rebalance dates, constructs target weights, simulates next-trading-day execution with costs and optional market realism constraints, updates an in-memory `PortfolioAccount`, and writes `reports/trade_sim_*.json`. It is offline research only and does not update persistent portfolio state or connect to brokers.
+
+If `--start` and `--end` are omitted, `trade-sim` uses the default smoke window `2024-01-01` to `2025-01-01`.

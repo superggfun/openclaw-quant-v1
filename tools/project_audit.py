@@ -43,6 +43,7 @@ REQUIRED_MODULE_DOCS = {
     "docs/FUNDAMENTAL_DATA.md",
     "docs/FUNDAMENTAL_FACTORS.md",
     "docs/MULTI_FACTOR.md",
+    "docs/MARKET_REALISM.md",
     "docs/PACKAGING.md",
     "docs/PORTFOLIO_CONSTRUCTION.md",
     "docs/PROTOCOLS.md",

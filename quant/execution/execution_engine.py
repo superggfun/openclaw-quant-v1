@@ -13,6 +13,8 @@ from quant.cost.cost_engine import CostEngine, TradeInput
 from quant.core_protocols.fill import Fill
 from quant.core_protocols.order import Order
 from quant.core_protocols.protocol_validation import validate_fill_references_order
+from quant.market_realism.execution_constraints import DEFAULT_MARKET_REALISM_CONFIG, ExecutionConstraints
+from quant.market_realism.liquidity_model import LiquidityModel
 from quant.rebalance.rebalance_engine import RebalanceEngine
 from quant.storage.portfolio_store import DEFAULT_ACCOUNT_NAME, SQLitePortfolioStore
 from quant.storage.sqlite_store import SQLitePriceStore
@@ -35,13 +37,21 @@ class ExecutedTrade:
     symbol: str
     side: str
     shares: int
+    requested_quantity: int
+    executed_quantity: int
+    rejected_quantity: int
+    execution_reason: str
     price: float
     notional: float
     fixed_fee: float
     commission: float
     slippage_cost: float
+    market_impact_cost: float
+    liquidity_cost: float
     total_cost: float
     cost_ratio: float
+    average_daily_volume: float | None
+    adv_participation: float | None
     batch: int
     executed_at: str
 
@@ -64,6 +74,7 @@ class ExecutionResult:
     unfilled_trades: list[UnfilledTrade]
     execution_costs: dict
     slippage_estimate: float
+    market_realism: dict
     final_cash: float
     final_positions: dict[str, float]
     warnings: list[str]
@@ -78,6 +89,7 @@ class ExecutionResult:
             "unfilled_trades": [asdict(trade) for trade in self.unfilled_trades],
             "execution_costs": self.execution_costs,
             "slippage_estimate": self.slippage_estimate,
+            "market_realism": self.market_realism,
             "final_cash": self.final_cash,
             "final_positions": self.final_positions,
             "warnings": self.warnings,
@@ -125,6 +137,11 @@ class ExecutionEngine:
         positions = self._current_positions(account["id"])
         cash = float(account["cash"])
         cost_engine = CostEngine(cost_config or {}, report_dir=self.report_dir)
+        realism_config = dict(DEFAULT_MARKET_REALISM_CONFIG)
+        if isinstance((cost_config or {}).get("market_realism"), dict):
+            realism_config.update((cost_config or {})["market_realism"])
+        constraints = ExecutionConstraints(realism_config)
+        liquidity_model = LiquidityModel(self.price_store, lookback_days=int(realism_config["adv_lookback_days"]))
         plan = self.rebalance_engine.plan(normalized_targets)
 
         intended_trades = self._intended_trades(plan)
@@ -165,6 +182,29 @@ class ExecutionEngine:
                         warnings.append(f"{intended.symbol} buy was not filled because cash is insufficient")
                         continue
 
+                liquidity = liquidity_model.snapshot(
+                    intended.symbol,
+                    executed_at if executed_at != "latest" else self._fallback_executed_at(intended.symbol, execution_date),
+                    lookback_days=int(realism_config["adv_lookback_days"]),
+                    include_as_of=False,
+                )
+                constrained = constraints.apply(
+                    symbol=intended.symbol,
+                    side=intended.side,
+                    requested_quantity=fillable_shares,
+                    price=price,
+                    average_daily_volume=liquidity.average_daily_volume,
+                    current_shares=math.floor(positions.get(intended.symbol, 0.0)),
+                    current_equity=max(cash, 0.0),
+                )
+                warnings.extend(liquidity.warnings + constrained.warnings)
+                if not constrained.allowed or constrained.adjusted_quantity <= 0:
+                    unfilled_trades.append(
+                        UnfilledTrade(intended.symbol, intended.side, fillable_shares, price, constrained.reason)
+                    )
+                    continue
+                fillable_shares = constrained.adjusted_quantity
+
                 if fillable_shares < shares:
                     unfilled_trades.append(
                         UnfilledTrade(
@@ -177,7 +217,16 @@ class ExecutionEngine:
                     )
 
                 trade_cost = cost_engine.estimate(
-                    [TradeInput(intended.symbol, intended.side, fillable_shares, price)],
+                    [
+                        TradeInput(
+                            intended.symbol,
+                            intended.side,
+                            fillable_shares,
+                            price,
+                            average_daily_volume=liquidity.average_daily_volume,
+                            volatility=liquidity.volatility,
+                        )
+                    ],
                     write_report=False,
                 )
                 if trade_cost.warnings:
@@ -216,13 +265,21 @@ class ExecutionEngine:
                         symbol=cost.symbol,
                         side=cost.side,
                         shares=cost.shares,
+                        requested_quantity=constrained.requested_quantity,
+                        executed_quantity=constrained.adjusted_quantity,
+                        rejected_quantity=constrained.rejected_quantity,
+                        execution_reason=constrained.reason,
                         price=cost.price,
                         notional=cost.notional,
                         fixed_fee=cost.fixed_fee,
                         commission=cost.commission,
                         slippage_cost=cost.slippage_cost,
+                        market_impact_cost=cost.market_impact_cost,
+                        liquidity_cost=cost.liquidity_cost,
                         total_cost=cost.total_cost,
                         cost_ratio=cost.cost_ratio,
+                        average_daily_volume=liquidity.average_daily_volume,
+                        adv_participation=cost.adv_participation,
                         batch=batch,
                         executed_at=executed_at,
                     )
@@ -267,6 +324,7 @@ class ExecutionEngine:
             unfilled_trades=unfilled_trades,
             execution_costs=execution_costs,
             slippage_estimate=execution_costs["total_slippage"],
+            market_realism=self._market_realism_summary(executed_trades, unfilled_trades, realism_config),
             final_cash=cash,
             final_positions=final_positions,
             warnings=warnings,
@@ -281,6 +339,7 @@ class ExecutionEngine:
             unfilled_trades=result.unfilled_trades,
             execution_costs=result.execution_costs,
             slippage_estimate=result.slippage_estimate,
+            market_realism=result.market_realism,
             final_cash=result.final_cash,
             final_positions=result.final_positions,
             warnings=result.warnings,
@@ -405,13 +464,31 @@ class ExecutionEngine:
         gross_trade_value = sum(trade.notional for trade in trades)
         total_commission = sum(trade.fixed_fee + trade.commission for trade in trades)
         total_slippage = sum(trade.slippage_cost for trade in trades)
+        total_market_impact = sum(trade.market_impact_cost for trade in trades)
+        total_liquidity_cost = sum(trade.liquidity_cost for trade in trades)
         total_cost = sum(trade.total_cost for trade in trades)
         return {
             "gross_trade_value": gross_trade_value,
             "total_commission": total_commission,
             "total_slippage": total_slippage,
+            "total_market_impact": total_market_impact,
+            "total_liquidity_cost": total_liquidity_cost,
             "total_cost": total_cost,
             "total_cost_ratio": total_cost / gross_trade_value if gross_trade_value else 0.0,
+        }
+
+    @staticmethod
+    def _market_realism_summary(trades: list[ExecutedTrade], unfilled: list[UnfilledTrade], config: dict) -> dict:
+        return {
+            "config": config,
+            "executed_trade_count": len(trades),
+            "unfilled_trade_count": len(unfilled),
+            "total_requested_quantity": sum(trade.requested_quantity for trade in trades) + sum(trade.shares for trade in unfilled),
+            "total_executed_quantity": sum(trade.executed_quantity for trade in trades),
+            "total_rejected_quantity": sum(trade.rejected_quantity for trade in trades) + sum(trade.shares for trade in unfilled),
+            "total_slippage": sum(trade.slippage_cost for trade in trades),
+            "total_market_impact": sum(trade.market_impact_cost for trade in trades),
+            "total_liquidity_cost": sum(trade.liquidity_cost for trade in trades),
         }
 
     def _fallback_executed_at(self, symbol: str, execution_date: str | None) -> str:

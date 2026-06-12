@@ -16,6 +16,8 @@ from quant.cost.cost_engine import CostEngine, DEFAULT_COST_CONFIG, TradeInput
 from quant.core_protocols.fill import Fill
 from quant.core_protocols.order import Order
 from quant.fundamental_data.fundamental_store import FundamentalStore
+from quant.market_realism.execution_constraints import DEFAULT_MARKET_REALISM_CONFIG, ExecutionConstraints
+from quant.market_realism.liquidity_model import LiquidityModel
 from quant.portfolio_construction.portfolio_construction import (
     SUPPORTED_METHODS,
     PortfolioConstructionEngine,
@@ -48,6 +50,8 @@ class TradingSimulationResult:
     positions_by_date: list[dict]
     trades: list[dict]
     rebalance_events: list[dict]
+    rejected_trades: list[dict]
+    market_realism: dict
     warnings: list[str]
     no_lookahead: bool
     report_path: str
@@ -84,6 +88,7 @@ class TradingSimulator:
         execution_price: str = "close",
         symbols: list[str] | None = None,
         portfolio_lookback: int = 60,
+        market_realism_config: Mapping | None = None,
     ) -> TradingSimulationResult:
         normalized_strategy = strategy.lower().strip()
         normalized_frequency = rebalance_frequency.lower().strip()
@@ -99,6 +104,9 @@ class TradingSimulator:
             raise ValueError("execution_price must be close or open")
 
         warnings: list[str] = []
+        realism_config = self._normalize_market_realism_config(market_realism_config, cost_config)
+        runtime_cost_config = dict(cost_config or {})
+        runtime_cost_config["market_realism"] = realism_config
         alpha_parameters = dict(alpha_config or {})
         universe = self._normalize_symbols(symbols or alpha_parameters.get("universe") or list(DEFAULT_SYMBOLS))
         alpha_parameters["universe"] = universe
@@ -122,7 +130,7 @@ class TradingSimulator:
 
             due_events = [event for event in pending_events if event["execution_date"] == date_text]
             for event in due_events:
-                event_result = self._execute_rebalance_event(account, event, prices, cost_config or {})
+                event_result = self._execute_rebalance_event(account, event, prices, runtime_cost_config)
                 executed_events.append(event_result)
             pending_events = [event for event in pending_events if event["execution_date"] != date_text]
 
@@ -179,6 +187,7 @@ class TradingSimulator:
                 "portfolio_lookback": portfolio_lookback,
                 "symbols": universe,
                 "cost_config": dict(DEFAULT_COST_CONFIG) | dict(cost_config or {}),
+                "market_realism_config": realism_config,
                 "alpha_config": alpha_parameters,
             },
             strategy=normalized_strategy,
@@ -198,6 +207,12 @@ class TradingSimulator:
             positions_by_date=positions_by_date,
             trades=[trade.to_dict() for trade in account.trades],
             rebalance_events=executed_events,
+            rejected_trades=[
+                rejected
+                for event in executed_events
+                for rejected in event.get("rejected_trades", [])
+            ],
+            market_realism=self._market_realism_summary(executed_events, realism_config),
             warnings=all_warnings,
             no_lookahead=True,
             report_path="",
@@ -260,6 +275,11 @@ class TradingSimulator:
         cost_config: Mapping,
     ) -> dict:
         before = account.mark_to_market(event["execution_date"], prices)
+        realism_config = dict(DEFAULT_MARKET_REALISM_CONFIG)
+        if isinstance(cost_config.get("market_realism"), Mapping):
+            realism_config.update(dict(cost_config["market_realism"]))
+        liquidity_model = LiquidityModel(self.price_store, lookback_days=int(realism_config["adv_lookback_days"]))
+        constraints = ExecutionConstraints(realism_config)
         target_weights = {
             symbol.upper(): float(weight)
             for symbol, weight in event["target_weights"].items()
@@ -271,7 +291,19 @@ class TradingSimulator:
         for symbol in sorted(current_symbols):
             price = prices.get(symbol)
             if price is None or price <= 0:
-                event["warnings"].append(f"missing execution price for {symbol}")
+                event["warnings"].append(f"WARN_NO_PRICE: missing execution price for {symbol}")
+                side = "SELL" if account.positions.get(symbol, 0) > 0 and target_weights.get(symbol, 0.0) == 0 else "UNKNOWN"
+                event.setdefault("rejected_trades", []).append(
+                    {
+                        "symbol": symbol,
+                        "side": side,
+                        "requested_quantity": None,
+                        "executed_quantity": 0,
+                        "rejected_quantity": None,
+                        "execution_status": "SKIPPED_NO_PRICE",
+                        "execution_reason": "SKIPPED_NO_PRICE",
+                    }
+                )
                 continue
             current_value = account.positions.get(symbol, 0) * price
             target_value = before.total_equity * target_weights.get(symbol, 0.0)
@@ -286,19 +318,44 @@ class TradingSimulator:
                 buys.append(trade)
 
         executed = []
+        rejected_trades = list(event.get("rejected_trades", []))
+        liquidity_snapshots: dict[str, dict] = {}
         protocol_orders: list[Order] = []
         protocol_fills: list[Fill] = []
         cost_engine = CostEngine(dict(cost_config), report_dir=self.report_dir)
         for trade in sells:
-            cost_report = cost_engine.estimate([trade], write_report=False)
-            event["warnings"].extend(cost_report.warnings)
-            estimate = cost_report.trades[0]
-            order = self._protocol_order(event, trade, len(protocol_orders) + 1)
-            applied = account.apply_trade(
+            constrained, liquidity = self._constrain_trade(
+                constraints,
+                liquidity_model,
+                event,
+                trade,
+                before.total_equity,
+                account.positions.get(trade.symbol, 0),
+            )
+            liquidity_snapshots[trade.symbol] = liquidity.to_dict()
+            event["warnings"].extend(liquidity.warnings + constrained.warnings)
+            if not constrained.allowed or constrained.adjusted_quantity <= 0:
+                rejected_trades.append(self._rejected_trade(trade, constrained))
+                continue
+            executable = TradeInput(
                 trade.symbol,
                 trade.side,
-                trade.shares,
+                constrained.adjusted_quantity,
                 trade.price,
+                average_daily_volume=liquidity.average_daily_volume,
+                volatility=liquidity.volatility,
+            )
+            if constrained.rejected_quantity:
+                rejected_trades.append(self._rejected_trade(trade, constrained))
+            cost_report = cost_engine.estimate([executable], write_report=False)
+            event["warnings"].extend(cost_report.warnings)
+            estimate = cost_report.trades[0]
+            order = self._protocol_order(event, executable, len(protocol_orders) + 1)
+            applied = account.apply_trade(
+                executable.symbol,
+                executable.side,
+                executable.shares,
+                executable.price,
                 estimate.total_cost,
                 event["execution_date"],
                 signal_date=event["signal_date"],
@@ -306,13 +363,35 @@ class TradingSimulator:
             )
             protocol_orders.append(order)
             protocol_fills.append(self._protocol_fill(event, order, applied, len(protocol_fills) + 1))
-            executed.append(applied.to_dict() | {"total_cost": estimate.total_cost})
+            executed.append(self._executed_trade_dict(applied.to_dict(), estimate, constrained, liquidity))
 
         for trade in buys:
-            affordable = trade.shares
+            constrained, liquidity = self._constrain_trade(
+                constraints,
+                liquidity_model,
+                event,
+                trade,
+                before.total_equity,
+                account.positions.get(trade.symbol, 0),
+            )
+            liquidity_snapshots[trade.symbol] = liquidity.to_dict()
+            event["warnings"].extend(liquidity.warnings + constrained.warnings)
+            if not constrained.allowed or constrained.adjusted_quantity <= 0:
+                rejected_trades.append(self._rejected_trade(trade, constrained))
+                continue
+            if constrained.rejected_quantity:
+                rejected_trades.append(self._rejected_trade(trade, constrained))
+            affordable = constrained.adjusted_quantity
             estimate = None
             while affordable > 0:
-                candidate = TradeInput(trade.symbol, trade.side, affordable, trade.price)
+                candidate = TradeInput(
+                    trade.symbol,
+                    trade.side,
+                    affordable,
+                    trade.price,
+                    average_daily_volume=liquidity.average_daily_volume,
+                    volatility=liquidity.volatility,
+                )
                 candidate_report = cost_engine.estimate([candidate], write_report=False)
                 event["warnings"].extend(candidate_report.warnings)
                 estimate = candidate_report.trades[0]
@@ -321,8 +400,27 @@ class TradingSimulator:
                 affordable -= 1
             if affordable <= 0 or estimate is None:
                 event["warnings"].append(f"insufficient cash to buy {trade.symbol}")
+                rejected_trades.append(
+                    {
+                        "symbol": trade.symbol,
+                        "side": trade.side,
+                        "requested_quantity": constrained.adjusted_quantity,
+                        "executed_quantity": 0,
+                        "rejected_quantity": constrained.adjusted_quantity,
+                        "execution_status": "REJECTED",
+                        "execution_reason": "INSUFFICIENT_CASH",
+                    }
+                )
                 continue
-            order = self._protocol_order(event, TradeInput(trade.symbol, trade.side, affordable, trade.price), len(protocol_orders) + 1)
+            executable = TradeInput(
+                trade.symbol,
+                trade.side,
+                affordable,
+                trade.price,
+                average_daily_volume=liquidity.average_daily_volume,
+                volatility=liquidity.volatility,
+            )
+            order = self._protocol_order(event, executable, len(protocol_orders) + 1)
             applied = account.apply_trade(
                 trade.symbol,
                 trade.side,
@@ -335,7 +433,8 @@ class TradingSimulator:
             )
             protocol_orders.append(order)
             protocol_fills.append(self._protocol_fill(event, order, applied, len(protocol_fills) + 1))
-            executed.append(applied.to_dict() | {"total_cost": estimate.total_cost})
+            adjusted_constraint = constrained.__class__(**(constrained.to_dict() | {"adjusted_quantity": affordable, "rejected_quantity": constrained.requested_quantity - affordable}))
+            executed.append(self._executed_trade_dict(applied.to_dict(), estimate, adjusted_constraint, liquidity))
 
         after = account.mark_to_market(event["execution_date"], prices)
         account_state = account.to_protocol_state(
@@ -353,7 +452,66 @@ class TradingSimulator:
             "equity_before": before.total_equity,
             "equity_after": after.total_equity,
             "cost_paid": round(sum(trade.get("total_cost", 0.0) for trade in executed), 6),
+            "liquidity": liquidity_snapshots,
+            "rejected_trades": rejected_trades,
+            "execution_warnings": self._dedupe(event["warnings"]),
             "warnings": self._dedupe(event["warnings"]),
+        }
+
+    def _constrain_trade(
+        self,
+        constraints: ExecutionConstraints,
+        liquidity_model: LiquidityModel,
+        event: dict,
+        trade: TradeInput,
+        equity: float,
+        current_shares: int,
+    ):
+        liquidity = liquidity_model.snapshot(
+            trade.symbol,
+            event["signal_date"],
+            lookback_days=int(constraints.config["adv_lookback_days"]),
+            include_as_of=True,
+        )
+        result = constraints.apply(
+            symbol=trade.symbol,
+            side=trade.side,
+            requested_quantity=trade.shares,
+            price=trade.price,
+            average_daily_volume=liquidity.average_daily_volume,
+            current_shares=current_shares,
+            current_equity=equity,
+        )
+        return result, liquidity
+
+    @staticmethod
+    def _executed_trade_dict(applied: dict, estimate, constraint, liquidity) -> dict:
+        return applied | {
+            "requested_quantity": constraint.requested_quantity,
+            "executed_quantity": constraint.adjusted_quantity,
+            "rejected_quantity": constraint.rejected_quantity,
+            "execution_status": "FILLED" if constraint.rejected_quantity == 0 else "PARTIALLY_FILLED",
+            "execution_reason": constraint.reason,
+            "average_daily_volume": liquidity.average_daily_volume,
+            "adv_participation": estimate.adv_participation,
+            "slippage_cost": estimate.slippage_cost,
+            "market_impact_cost": estimate.market_impact_cost,
+            "liquidity_cost": estimate.liquidity_cost,
+            "total_cost": estimate.total_cost,
+        }
+
+    @staticmethod
+    def _rejected_trade(trade: TradeInput, constraint) -> dict:
+        return {
+            "symbol": trade.symbol,
+            "side": trade.side,
+            "requested_quantity": constraint.requested_quantity,
+            "executed_quantity": constraint.adjusted_quantity if constraint.allowed else 0,
+            "rejected_quantity": constraint.rejected_quantity,
+            "execution_status": "PARTIALLY_FILLED" if constraint.allowed and constraint.adjusted_quantity > 0 else "REJECTED",
+            "execution_reason": constraint.reason,
+            "average_daily_volume": constraint.average_daily_volume,
+            "adv_participation": constraint.adv_participation,
         }
 
     @staticmethod
@@ -476,6 +634,39 @@ class TradingSimulator:
                 output.append(text)
                 seen.add(text)
         return output
+
+    @staticmethod
+    def _normalize_market_realism_config(market_realism_config: Mapping | None, cost_config: Mapping | None) -> dict:
+        merged = dict(DEFAULT_MARKET_REALISM_CONFIG)
+        cost_values = dict(cost_config or {})
+        nested = cost_values.get("market_realism")
+        if isinstance(nested, Mapping):
+            merged.update(dict(nested))
+        merged.update(dict(market_realism_config or {}))
+        if "min_trade_notional" in cost_values and not (isinstance(nested, Mapping) and "min_trade_notional" in nested) and not (market_realism_config and "min_trade_notional" in market_realism_config):
+            merged["min_trade_notional"] = cost_values["min_trade_notional"]
+        return merged
+
+    @staticmethod
+    def _market_realism_summary(events: list[dict], config: dict) -> dict:
+        executed = [trade for event in events for trade in event.get("executed_trades", [])]
+        rejected = [trade for event in events for trade in event.get("rejected_trades", [])]
+        return {
+            "config": config,
+            "executed_trade_count": len(executed),
+            "rejected_trade_count": len(rejected),
+            "total_requested_quantity": sum(int(trade.get("requested_quantity") or trade.get("shares") or 0) for trade in executed + rejected),
+            "total_executed_quantity": sum(int(trade.get("executed_quantity") or trade.get("shares") or 0) for trade in executed),
+            "total_rejected_quantity": sum(int(trade.get("rejected_quantity") or 0) for trade in executed + rejected),
+            "total_slippage": round(sum(float(trade.get("slippage_cost") or 0.0) for trade in executed), 6),
+            "total_market_impact": round(sum(float(trade.get("market_impact_cost") or 0.0) for trade in executed), 6),
+            "total_liquidity_cost": round(sum(float(trade.get("liquidity_cost") or 0.0) for trade in executed), 6),
+            "largest_constrained_trades": sorted(
+                rejected,
+                key=lambda item: int(item.get("rejected_quantity") or 0),
+                reverse=True,
+            )[:5],
+        }
 
     def _write_report(self, result: TradingSimulationResult) -> Path:
         self.report_dir.mkdir(parents=True, exist_ok=True)

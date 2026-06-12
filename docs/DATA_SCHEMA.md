@@ -471,10 +471,12 @@ Top-level keys:
 - `model`: `fixed`, `linear`, or `combined`.
 - `currency`: reporting currency.
 - `config`: cost model parameters.
-- `trades`: per-trade symbol, side, shares, price, notional, fees, slippage, total cost, and cost ratio.
+- `trades`: per-trade symbol, side, shares, price, notional, fees, slippage, market impact, liquidity cost, total cost, and cost ratio.
 - `gross_trade_value`: sum of trade notionals.
 - `total_commission`: fixed plus linear commissions.
 - `total_slippage`: slippage cost.
+- `total_market_impact`: estimated market impact cost when configured.
+- `total_liquidity_cost`: estimated liquidity cost when ADV context is supplied.
 - `total_cost`: all estimated costs.
 - `total_cost_ratio`: total cost divided by gross trade value.
 - `warnings`: small trades or poor cost efficiency warnings.
@@ -492,6 +494,7 @@ Top-level keys:
 - `unfilled_trades`: quantities that were not filled and reasons.
 - `execution_costs`: gross value, commission, slippage, total cost, and cost ratio.
 - `slippage_estimate`: total simulated slippage cost.
+- `market_realism`: requested/executed/rejected quantity totals, slippage, market impact, liquidity cost, and constraint config.
 - `final_cash`: cash after simulated fills and costs.
 - `final_positions`: simulated ending quantities.
 - `warnings`: non-blocking warnings.
@@ -558,7 +561,7 @@ Trading simulation reports are generated files, not database tables. They are ig
 Top-level keys:
 
 - `metadata`: report type, generation time, offline simulation flags, and no-broker markers.
-- `parameters`: start/end, rebalance frequency, execution price, symbols, alpha config, and cost config.
+- `parameters`: start/end, rebalance frequency, execution price, symbols, alpha config, cost config, and market realism config.
 - `strategy`: currently `alpha`.
 - `portfolio_method`: `equal_weight`, `inverse_volatility`, `risk_parity`, or `min_variance`.
 - `initial_cash`: starting simulated account cash.
@@ -570,8 +573,10 @@ Top-level keys:
 - `equity_curve`: daily equity observations.
 - `cash_curve`: daily cash observations.
 - `positions_by_date`: daily positions and marked market value.
-- `trades`: simulated fills with signal and execution dates.
-- `rebalance_events`: signal date, execution date, targets, fills, costs, and warnings by rebalance.
+- `trades`: simulated fills with signal and execution dates, requested/executed/rejected quantities, execution reason, ADV participation, slippage, market impact, liquidity cost, and total cost.
+- `rebalance_events`: signal date, execution date, targets, fills, rejected trades, liquidity snapshots, costs, and warnings by rebalance.
+- `rejected_trades`: skipped or partially rejected simulated trades with execution status and reason.
+- `market_realism`: aggregate requested/executed/rejected quantities, slippage, market impact, liquidity cost, and largest constrained trades.
 - `warnings`: deterministic simulation warnings.
 - `no_lookahead`: true for the signal/execution design.
 

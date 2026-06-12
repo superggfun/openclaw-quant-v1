@@ -8,6 +8,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterable
 
+from quant.market_realism.slippage_model import SlippageModel
+
 
 DEFAULT_COST_CONFIG = {
     "model": "combined",
@@ -15,6 +17,9 @@ DEFAULT_COST_CONFIG = {
     "commission_rate": 0.001,
     "min_commission": 1.0,
     "slippage_bps": 5.0,
+    "slippage_model": None,
+    "market_impact_bps": 0.0,
+    "liquidity_impact_rate": 0.0,
     "currency": "USD",
     "min_trade_notional": 50.0,
     "min_cost_efficiency_ratio": None,
@@ -27,6 +32,8 @@ class TradeInput:
     side: str
     shares: int
     price: float
+    average_daily_volume: float | None = None
+    volatility: float | None = None
 
 
 @dataclass(frozen=True)
@@ -39,8 +46,12 @@ class TradeCostEstimate:
     fixed_fee: float
     commission: float
     slippage_cost: float
+    market_impact_cost: float
+    liquidity_cost: float
     total_cost: float
     cost_ratio: float
+    slippage_model: str
+    adv_participation: float | None
 
 
 @dataclass(frozen=True)
@@ -52,6 +63,8 @@ class CostReport:
     gross_trade_value: float
     total_commission: float
     total_slippage: float
+    total_market_impact: float
+    total_liquidity_cost: float
     total_cost: float
     total_cost_ratio: float
     warnings: list[str]
@@ -66,6 +79,8 @@ class CostReport:
             "gross_trade_value": self.gross_trade_value,
             "total_commission": self.total_commission,
             "total_slippage": self.total_slippage,
+            "total_market_impact": self.total_market_impact,
+            "total_liquidity_cost": self.total_liquidity_cost,
             "total_cost": self.total_cost,
             "total_cost_ratio": self.total_cost_ratio,
             "warnings": self.warnings,
@@ -96,8 +111,18 @@ class CostEngine:
             notional = trade.shares * trade.price
             fixed_fee = self._fixed_fee()
             commission = self._commission(notional)
-            slippage_cost = notional * (self.config["slippage_bps"] / 10000.0)
-            total_cost = fixed_fee + commission + slippage_cost
+            adv_participation = self._adv_participation(trade)
+            slippage_model = SlippageModel(self.config["slippage_model"])
+            slippage_cost = slippage_model.estimate(
+                notional=notional,
+                shares=trade.shares,
+                price=trade.price,
+                average_daily_volume=trade.average_daily_volume,
+                volatility=trade.volatility,
+            )
+            market_impact_cost = self._market_impact(notional, adv_participation)
+            liquidity_cost = self._liquidity_cost(notional, adv_participation)
+            total_cost = fixed_fee + commission + slippage_cost + market_impact_cost + liquidity_cost
             cost_ratio = total_cost / notional if notional else 0.0
 
             if notional < self.config["min_trade_notional"]:
@@ -123,14 +148,20 @@ class CostEngine:
                     fixed_fee=fixed_fee,
                     commission=commission,
                     slippage_cost=slippage_cost,
+                    market_impact_cost=market_impact_cost,
+                    liquidity_cost=liquidity_cost,
                     total_cost=total_cost,
                     cost_ratio=cost_ratio,
+                    slippage_model=str(self.config["slippage_model"]["model"]),
+                    adv_participation=adv_participation,
                 )
             )
 
         gross_trade_value = sum(trade.notional for trade in trade_estimates)
         total_commission = sum(trade.fixed_fee + trade.commission for trade in trade_estimates)
         total_slippage = sum(trade.slippage_cost for trade in trade_estimates)
+        total_market_impact = sum(trade.market_impact_cost for trade in trade_estimates)
+        total_liquidity_cost = sum(trade.liquidity_cost for trade in trade_estimates)
         total_cost = sum(trade.total_cost for trade in trade_estimates)
         total_cost_ratio = total_cost / gross_trade_value if gross_trade_value else 0.0
 
@@ -142,6 +173,8 @@ class CostEngine:
             gross_trade_value=gross_trade_value,
             total_commission=total_commission,
             total_slippage=total_slippage,
+            total_market_impact=total_market_impact,
+            total_liquidity_cost=total_liquidity_cost,
             total_cost=total_cost,
             total_cost_ratio=total_cost_ratio,
             warnings=warnings,
@@ -156,6 +189,8 @@ class CostEngine:
             gross_trade_value=report.gross_trade_value,
             total_commission=report.total_commission,
             total_slippage=report.total_slippage,
+            total_market_impact=report.total_market_impact,
+            total_liquidity_cost=report.total_liquidity_cost,
             total_cost=report.total_cost,
             total_cost_ratio=report.total_cost_ratio,
             warnings=report.warnings,
@@ -172,6 +207,25 @@ class CostEngine:
             return 0.0
         return max(notional * self.config["commission_rate"], self.config["min_commission"])
 
+    def _market_impact(self, notional: float, adv_participation: float | None) -> float:
+        if notional <= 0:
+            return 0.0
+        base = notional * self.config["market_impact_bps"] / 10000.0
+        if adv_participation is None:
+            return base
+        return base * max(1.0, adv_participation)
+
+    def _liquidity_cost(self, notional: float, adv_participation: float | None) -> float:
+        if notional <= 0 or adv_participation is None:
+            return 0.0
+        return notional * self.config["liquidity_impact_rate"] * max(0.0, adv_participation)
+
+    @staticmethod
+    def _adv_participation(trade: TradeInput) -> float | None:
+        if trade.average_daily_volume is None or trade.average_daily_volume <= 0:
+            return None
+        return max(float(trade.shares) / float(trade.average_daily_volume), 0.0)
+
     @staticmethod
     def _normalize_config(config: dict) -> dict:
         merged = dict(DEFAULT_COST_CONFIG)
@@ -184,12 +238,32 @@ class CostEngine:
         merged["commission_rate"] = float(merged["commission_rate"])
         merged["min_commission"] = float(merged["min_commission"])
         merged["slippage_bps"] = float(merged["slippage_bps"])
+        if merged.get("slippage_model") is None:
+            merged["slippage_model"] = {"model": "bps", "bps": merged["slippage_bps"]}
+        elif isinstance(merged["slippage_model"], str):
+            merged["slippage_model"] = {"model": merged["slippage_model"], "bps": merged["slippage_bps"]}
+        elif isinstance(merged["slippage_model"], dict):
+            merged["slippage_model"] = dict(merged["slippage_model"])
+            merged["slippage_model"].setdefault("bps", merged["slippage_bps"])
+        else:
+            raise ValueError("slippage_model must be a string or JSON object")
+        SlippageModel(merged["slippage_model"])
+        merged["market_impact_bps"] = float(merged["market_impact_bps"])
+        merged["liquidity_impact_rate"] = float(merged["liquidity_impact_rate"])
         merged["currency"] = str(merged["currency"]).upper()
         merged["min_trade_notional"] = float(merged["min_trade_notional"])
         if merged.get("min_cost_efficiency_ratio") is not None:
             merged["min_cost_efficiency_ratio"] = float(merged["min_cost_efficiency_ratio"])
 
-        for key in ("fixed_fee", "commission_rate", "min_commission", "slippage_bps", "min_trade_notional"):
+        for key in (
+            "fixed_fee",
+            "commission_rate",
+            "min_commission",
+            "slippage_bps",
+            "market_impact_bps",
+            "liquidity_impact_rate",
+            "min_trade_notional",
+        ):
             if merged[key] < 0:
                 raise ValueError(f"{key} must be non-negative")
         return merged

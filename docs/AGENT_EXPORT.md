@@ -88,6 +88,9 @@ The exporter deterministically emits warnings for conditions such as:
 - `WARN_SHARPE_RETURN_MISMATCH`
 - `WARN_FACTOR_IC_NEGATIVE`
 - `WARN_UNFILLED_TRADES_PRESENT`
+- `WARN_LIQUIDITY_CAP`
+- `WARN_HIGH_SLIPPAGE`
+- `WARN_NO_PRICE`
 - `WARN_POSITION_CONCENTRATION_HIGH`
 
 Warnings are research prompts for review. They are not trade instructions.
@@ -118,6 +121,10 @@ When `visualize-report` has generated charts for the same source report, Agent E
 ## Walk Forward Reports
 
 Agent Export supports `reports/walk_forward_*.json`. Summaries include fold count, average train/test return and Sharpe, factor stability ranking, warnings such as `WARN_OVERFIT` and `WARN_FACTOR_DECAY`, and deterministic next steps like reviewing out-of-sample folds or comparing factor stability.
+
+## Market Realism
+
+For `trade_sim` and `execution` reports, Agent Export includes slippage, market impact, liquidity cost, rejected trade counts, and largest constrained trades when those fields exist. It does not embed chart bytes or change source reports.
 
 ## Trade Simulation Reports
 
