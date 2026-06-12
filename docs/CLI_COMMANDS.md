@@ -26,6 +26,10 @@ python -m quant.cli universe-build --sector Technology --max-symbols 10
 python -m quant.cli provider-list
 python -m quant.cli provider-health
 python -m quant.cli provider-info yfinance
+python -m quant.cli fundamental-import --file examples/fundamentals_sample.csv
+python -m quant.cli fundamental-show --symbol AAPL --latest
+python -m quant.cli fundamental-coverage
+python -m quant.cli fundamental-quality
 python -m quant.cli data-refresh
 python -m quant.cli data-coverage
 python -m quant.cli research-readiness
@@ -51,6 +55,22 @@ python -m quant.cli research-readiness
 The data layer commands manage providers, research universes, static metadata, stored-price coverage, data quality, and readiness diagnostics. The default provider is Yahoo Finance / `yfinance`, resolved through the `DataProvider` abstraction. They do not provide real-time market data, AkShare, Tushare, A-share data, factor evaluation semantic changes, backtest semantic changes, portfolio state changes, or execution behavior.
 
 `provider-list` shows registered providers and placeholders. `provider-health` reports provider readiness without downloading market data. `provider-info` prints one provider's status and health details.
+
+## Fundamental Data
+
+```bash
+python -m quant.cli fundamental-import --file examples/fundamentals_sample.csv
+python -m quant.cli fundamental-import --file examples/fundamentals_sample.csv --statement income
+python -m quant.cli fundamental-import --file examples/fundamentals_sample.csv --force
+python -m quant.cli fundamental-show --symbol AAPL
+python -m quant.cli fundamental-show --symbol AAPL --latest
+python -m quant.cli fundamental-show --symbol AAPL --statement metrics
+python -m quant.cli fundamental-coverage
+python -m quant.cli fundamental-quality
+python -m quant.cli fundamental-quality --symbol AAPL
+```
+
+The fundamental commands import and inspect offline CSV fundamentals. They do not generate fundamental factors, target weights, trades, broker calls, or investment advice.
 
 ## Agent Export
 

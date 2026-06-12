@@ -37,6 +37,9 @@ Supported report types:
 - `execution`
 - `backtest`
 - `trade_sim`
+- `fundamental_import`
+- `fundamental_coverage`
+- `fundamental_quality`
 
 ## Common Output Schema
 
@@ -108,3 +111,7 @@ Agent Export supports `reports/walk_forward_*.json`. Summaries include fold coun
 ## Trade Simulation Reports
 
 Agent Export supports `reports/trade_sim_*.json`. Summaries include strategy, portfolio method, initial cash, final equity, total return, annual return, Sharpe, max drawdown, total cost, turnover, trade count, rebalance count, no-lookahead marker, warnings, and deterministic next steps such as comparing portfolio methods or inspecting cost drag.
+
+## Fundamental Reports
+
+Agent Export supports `reports/fundamental_import_*.json`, `reports/fundamental_coverage_*.json`, and `reports/fundamental_quality_*.json`. Summaries include import counts, readiness score, symbols covered, missing symbols, latest report date, and key quality warnings. These summaries are diagnostics only and do not create trading signals.

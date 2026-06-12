@@ -6,13 +6,14 @@ This project is for research and simulation only. It is not investment advice.
 
 ## Current Version
 
-`v0.24.0-data-provider-abstraction`
+`v0.25.0-fundamental-data-layer`
 
 This release includes:
 
 - CLI parser and command handlers split under `quant/cli_commands/`.
 - Data provider abstraction with yfinance as the default provider.
 - yfinance daily OHLCV ingestion through the provider interface.
+- Fundamental data storage, CSV import, query, coverage, and quality diagnostics.
 - SQLite price storage with idempotent updates.
 - Expanded research universe management.
 - Static symbol metadata storage.
@@ -39,7 +40,7 @@ This release includes:
 - CLI commands for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtest, allocation, rebalance, risk, optimizer, portfolio construction, cost, and execution workflows.
 - pytest coverage for core state transitions.
 
-`v0.24.0` decouples price refresh and data diagnostics from direct yfinance calls through a provider registry. It does not change quant calculations, add factors, connect brokers, or add machine learning.
+`v0.25.0` adds a fundamental-data foundation for future true value, quality, and growth factors. It does not create fundamental factor scores yet, change price-only factor semantics, connect brokers, or add machine learning.
 
 ## Scope
 
@@ -49,6 +50,7 @@ This release includes:
 - Idempotent price updates using `(symbol, date)` as the primary key
 - Simulated account, position, and trade tracking in SQLite
 - Pure calculation alpha, factor pipeline, factor evaluation, factor backtest, backtest, rebalance, risk, optimizer, portfolio construction, cost, and execution modules
+- Fundamental CSV import and diagnostics for offline research
 - Reserved OpenClaw integration boundary with no live execution code
 
 Default symbols:
@@ -81,6 +83,7 @@ openclaw-quant-v1/
 |  |- factor_eval/
 |  |- factor_pipeline/
 |  |- factors/
+|  |- fundamental_data/
 |  |- optimizer/
 |  |- portfolio_construction/
 |  |- rebalance/
@@ -113,6 +116,7 @@ Key modules:
 - `quant/cli_commands/`: parser registration and command handlers for each CLI area.
 - `quant/data_layer/`: universe management, symbol metadata, coverage, quality, and readiness diagnostics.
 - `quant/data_providers/`: provider abstraction, registry, yfinance provider, CSV provider, mock provider, and future-provider placeholders.
+- `quant/fundamental_data/`: fundamental statement storage, CSV import, query, coverage, and quality diagnostics.
 - `quant/agent_export/agent_exporter.py`: compact report summaries for LLM/agent contexts.
 - `quant/visualization/`: PNG, SVG, and HTML visual reports from existing JSON reports.
 - `quant/alpha/alpha_engine.py`: factor calculation and target weight generation.
@@ -163,6 +167,10 @@ python -m quant.cli universe-build --sector Technology --max-symbols 10
 python -m quant.cli provider-list
 python -m quant.cli provider-health
 python -m quant.cli provider-info yfinance
+python -m quant.cli fundamental-import --file examples/fundamentals_sample.csv
+python -m quant.cli fundamental-show --symbol AAPL --latest
+python -m quant.cli fundamental-coverage
+python -m quant.cli fundamental-quality
 python -m quant.cli data-refresh
 python -m quant.cli data-coverage
 python -m quant.cli research-readiness
@@ -171,6 +179,7 @@ python -m quant.cli visualize-report --report reports/trade_sim_YYYYMMDD_HHMMSS.
 ```
 
 See `docs/DATA_LAYER.md` and `docs/DATA_PROVIDERS.md` for universe, provider, metadata, coverage, quality, and readiness details.
+See `docs/FUNDAMENTAL_DATA.md` for fundamental CSV import, query, coverage, and quality details.
 
 ## Agent Export
 
@@ -595,6 +604,8 @@ export OPENCLAW_QUANT_DB_PATH=/tmp/openclaw-quant.db
 
 - `prices`: daily OHLCV data from the configured provider, defaulting to yfinance
 - `symbol_metadata`: static symbol metadata for universe and sector workflows
+- `income_statement`, `balance_sheet`, `cash_flow`, `fundamental_metrics`: imported fundamental data
+- `fundamental_import_log`: import summaries
 - `accounts`: simulated account cash and initial cash
 - `positions`: current simulated positions
 - `trades`: simulated trade ledger

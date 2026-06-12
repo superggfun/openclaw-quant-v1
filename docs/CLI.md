@@ -13,6 +13,10 @@ python -m quant.cli universe-build --sector Technology --max-symbols 10
 python -m quant.cli provider-list
 python -m quant.cli provider-health
 python -m quant.cli provider-info yfinance
+python -m quant.cli fundamental-import --file examples/fundamentals_sample.csv
+python -m quant.cli fundamental-show --symbol AAPL --latest
+python -m quant.cli fundamental-coverage
+python -m quant.cli fundamental-quality
 python -m quant.cli data-refresh
 python -m quant.cli data-coverage
 python -m quant.cli research-readiness

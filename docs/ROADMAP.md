@@ -1,5 +1,15 @@
 # Roadmap
 
+## v0.25.0-fundamental-data-layer
+
+- Adds `quant/fundamental_data` for fundamental storage, CSV import, query, coverage, and quality checks.
+- Adds SQLite tables for income statements, balance sheets, cash flows, fundamental metrics, and import logs.
+- Adds CLI commands: `fundamental-import`, `fundamental-show`, `fundamental-coverage`, and `fundamental-quality`.
+- Adds `examples/fundamentals_sample.csv`.
+- Adds Agent Export support for fundamental import, coverage, and quality reports.
+- Data-layer only: no fundamental factor scoring, no broker/live trading, no paid API integration, no ML, and no changes to price-only factor semantics.
+- v0.26 is planned for true fundamental factor scoring using this layer.
+
 ## v0.24.0-data-provider-abstraction
 
 - Adds `quant/data_providers` with a `DataProvider` interface and provider registry.

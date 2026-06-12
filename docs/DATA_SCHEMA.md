@@ -45,6 +45,46 @@ Columns:
 - `created_at`: insertion timestamp.
 - `updated_at`: update timestamp.
 
+## income_statement
+
+Imported income statement rows keyed by `symbol`, `fiscal_period_end`, and `fiscal_quarter`.
+
+Important columns:
+
+- common: `symbol`, `fiscal_period_end`, `report_date`, `fiscal_year`, `fiscal_quarter`, `currency`
+- metrics: `revenue`, `gross_profit`, `operating_income`, `net_income`, `eps_basic`, `eps_diluted`, `shares_outstanding_basic`, `shares_outstanding_diluted`
+
+## balance_sheet
+
+Imported balance sheet rows keyed by `symbol`, `fiscal_period_end`, and `fiscal_quarter`.
+
+Important columns:
+
+- common: `symbol`, `fiscal_period_end`, `report_date`, `fiscal_year`, `fiscal_quarter`, `currency`
+- metrics: `total_assets`, `total_liabilities`, `total_equity`, `total_debt`, `cash_and_equivalents`, `current_assets`, `current_liabilities`, `inventory`
+
+## cash_flow
+
+Imported cash flow rows keyed by `symbol`, `fiscal_period_end`, and `fiscal_quarter`.
+
+Important columns:
+
+- common: `symbol`, `fiscal_period_end`, `report_date`, `fiscal_year`, `fiscal_quarter`, `currency`
+- metrics: `operating_cash_flow`, `capital_expenditure`, `free_cash_flow`, `dividends_paid`
+
+## fundamental_metrics
+
+Imported valuation, profitability, leverage, liquidity, and growth metrics keyed by `symbol`, `fiscal_period_end`, and `fiscal_quarter`.
+
+Important columns:
+
+- common: `symbol`, `fiscal_period_end`, `report_date`, `fiscal_year`, `fiscal_quarter`, `currency`
+- metrics: `market_cap`, `enterprise_value`, `book_value_per_share`, `pe_ratio`, `pb_ratio`, `ps_ratio`, `ev_to_ebitda`, `roe`, `roa`, `gross_margin`, `net_margin`, `debt_to_equity`, `current_ratio`, `quick_ratio`, `revenue_growth`, `eps_growth`, `free_cash_flow_yield`
+
+## fundamental_import_log
+
+Append-only import log for CSV imports. It stores file path, statement override, force flag, inserted/updated/skipped/error counts, and warnings.
+
 ## accounts
 
 Simulated account state.
@@ -307,6 +347,38 @@ Top-level keys:
 - `symbols`
 - `summary`: inserted, updated, skipped, and error counts.
 - `per_symbol`: per-symbol inserted, updated, skipped, fetched, status, and error details.
+
+## reports/fundamental_import_*.json
+
+Fundamental import reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `metadata`
+- `parameters`
+- `summary`: inserted, updated, skipped, and error counts.
+- `warnings`
+- `no_lookahead_notes`
+- `interpretation_notes`
+
+## reports/fundamental_coverage_*.json
+
+Fundamental coverage reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `summary`
+- `coverage`: symbols covered, missing symbols, statement coverage, date range, latest report date, missing required field count, and readiness score.
+
+## reports/fundamental_quality_*.json
+
+Fundamental quality reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `summary`
+- `quality_checks`
+- `warnings`
 
 ## reports/data_coverage_*.json
 

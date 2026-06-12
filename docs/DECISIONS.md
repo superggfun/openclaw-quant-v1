@@ -135,3 +135,7 @@ The `v0.21.0` trading simulation layer tracks cash, positions, PnL, costs, and t
 ## 2026-06-12: Data Providers Are An Abstraction Boundary
 
 The `v0.24.0` provider layer introduces `DataProvider` and `ProviderRegistry` so price refresh and diagnostics no longer depend directly on yfinance. `yfinance` remains the default provider. CSV and mock providers are for offline imports and tests. AkShare, Tushare, Alpha Vantage, and Polygon are registered only as not-installed placeholders. This release does not change factor evaluation, backtest semantics, report schemas, or no-lookahead rules.
+
+## 2026-06-12: Fundamental Data Is Storage Only
+
+The `v0.25.0` fundamental data layer imports, stores, queries, and validates statement and metric data. It preserves `report_date` separately from `fiscal_period_end` for future no-lookahead factor alignment. It does not implement PE, PB, ROE, ROA, revenue growth, EPS growth, or other fundamental factor scoring yet.

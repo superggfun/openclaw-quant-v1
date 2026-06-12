@@ -20,6 +20,8 @@ from quant.data_providers import DataProvider, ProviderRegistry, create_default_
 from quant.execution.execution_engine import ExecutionEngine
 from quant.factor_backtest.factor_backtest import FactorBacktest
 from quant.factor_eval.factor_evaluation import FactorEvaluation
+from quant.fundamental_data.fundamental_service import FundamentalService
+from quant.fundamental_data.fundamental_store import FundamentalStore
 from quant.optimizer.optimizer_engine import OptimizerEngine
 from quant.portfolio_construction.portfolio_construction import PortfolioConstructionEngine
 from quant.rebalance.rebalance_engine import RebalanceEngine
@@ -41,6 +43,7 @@ class CLIContext:
     price_store: SQLitePriceStore
     portfolio_store: SQLitePortfolioStore
     metadata_store: SymbolMetadataStore
+    fundamental_store: FundamentalStore
     provider_registry: ProviderRegistry
     data_provider: DataProvider
     price_service: PriceService
@@ -59,6 +62,7 @@ class CLIContext:
     universe_manager: UniverseManager
     data_quality_analyzer: DataQualityAnalyzer
     data_refresh_manager: DataRefreshManager
+    fundamental_service: FundamentalService
     agent_exporter: AgentExporter
     walk_forward_engine: WalkForwardEngine
     trading_simulator: TradingSimulator
@@ -69,6 +73,7 @@ def create_context(db_path: Path) -> CLIContext:
     price_store = SQLitePriceStore(db_path)
     portfolio_store = SQLitePortfolioStore(db_path)
     metadata_store = SymbolMetadataStore(db_path)
+    fundamental_store = FundamentalStore(db_path)
     provider_registry = create_default_registry()
     data_provider = provider_registry.default_provider()
     price_service = PriceService(price_store, data_source=data_provider)
@@ -77,6 +82,7 @@ def create_context(db_path: Path) -> CLIContext:
         price_store=price_store,
         portfolio_store=portfolio_store,
         metadata_store=metadata_store,
+        fundamental_store=fundamental_store,
         provider_registry=provider_registry,
         data_provider=data_provider,
         price_service=price_service,
@@ -95,6 +101,7 @@ def create_context(db_path: Path) -> CLIContext:
         universe_manager=UniverseManager(metadata_store, data_provider),
         data_quality_analyzer=DataQualityAnalyzer(price_store, metadata_store),
         data_refresh_manager=DataRefreshManager(price_store, data_provider),
+        fundamental_service=FundamentalService(fundamental_store),
         agent_exporter=AgentExporter(),
         walk_forward_engine=WalkForwardEngine(price_store),
         trading_simulator=TradingSimulator(price_store),

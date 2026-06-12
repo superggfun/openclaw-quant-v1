@@ -21,6 +21,8 @@ SUPPORTED_REPORT_TYPES = {
     "portfolio_construction",
     "walk_forward",
     "risk",
+    "fundamental_coverage",
+    "fundamental_quality",
 }
 
 EXPECTED_CHARTS_BY_REPORT_TYPE = {
@@ -32,6 +34,8 @@ EXPECTED_CHARTS_BY_REPORT_TYPE = {
     "portfolio_construction": {"target_weights", "risk_contribution", "volatility_contribution", "correlation_matrix"},
     "walk_forward": {"fold_returns", "train_vs_test_return", "train_vs_test_sharpe", "factor_stability_ranking", "overfit_diagnostics"},
     "risk": {"risk_summary", "top_holdings"},
+    "fundamental_coverage": {"statement_coverage"},
+    "fundamental_quality": {"warnings_by_reason"},
 }
 
 
@@ -227,6 +231,17 @@ class ReportVisualizer:
             builder.bar_chart(prefix, "top_holdings", "Top Holdings", holdings),
         )
 
+    def _charts_fundamental_coverage(self, builder: ChartBuilder, prefix: str, report: dict[str, Any]) -> list[ChartArtifact]:
+        coverage = report.get("coverage") or {}
+        return self._keep(
+            builder.bar_chart(prefix, "statement_coverage", "Statement Coverage", coverage.get("statement_coverage") or {}),
+        )
+
+    def _charts_fundamental_quality(self, builder: ChartBuilder, prefix: str, report: dict[str, Any]) -> list[ChartArtifact]:
+        return self._keep(
+            builder.bar_chart(prefix, "warnings_by_reason", "Warnings By Reason", self._warning_counts(report.get("warnings") or [])),
+        )
+
     @staticmethod
     def _series(items: Any, label_key: str, value_key: str) -> list[tuple[str, float]]:
         output = []
@@ -368,6 +383,8 @@ class ReportVisualizer:
         if report_type == "backtest":
             return report.get("metrics") or {}
         keys = ("strategy", "portfolio_method", "final_equity", "total_return", "max_drawdown", "total_cost", "trade_count", "risk_score", "factor", "ic_mean", "rank_ic_mean", "icir", "method")
+        if report_type in {"fundamental_coverage", "fundamental_quality"}:
+            return report.get("summary") or {}
         return {key: report.get(key) for key in keys if key in report}
 
     @staticmethod

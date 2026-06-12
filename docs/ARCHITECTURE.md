@@ -21,6 +21,7 @@ SQLite / External APIs
 - `quant.agent_export.agent_exporter`: Converts detailed JSON reports into compact agent-friendly text, Markdown, or JSON summaries.
 - `quant.visualization`: Converts existing JSON reports into PNG, SVG, and HTML visual dashboards.
 - `quant.data_providers`: Defines the `DataProvider` interface, provider registry, yfinance provider, CSV provider, mock provider, and future-provider placeholders.
+- `quant.fundamental_data`: Stores, imports, queries, validates, and reports offline fundamental data.
 - `quant.data_layer.universe_manager`: Builds default, custom, sector, ETF, and large-cap universes.
 - `quant.data_layer.symbol_metadata`: Stores static symbol metadata in SQLite.
 - `quant.data_layer.data_quality`: Produces coverage, data quality, and research readiness reports.
@@ -69,6 +70,14 @@ CLI provider/data commands -> ProviderRegistry + UniverseManager + SymbolMetadat
 ```
 
 The data layer expands research coverage and diagnostics without changing factor evaluation, factor backtest, portfolio backtest, or no-lookahead semantics. `v0.24.0` changes the data access boundary only: yfinance remains the default provider, CSV and mock providers support offline workflows, and AkShare/Tushare/Alpha Vantage/Polygon are placeholders.
+
+Fundamental data flow:
+
+```text
+CLI fundamental-* commands -> FundamentalService -> FundamentalStore -> SQLite fundamental tables -> reports/fundamental_*.json
+```
+
+The fundamental data layer is storage/import/query/quality only in `v0.25.0`. It does not create PE/PB/ROE factors yet and does not change existing price-only factor behavior.
 
 Agent export flow:
 

@@ -104,6 +104,9 @@ class AgentExporter:
             return "execution"
         if "metrics" in report and ("equity_curve" in report or "trades" in report):
             return "backtest"
+        report_type = (report.get("metadata") or {}).get("report_type")
+        if report_type in {"fundamental_import", "fundamental_coverage", "fundamental_quality"}:
+            return report_type
         return "unknown"
 
     def render(self, export: AgentExport, output_format: str = "text", max_tokens: int = 800) -> str:
@@ -460,6 +463,77 @@ class AgentExporter:
             ["run walk-forward validation", "compare portfolio methods", "inspect cost drag", "review drawdown"],
             ["run strategy evaluation", "export trade simulation report"],
             [],
+        )
+
+    def _export_fundamental_import(self, report: dict[str, Any], generated_from: str) -> AgentExport:
+        summary = report.get("summary") or {}
+        warnings = self._clean_warnings(report.get("warnings"))
+        metrics = {
+            "inserted": summary.get("inserted"),
+            "updated": summary.get("updated"),
+            "skipped": summary.get("skipped"),
+            "errors": summary.get("errors"),
+            "file": (report.get("parameters") or {}).get("file"),
+            "statement": (report.get("parameters") or {}).get("statement"),
+        }
+        return self._base_export(
+            "fundamental_import",
+            generated_from,
+            "Fundamental CSV import completed.",
+            metrics,
+            ["fundamental data imported into SQLite"],
+            warnings,
+            ["run fundamental coverage", "run fundamental quality", "review report_date alignment"],
+            [],
+            report.get("no_lookahead_notes") or [],
+        )
+
+    def _export_fundamental_coverage(self, report: dict[str, Any], generated_from: str) -> AgentExport:
+        coverage = report.get("coverage") or {}
+        warnings = self._clean_warnings(report.get("warnings"))
+        if coverage.get("symbols_missing_fundamental_data", 0):
+            warnings.append("WARN_FUNDAMENTAL_COVERAGE_GAP")
+        metrics = {
+            "readiness_score": coverage.get("readiness_score"),
+            "total_symbols": coverage.get("total_symbols"),
+            "symbols_covered": coverage.get("symbols_with_any_fundamental_data"),
+            "symbols_missing": coverage.get("symbols_missing_fundamental_data"),
+            "missing_symbols": (coverage.get("missing_symbols") or [])[:10],
+            "statement_coverage": coverage.get("statement_coverage"),
+            "latest_report_date": coverage.get("latest_report_date"),
+        }
+        return self._base_export(
+            "fundamental_coverage",
+            generated_from,
+            f"Fundamental coverage readiness score is {coverage.get('readiness_score')}.",
+            metrics,
+            ["fundamental coverage report generated"],
+            warnings,
+            ["import missing symbols", "run fundamental quality", "validate report_date freshness"],
+            [],
+            report.get("no_lookahead_notes") or [],
+        )
+
+    def _export_fundamental_quality(self, report: dict[str, Any], generated_from: str) -> AgentExport:
+        summary = report.get("summary") or {}
+        warnings = self._clean_warnings(report.get("warnings"))
+        metrics = {
+            "status": summary.get("status"),
+            "symbols_checked": summary.get("symbols_checked"),
+            "warnings": summary.get("warnings"),
+            "checks": summary.get("checks"),
+            "top_warnings": warnings[:10],
+        }
+        return self._base_export(
+            "fundamental_quality",
+            generated_from,
+            f"Fundamental quality status is {summary.get('status')}.",
+            metrics,
+            ["fundamental quality checks completed"],
+            warnings,
+            ["fix stale reports", "review missing fields", "check currency consistency"],
+            [],
+            report.get("no_lookahead_notes") or [],
         )
 
     def _base_export(

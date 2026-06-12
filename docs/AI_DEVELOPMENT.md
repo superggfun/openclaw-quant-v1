@@ -4,13 +4,14 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v0.24.0-data-provider-abstraction`
+`v0.25.0-fundamental-data-layer`
 
 The project currently includes:
 
 - A market data layer using a `DataProvider` abstraction with `yfinance` as the default US stock and ETF daily OHLCV provider.
 - SQLite storage for normalized price data.
 - An offline data layer for universe management, static metadata, coverage, quality, and readiness diagnostics.
+- A fundamental data layer for CSV import, storage, query, coverage, and quality diagnostics.
 - An agent export layer that compresses existing reports for LLM and OpenClaw-style agent context windows.
 - A simulated portfolio state module with accounts, positions, and trades.
 - An alpha engine that calculates deterministic factors and target weights from stored prices.
@@ -66,11 +67,13 @@ The project intentionally does not include:
 - Data layer and provider features must not change factor evaluation or backtest semantics. They should improve metadata, coverage, quality, provider boundaries, and readiness only.
 - AkShare, Tushare, A-share data, real-time market data, Alpha Vantage, and Polygon are future provider additions unless explicitly implemented in a later release.
 - Agent export features must remain read-only and export-only. Do not change source report schemas, quant logic, factor evaluation, backtest behavior, portfolio state, or execution behavior.
+- Fundamental data features must remain storage/import/query/quality only until a later explicit factor-scoring release. Do not change existing price-only factor semantics.
 
 ## Important Files
 
 - `quant/config.py`: project defaults and symbol universe.
 - `quant/data_providers/`: provider interface, registry, yfinance provider, CSV provider, mock provider, and future-provider placeholders.
+- `quant/fundamental_data/`: fundamental store, importer, service, coverage, and quality checks.
 - `quant/data_source/yfinance_client.py`: legacy yfinance normalization client used by the yfinance provider.
 - `quant/data_layer/`: universe, metadata, data quality, coverage, and readiness modules.
 - `quant/agent_export/agent_exporter.py`: compact report export layer for LLM/agent consumers.
@@ -133,3 +136,7 @@ Visualization code belongs under `quant/visualization`. It should read existing 
 ## v0.24 Data Provider Notes
 
 Provider code belongs under `quant/data_providers`. `PriceService` and data refresh should call the `DataProvider` interface rather than importing provider implementations directly. Keep `yfinance` as the default until a later release explicitly changes configuration. New providers must include health checks, deterministic tests, documentation, and must preserve no-lookahead semantics by only loading historical data requested by callers.
+
+## v0.25 Fundamental Data Notes
+
+Fundamental data code belongs under `quant/fundamental_data`. Store `report_date` separately from `fiscal_period_end`; future factor code must use `report_date` for no-lookahead alignment. CSV import is the main supported path in v0.25. Do not add true fundamental factor scores until a later release explicitly asks for them.

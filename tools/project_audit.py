@@ -40,6 +40,7 @@ REQUIRED_MODULE_DOCS = {
     "docs/FACTOR_EVALUATION.md",
     "docs/FACTOR_LIBRARY.md",
     "docs/FACTOR_PIPELINE.md",
+    "docs/FUNDAMENTAL_DATA.md",
     "docs/PORTFOLIO_CONSTRUCTION.md",
     "docs/STRATEGY_EVALUATION.md",
     "docs/TRADING_SIMULATION.md",
