@@ -16,6 +16,7 @@ from quant.cost.cost_engine import CostEngine, TradeInput
 from quant.data_layer.data_quality import DataQualityAnalyzer, DataRefreshManager
 from quant.data_layer.symbol_metadata import SymbolMetadataStore
 from quant.data_layer.universe_manager import UniverseManager
+from quant.data_providers import DataProvider, ProviderRegistry, create_default_registry
 from quant.execution.execution_engine import ExecutionEngine
 from quant.factor_backtest.factor_backtest import FactorBacktest
 from quant.factor_eval.factor_evaluation import FactorEvaluation
@@ -40,6 +41,8 @@ class CLIContext:
     price_store: SQLitePriceStore
     portfolio_store: SQLitePortfolioStore
     metadata_store: SymbolMetadataStore
+    provider_registry: ProviderRegistry
+    data_provider: DataProvider
     price_service: PriceService
     portfolio_service: PortfolioService
     backtest_service: BacktestService
@@ -66,12 +69,16 @@ def create_context(db_path: Path) -> CLIContext:
     price_store = SQLitePriceStore(db_path)
     portfolio_store = SQLitePortfolioStore(db_path)
     metadata_store = SymbolMetadataStore(db_path)
-    price_service = PriceService(price_store)
+    provider_registry = create_default_registry()
+    data_provider = provider_registry.default_provider()
+    price_service = PriceService(price_store, data_source=data_provider)
     return CLIContext(
         db_path=db_path,
         price_store=price_store,
         portfolio_store=portfolio_store,
         metadata_store=metadata_store,
+        provider_registry=provider_registry,
+        data_provider=data_provider,
         price_service=price_service,
         portfolio_service=PortfolioService(portfolio_store),
         backtest_service=BacktestService(price_store),
@@ -85,9 +92,9 @@ def create_context(db_path: Path) -> CLIContext:
         factor_evaluation=FactorEvaluation(price_store),
         factor_backtest_engine=FactorBacktest(price_store),
         strategy_evaluation=StrategyEvaluation(),
-        universe_manager=UniverseManager(metadata_store),
+        universe_manager=UniverseManager(metadata_store, data_provider),
         data_quality_analyzer=DataQualityAnalyzer(price_store, metadata_store),
-        data_refresh_manager=DataRefreshManager(price_store, price_service.data_source),
+        data_refresh_manager=DataRefreshManager(price_store, data_provider),
         agent_exporter=AgentExporter(),
         walk_forward_engine=WalkForwardEngine(price_store),
         trading_simulator=TradingSimulator(price_store),

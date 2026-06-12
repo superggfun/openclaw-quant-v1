@@ -35,6 +35,7 @@ REQUIRED_MODULE_DOCS = {
     "docs/AGENT_EXPORT.md",
     "docs/BACKTEST.md",
     "docs/DATA_LAYER.md",
+    "docs/DATA_PROVIDERS.md",
     "docs/FACTOR_BACKTEST.md",
     "docs/FACTOR_EVALUATION.md",
     "docs/FACTOR_LIBRARY.md",

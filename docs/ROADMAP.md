@@ -1,5 +1,15 @@
 # Roadmap
 
+## v0.24.0-data-provider-abstraction
+
+- Adds `quant/data_providers` with a `DataProvider` interface and provider registry.
+- Keeps `yfinance` as the default provider with no data behavior changes.
+- Adds CSV and mock providers for offline imports and deterministic tests.
+- Registers future-provider placeholders for AkShare, Tushare, Alpha Vantage, and Polygon as not installed.
+- Adds CLI commands: `provider-list`, `provider-health`, and `provider-info`.
+- Refactors `PriceService` and data refresh to depend on providers rather than direct yfinance calls.
+- Architecture-only: no new factors, no backtest semantic changes, no broker integrations, no live trading, and no machine learning.
+
 ## v0.23.0-visualization-reports
 
 - Adds `quant/visualization` for report charts and dashboards.
@@ -212,7 +222,6 @@ Strategy Evaluation / Performance Attribution is not implemented in v0.13. It is
 
 - Add richer portfolio reporting.
 - Add configurable universe files and metadata maintenance commands.
-- Add provider abstraction for future AkShare, Tushare, and A-share research data after separate design.
 - Add realized PnL tracking.
 - Add basic performance metrics.
 - Add benchmark and buy-and-hold comparison metrics.

@@ -10,6 +10,9 @@ python -m quant.cli show-prices SPY --limit 5
 python -m quant.cli list-symbols
 python -m quant.cli universe-list
 python -m quant.cli universe-build --sector Technology --max-symbols 10
+python -m quant.cli provider-list
+python -m quant.cli provider-health
+python -m quant.cli provider-info yfinance
 python -m quant.cli data-refresh
 python -m quant.cli data-coverage
 python -m quant.cli research-readiness

@@ -5,7 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from quant.config import DEFAULT_SYMBOLS
-from quant.data_layer.symbol_metadata import SymbolMetadataStore
+from quant.data_layer.symbol_metadata import SymbolMetadata, SymbolMetadataStore
+from quant.data_providers import DataProvider
 
 
 ETF_UNIVERSE = ("SPY", "QQQ", "DIA", "IWM", "TLT", "GLD", "XLK", "XLF", "XLV", "XLE")
@@ -45,8 +46,9 @@ class UniverseResult:
 class UniverseManager:
     """Build deterministic research universes from static metadata."""
 
-    def __init__(self, metadata_store: SymbolMetadataStore) -> None:
+    def __init__(self, metadata_store: SymbolMetadataStore, data_provider: DataProvider | None = None) -> None:
         self.metadata_store = metadata_store
+        self.data_provider = data_provider
 
     def list_universes(self) -> dict[str, list[str]]:
         return {
@@ -76,7 +78,7 @@ class UniverseManager:
             if not ticker or ticker in seen:
                 continue
             seen.add(ticker)
-            metadata = self.metadata_store.get(ticker)
+            metadata = self._metadata_for(ticker)
             if not metadata:
                 excluded.append(ticker)
                 reasons[ticker] = "missing metadata"
@@ -115,3 +117,23 @@ class UniverseManager:
         if universe_key in {"all", "metadata"}:
             return [row["symbol"] for row in self.metadata_store.list_all()]
         return list(DEFAULT_RESEARCH_UNIVERSE)
+
+    def _metadata_for(self, symbol: str) -> dict | None:
+        metadata = self.metadata_store.get(symbol)
+        if metadata or not self.data_provider:
+            return metadata
+        provider_metadata = self.data_provider.get_symbol_metadata(symbol)
+        if not provider_metadata:
+            return None
+        ticker = provider_metadata.get("symbol", symbol).upper().strip()
+        row = SymbolMetadata(
+            symbol=ticker,
+            name=provider_metadata.get("name", ticker),
+            asset_type=provider_metadata.get("asset_type", "Equity"),
+            sector=provider_metadata.get("sector", "Unknown"),
+            industry=provider_metadata.get("industry", "Unknown"),
+            currency=provider_metadata.get("currency", "USD"),
+            exchange=provider_metadata.get("exchange", "UNKNOWN"),
+        )
+        self.metadata_store.upsert_many([row])
+        return self.metadata_store.get(symbol)

@@ -2,6 +2,8 @@
 
 The default SQLite database is `data/quant.db`.
 
+`v0.24.0` adds a provider abstraction in code, but it does not add provider tables. Provider registry state is static Python configuration. Price rows continue to land in `prices`.
+
 ## prices
 
 Daily OHLCV price data.
@@ -294,6 +296,17 @@ Top-level keys:
 - `symbols`: refreshed symbols.
 - `summary`: total symbols, inserted rows, updated rows, skipped existing rows, and error count.
 - `per_symbol`: per-symbol inserted, updated, skipped, fetched, fetch start, end date, status, and error message.
+
+## reports/data_refresh_*.json
+
+Data refresh reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `provider`: resolved data provider name, defaulting to `yfinance`.
+- `symbols`
+- `summary`: inserted, updated, skipped, and error counts.
+- `per_symbol`: per-symbol inserted, updated, skipped, fetched, status, and error details.
 
 ## reports/data_coverage_*.json
 

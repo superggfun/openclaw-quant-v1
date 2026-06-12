@@ -1,10 +1,10 @@
 # Data Layer
 
-`v0.17.0` expands the research data foundation for larger universes, symbol metadata, historical data refresh, coverage diagnostics, and research readiness scoring.
+`v0.17.0` expands the research data foundation for larger universes, symbol metadata, historical data refresh, coverage diagnostics, and research readiness scoring. `v0.24.0` adds a provider abstraction so these workflows no longer depend directly on `yfinance` internals.
 
-This layer is offline research infrastructure built on the existing Yahoo Finance / `yfinance` daily price adapter. It does not connect to brokers, place orders, provide real-time market data, run high-frequency logic, trade options, or use machine learning.
+This layer is offline research infrastructure. The default provider remains Yahoo Finance / `yfinance` daily OHLCV data, but access now goes through `quant/data_providers`. It does not connect to brokers, place orders, provide real-time market data, run high-frequency logic, trade options, or use machine learning.
 
-AkShare, Tushare, A-share universes, and other regional/provider integrations are future provider additions. They are not implemented in `v0.17.0`.
+AkShare, Tushare, A-share universes, and other regional/provider integrations are future provider additions. They are registered as placeholders only.
 
 ## Commands
 
@@ -13,6 +13,9 @@ python -m quant.cli universe-list
 python -m quant.cli universe-build
 python -m quant.cli universe-build --symbols SPY,QQQ,NVDA
 python -m quant.cli universe-build --sector Technology --max-symbols 10
+python -m quant.cli provider-list
+python -m quant.cli provider-health
+python -m quant.cli provider-info yfinance
 python -m quant.cli data-refresh
 python -m quant.cli data-refresh --universe etf_universe --start-date 2024-01-01 --end-date 2025-01-01
 python -m quant.cli data-coverage
@@ -47,7 +50,7 @@ The bootstrap data covers the original project pool plus additional ETFs and lar
 
 ## Historical Data Refresh
 
-`data-refresh` uses the existing `yfinance` daily price adapter and SQLite price store. It refreshes symbols from either the configured defaults or a selected universe.
+`data-refresh` uses the default `DataProvider` and SQLite price store. Today the default provider is `yfinance`; future providers can be added behind the same interface without changing refresh or coverage callers.
 
 The command reports inserted, updated, skipped, fetched, and error counts per symbol and writes refresh plus coverage reports. Existing `(symbol, date)` rows are upserted, so repeated runs do not create duplicate price rows. When no `--start-date` is supplied, refresh starts after the latest stored date for each symbol and counts earlier rows as skipped.
 

@@ -4,13 +4,13 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v0.23.0-visualization-reports`
+`v0.24.0-data-provider-abstraction`
 
 The project currently includes:
 
-- A market data layer using `yfinance` for US stock and ETF daily OHLCV data.
+- A market data layer using a `DataProvider` abstraction with `yfinance` as the default US stock and ETF daily OHLCV provider.
 - SQLite storage for normalized price data.
-- A `yfinance`-based offline data layer for universe management, static metadata, coverage, quality, and readiness diagnostics.
+- An offline data layer for universe management, static metadata, coverage, quality, and readiness diagnostics.
 - An agent export layer that compresses existing reports for LLM and OpenClaw-style agent context windows.
 - A simulated portfolio state module with accounts, positions, and trades.
 - An alpha engine that calculates deterministic factors and target weights from stored prices.
@@ -63,14 +63,15 @@ The project intentionally does not include:
 - Strategy evaluation features must read or generate supported offline source reports, then explain them without introducing new strategies, modifying portfolio state, or executing trades.
 - Strategy evaluation warning codes are research diagnostics. Do not treat them as automatic trade instructions.
 - Portfolio construction features must use stored prices only, respect the requested end/as-of date, generate target weights only, and leave rebalance or execution simulation to downstream modules.
-- Data layer features must not change factor evaluation or backtest semantics. They should improve metadata, coverage, quality, and readiness only.
-- AkShare, Tushare, A-share data, and real-time market data are future provider additions and are not part of v0.17.
+- Data layer and provider features must not change factor evaluation or backtest semantics. They should improve metadata, coverage, quality, provider boundaries, and readiness only.
+- AkShare, Tushare, A-share data, real-time market data, Alpha Vantage, and Polygon are future provider additions unless explicitly implemented in a later release.
 - Agent export features must remain read-only and export-only. Do not change source report schemas, quant logic, factor evaluation, backtest behavior, portfolio state, or execution behavior.
 
 ## Important Files
 
 - `quant/config.py`: project defaults and symbol universe.
-- `quant/data_source/yfinance_client.py`: external market data adapter.
+- `quant/data_providers/`: provider interface, registry, yfinance provider, CSV provider, mock provider, and future-provider placeholders.
+- `quant/data_source/yfinance_client.py`: legacy yfinance normalization client used by the yfinance provider.
 - `quant/data_layer/`: universe, metadata, data quality, coverage, and readiness modules.
 - `quant/agent_export/agent_exporter.py`: compact report export layer for LLM/agent consumers.
 - `quant/storage/sqlite_store.py`: price table persistence.
@@ -128,3 +129,7 @@ Trading simulation code belongs under `quant/trading_simulation`. Keep it offlin
 ## v0.23 Visualization Notes
 
 Visualization code belongs under `quant/visualization`. It should read existing JSON reports and write generated artifacts under `reports/charts/`. Do not change source report schemas, quant calculations, factor logic, portfolio state, or execution behavior.
+
+## v0.24 Data Provider Notes
+
+Provider code belongs under `quant/data_providers`. `PriceService` and data refresh should call the `DataProvider` interface rather than importing provider implementations directly. Keep `yfinance` as the default until a later release explicitly changes configuration. New providers must include health checks, deterministic tests, documentation, and must preserve no-lookahead semantics by only loading historical data requested by callers.

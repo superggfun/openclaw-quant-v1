@@ -23,6 +23,9 @@ python -m quant.cli show-prices SPY --limit 5
 python -m quant.cli list-symbols
 python -m quant.cli universe-list
 python -m quant.cli universe-build --sector Technology --max-symbols 10
+python -m quant.cli provider-list
+python -m quant.cli provider-health
+python -m quant.cli provider-info yfinance
 python -m quant.cli data-refresh
 python -m quant.cli data-coverage
 python -m quant.cli research-readiness
@@ -37,12 +40,17 @@ python -m quant.cli universe-list
 python -m quant.cli universe-build
 python -m quant.cli universe-build --symbols SPY,QQQ,NVDA
 python -m quant.cli universe-build --sector Technology --max-symbols 10
+python -m quant.cli provider-list
+python -m quant.cli provider-health
+python -m quant.cli provider-info yfinance
 python -m quant.cli data-refresh --universe etf_universe --start-date 2024-01-01
 python -m quant.cli data-coverage
 python -m quant.cli research-readiness
 ```
 
-The data layer commands manage research universes, static metadata, stored-price coverage, data quality, and readiness diagnostics. They use the existing Yahoo Finance / `yfinance` daily data path. They do not provide real-time market data, AkShare, Tushare, A-share data, factor evaluation semantic changes, backtest semantic changes, portfolio state changes, or execution behavior.
+The data layer commands manage providers, research universes, static metadata, stored-price coverage, data quality, and readiness diagnostics. The default provider is Yahoo Finance / `yfinance`, resolved through the `DataProvider` abstraction. They do not provide real-time market data, AkShare, Tushare, A-share data, factor evaluation semantic changes, backtest semantic changes, portfolio state changes, or execution behavior.
+
+`provider-list` shows registered providers and placeholders. `provider-health` reports provider readiness without downloading market data. `provider-info` prints one provider's status and health details.
 
 ## Agent Export
 

@@ -131,3 +131,7 @@ The `v0.20.0` walk-forward layer orchestrates existing alpha, backtest, factor e
 ## 2026-06-12: Trading Simulation Uses In-Memory Account State
 
 The `v0.21.0` trading simulation layer tracks cash, positions, PnL, costs, and trades in an in-memory `PortfolioAccount`. It writes reports only and does not mutate the persistent `accounts`, `positions`, or `trades` tables. Signals use signal-date-and-earlier data, execution is scheduled for the next available trading date, and the feature remains offline historical research only.
+
+## 2026-06-12: Data Providers Are An Abstraction Boundary
+
+The `v0.24.0` provider layer introduces `DataProvider` and `ProviderRegistry` so price refresh and diagnostics no longer depend directly on yfinance. `yfinance` remains the default provider. CSV and mock providers are for offline imports and tests. AkShare, Tushare, Alpha Vantage, and Polygon are registered only as not-installed placeholders. This release does not change factor evaluation, backtest semantics, report schemas, or no-lookahead rules.

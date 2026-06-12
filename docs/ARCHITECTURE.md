@@ -20,6 +20,7 @@ SQLite / External APIs
 - `quant.cli_commands`: Dedicated parser registration and command handlers for data, data layer, agent export, visualization, portfolio, rebalance, risk, optimizer, portfolio construction, alpha, factor, strategy evaluation, trading simulation, cost, execution, and backtest commands.
 - `quant.agent_export.agent_exporter`: Converts detailed JSON reports into compact agent-friendly text, Markdown, or JSON summaries.
 - `quant.visualization`: Converts existing JSON reports into PNG, SVG, and HTML visual dashboards.
+- `quant.data_providers`: Defines the `DataProvider` interface, provider registry, yfinance provider, CSV provider, mock provider, and future-provider placeholders.
 - `quant.data_layer.universe_manager`: Builds default, custom, sector, ETF, and large-cap universes.
 - `quant.data_layer.symbol_metadata`: Stores static symbol metadata in SQLite.
 - `quant.data_layer.data_quality`: Produces coverage, data quality, and research readiness reports.
@@ -41,7 +42,7 @@ SQLite / External APIs
 - `quant.execution.execution_engine`: Simulates execution of rebalance suggestions and costs.
 - `quant.storage.sqlite_store`: Owns the `prices` table.
 - `quant.storage.portfolio_store`: Owns `accounts`, `positions`, and `trades`.
-- `quant.data_source.yfinance_client`: Wraps yfinance and normalizes downloaded prices.
+- `quant.data_source.yfinance_client`: Legacy yfinance normalization client used by `quant.data_providers.yfinance_provider`.
 
 ## Data Flow
 
@@ -56,16 +57,18 @@ python -m quant.cli -> quant.cli build_parser/create_context -> quant.cli_comman
 Price update flow:
 
 ```text
-CLI update-prices -> PriceService -> YFinanceClient -> SQLitePriceStore -> prices
+CLI update-prices -> PriceService -> ProviderRegistry/default DataProvider -> SQLitePriceStore -> prices
+                                    |
+                                    `-> YFinanceProvider -> YFinanceClient -> yfinance
 ```
 
 Data layer flow:
 
 ```text
-CLI universe/data commands -> UniverseManager + SymbolMetadataStore + DataQualityAnalyzer -> prices/symbol_metadata -> reports/data_*.json
+CLI provider/data commands -> ProviderRegistry + UniverseManager + SymbolMetadataStore + DataQualityAnalyzer -> prices/symbol_metadata -> reports/data_*.json
 ```
 
-The data layer expands research coverage and diagnostics without changing factor evaluation, factor backtest, portfolio backtest, or no-lookahead semantics.
+The data layer expands research coverage and diagnostics without changing factor evaluation, factor backtest, portfolio backtest, or no-lookahead semantics. `v0.24.0` changes the data access boundary only: yfinance remains the default provider, CSV and mock providers support offline workflows, and AkShare/Tushare/Alpha Vantage/Polygon are placeholders.
 
 Agent export flow:
 

@@ -10,7 +10,7 @@ from pathlib import Path
 import pandas as pd
 
 from quant.config import DEFAULT_START_DATE
-from quant.data_source.yfinance_client import YFinanceClient
+from quant.data_providers import DataProvider, YFinanceProvider
 from quant.data_layer.symbol_metadata import SymbolMetadataStore
 from quant.storage.sqlite_store import SQLitePriceStore
 
@@ -38,11 +38,12 @@ class DataRefreshManager:
     def __init__(
         self,
         price_store: SQLitePriceStore,
-        data_source: YFinanceClient | None = None,
+        data_source: DataProvider | None = None,
         report_dir: str | Path = "reports",
     ) -> None:
         self.price_store = price_store
-        self.data_source = data_source or YFinanceClient()
+        self.data_provider = data_source or YFinanceProvider()
+        self.data_source = self.data_provider
         self.report_dir = Path(report_dir)
 
     def refresh(
@@ -76,8 +77,8 @@ class DataRefreshManager:
                 continue
 
             try:
-                prices = self.data_source.fetch_daily_prices(symbol, start=fetch_start, end=end_date)
-            except Exception as exc:  # yfinance/network errors should not abort the whole refresh.
+                prices = self._get_price_history(symbol, start=fetch_start, end=end_date)
+            except Exception as exc:  # Provider/network errors should not abort the whole refresh.
                 per_symbol[symbol] = {
                     "status": "ERROR",
                     "inserted": 0,
@@ -116,6 +117,7 @@ class DataRefreshManager:
         }
         payload = {
             "created_at": datetime.now().isoformat(timespec="seconds"),
+            "provider": getattr(self.data_provider, "name", self.data_provider.__class__.__name__),
             "symbols": normalized,
             "summary": summary,
             "per_symbol": per_symbol,
@@ -151,6 +153,16 @@ class DataRefreshManager:
             return False
         latest_date = datetime.strptime(latest, "%Y-%m-%d").date()
         return latest_date >= date.today() - timedelta(days=1)
+
+    def _get_price_history(
+        self,
+        symbol: str,
+        start: str | date | None = None,
+        end: str | date | None = None,
+    ) -> pd.DataFrame:
+        if hasattr(self.data_provider, "get_price_history"):
+            return self.data_provider.get_price_history(symbol, start=start, end=end)
+        return self.data_provider.fetch_daily_prices(symbol, start=start, end=end)
 
     def _write_report(self, prefix: str, payload: dict) -> Path:
         self.report_dir.mkdir(parents=True, exist_ok=True)

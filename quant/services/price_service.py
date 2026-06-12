@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 from typing import Iterable
 
 from quant.config import DEFAULT_START_DATE, DEFAULT_SYMBOLS
-from quant.data_source.yfinance_client import YFinanceClient
+from quant.data_providers import DataProvider, YFinanceProvider
 from quant.storage.sqlite_store import SQLitePriceStore
 
 
@@ -16,11 +16,12 @@ class PriceService:
     def __init__(
         self,
         store: SQLitePriceStore,
-        data_source: YFinanceClient | None = None,
+        data_source: DataProvider | None = None,
         default_symbols: Iterable[str] = DEFAULT_SYMBOLS,
     ) -> None:
         self.store = store
-        self.data_source = data_source or YFinanceClient()
+        self.data_provider = data_source or YFinanceProvider()
+        self.data_source = self.data_provider
         self.default_symbols = tuple(symbol.upper() for symbol in default_symbols)
 
     def update_prices(
@@ -34,7 +35,7 @@ class PriceService:
 
         for symbol in normalized_symbols:
             fetch_start = self._resolve_start_date(symbol, start)
-            prices = self.data_source.fetch_daily_prices(symbol, start=fetch_start, end=end)
+            prices = self._get_price_history(symbol, start=fetch_start, end=end)
             results[symbol] = self.store.upsert_prices(prices)
 
         return results
@@ -70,3 +71,12 @@ class PriceService:
                 seen.add(ticker)
         return normalized
 
+    def _get_price_history(
+        self,
+        symbol: str,
+        start: str | date | None = None,
+        end: str | date | None = None,
+    ):
+        if hasattr(self.data_provider, "get_price_history"):
+            return self.data_provider.get_price_history(symbol, start=start, end=end)
+        return self.data_provider.fetch_daily_prices(symbol, start=start, end=end)
