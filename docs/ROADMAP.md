@@ -1,5 +1,12 @@
 # Roadmap
 
+## v0.39.0-research-validation-coverage-expansion
+
+- Adds bounded `research-validation` workflow for evidence collection using existing engines.
+- Supports `--mode quick` for local smoke validation and `--mode full` for long-running full validation.
+- Records `TIMEOUT`, `SLOW_STEP`, `PARTIAL_RESULTS`, per-step runtime, skipped steps, warning statistics, and recommended performance work.
+- Research validation only: no new factors, strategy logic, MCP features, data providers, ML, news sentiment, broker/live trading, or no-lookahead semantic changes.
+
 ## v0.37.0-strategy-evaluation-gates
 
 - Adds `quant/strategy_gates` for deterministic Strategy Evaluation Gates.

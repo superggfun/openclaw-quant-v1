@@ -236,3 +236,9 @@ Forbidden trading/broker tool names must return `NOT_SUPPORTED`, including `plac
 Strategy Evaluation Gate code belongs under `quant/strategy_gates`. It may read Strategy DSL validation, Factor Store history, walk-forward history, regime diagnostics, and offline strategy-run/trade-sim reports. It must not add factors, alter quant calculations, change report schemas for existing reports, connect brokers, submit orders, mutate real accounts, or weaken no-lookahead rules.
 
 `strategy-gate` and `strategy-run --with-gates` are offline research quality-control commands. MCP `run_strategy_gates` must remain `OFFLINE_SIMULATION`; `latest_strategy_gate_report` must remain `READ_ONLY`.
+
+## v0.39 Research Validation & Coverage Notes
+
+Research validation code belongs under `quant/research_validation`. It may orchestrate existing factor evaluation, factor backtest, walk-forward, regime, Strategy DSL, and Strategy Gate engines. It must not add factors, change strategy logic, alter no-lookahead semantics, add broker/live trading behavior, or tune parameters.
+
+Use `research-validation --mode quick` for bounded local smoke validation. Use `--mode full` only for deliberate long-running research sessions. The workflow must record partial results, skipped steps, timeouts, slow steps, and runtime seconds.

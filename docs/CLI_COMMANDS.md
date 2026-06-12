@@ -252,9 +252,13 @@ python -m quant.cli research-run
 python -m quant.cli research-status
 python -m quant.cli research-history
 python -m quant.cli research-report
+python -m quant.cli research-validation --mode quick
+python -m quant.cli research-validation --mode full --max-folds 5 --timeout-seconds 3600
 ```
 
 `research-run` automates an offline research workflow and writes `reports/research_run_*.json`. The default `examples/research_scheduler_config.json` is lightweight daily/smoke mode, not full-universe validation. Full research remains available by config: larger universe, multiple factors, data refresh enabled, visualization/export enabled, and longer trade simulation windows. Use `--skip-data-refresh`, `--skip-trade-sim`, `--skip-visualization`, or `--skip-agent-export` for even shorter smoke runs.
+
+`research-validation` runs the v0.39 evidence and coverage sprint. Quick mode is bounded and intended for local smoke/research runs. Full mode can be long-running and should be scheduled deliberately.
 
 ## Strategy Evaluation
 

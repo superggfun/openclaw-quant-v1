@@ -23,6 +23,7 @@ STALE_VERSION_PATTERN = re.compile(r"\b[vV]1\.\d+")
 GENERATED_PATHS = [
     "data/quant.db",
     "reports/example.json",
+    "reports/research_validation_summary.md",
     "reports/agent_summary.md",
     "reports/charts/example.png",
     "examples/portfolio_constructed_targets.json",
@@ -56,6 +57,7 @@ REQUIRED_MODULE_DOCS = {
     "docs/PORTFOLIO_CONSTRUCTION.md",
     "docs/PROTOCOLS.md",
     "docs/REGIME_DETECTION.md",
+    "docs/RESEARCH_VALIDATION.md",
     "docs/SCHEDULER.md",
     "docs/STRATEGY_DSL.md",
     "docs/STRATEGY_GATES.md",

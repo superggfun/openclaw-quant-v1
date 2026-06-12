@@ -6,13 +6,13 @@ This project is research infrastructure only. It is not investment advice, does 
 
 ## Current Version
 
-`v0.37.0-strategy-evaluation-gates`
+`v0.39.0-research-validation-coverage-expansion`
 
-This release adds Strategy Evaluation Gates for deterministic offline quality control around Strategy DSL definitions and strategy-run evidence.
+This release adds a bounded Research Validation Sprint workflow for evidence collection over existing factors, strategies, gates, regimes, and warnings.
 
-No alpha factors, data providers, broker integrations, live trading, order submission, machine learning, quant calculation behavior, or no-lookahead rules are intentionally changed in v0.37.
+No alpha factors, data providers, MCP features, broker integrations, live trading, order submission, machine learning, strategy logic, quant calculation behavior, or no-lookahead rules are intentionally changed in v0.39.
 
-Strategy Gates read existing DSL validation, Factor Store history, walk-forward history, regime diagnostics, and offline trade simulation evidence. They emit `PASS`, `WARNING`, `FAIL`, or `REJECTED` reports for research review only. MCP capability gates still enable only `READ_ONLY` and `OFFLINE_SIMULATION`; paper/live trading capabilities are reserved or forbidden and blocked before execution.
+`research-validation --mode quick` is the bounded local smoke/research workflow. `--mode full` remains available for long-running all-factor/all-strategy validation. MCP capability gates still enable only `READ_ONLY` and `OFFLINE_SIMULATION`; paper/live trading capabilities are reserved or forbidden and blocked before execution.
 
 ## Quick Start
 
@@ -84,6 +84,7 @@ python -m quant.cli strategy-list
 python -m quant.cli strategy-validate
 python -m quant.cli strategy-gate --strategy momentum_fundamental
 python -m quant.cli strategy-run --strategy momentum_fundamental --with-gates
+python -m quant.cli research-validation --mode quick
 ```
 
 See `docs/CLI.md` and `docs/CLI_COMMANDS.md` for the full command reference.
@@ -105,6 +106,7 @@ See `docs/CLI.md` and `docs/CLI_COMMANDS.md` for the full command reference.
 - Local MCP-compatible research interface for OpenClaw-style tool access.
 - Strategy DSL definitions for reproducible research strategy configuration.
 - Strategy Evaluation Gates for offline quality checks before relying on strategy research.
+- Bounded Research Validation Sprint workflow for ranking current evidence and warning frequency.
 - Portfolio construction methods including equal weight, inverse volatility, risk parity, and minimum variance.
 - Simulated portfolio state, rebalance planning, cost estimation, execution simulation, historical trading simulation, and market realism constraints.
 - Unified account/order/fill/position protocol objects for future MCP/OpenClaw integration.

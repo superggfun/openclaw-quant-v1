@@ -139,9 +139,12 @@ python -m quant.cli research-run
 python -m quant.cli research-status
 python -m quant.cli research-history
 python -m quant.cli research-report
+python -m quant.cli research-validation --mode quick
 ```
 
 `research-run` executes the offline daily research pipeline from `examples/research_scheduler_config.json`: coverage checks, factor evaluation, Factor Store update, regime detection, historical trade simulation, visualization, Agent Export, and a compact summary. The default config is lightweight daily/smoke mode, not full-universe validation. Full research remains available by enabling data refresh, expanding symbols, adding factors, and extending the trade simulation window in config. Steps are failure-isolated where possible. This is research automation only; it does not connect to brokers, place orders, or perform live trading.
+
+`research-validation` is the v0.39 bounded evidence and coverage sprint. Use `--mode quick` for local smoke validation and `--mode full` for long-running validation over broader factor and strategy sets. It records partial results, skipped steps, timeouts, slow steps, warning frequencies, and recommendations without changing engine semantics.
 
 ## Strategy DSL
 

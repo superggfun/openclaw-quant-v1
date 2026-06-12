@@ -27,6 +27,7 @@ alias_modules(
         "rebalance": "quant.cli_commands.rebalance",
         "regime": "quant.cli_commands.regime",
         "risk": "quant.cli_commands.risk",
+        "research_validation": "quant.cli_commands.research_validation",
         "scheduler": "quant.cli_commands.scheduler",
         "strategy_gates": "quant.cli_commands.strategy_gates",
         "strategy_eval": "quant.cli_commands.strategy_eval",

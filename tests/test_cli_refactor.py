@@ -36,6 +36,7 @@ EXPECTED_COMMANDS = {
     "regime-history",
     "regime-report",
     "regime-rank",
+    "research-validation",
     "research-run",
     "research-status",
     "research-history",

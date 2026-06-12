@@ -7,6 +7,7 @@ data/quant.db
 data/*.db
 data/*.db-*
 reports/*.json
+reports/*.md
 reports/charts/
 reports/agent_summary.*
 reports/agent_export_*.*
