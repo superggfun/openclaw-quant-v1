@@ -14,15 +14,52 @@ Storage / Data Sources
 SQLite / External APIs
 ```
 
+## Layered Package Layout
+
+`v0.34.0` is phase 1 of the layered namespace refactor. It introduces a clearer package layout before any MCP, API, OpenClaw, LangChain, QuantStats, or PyFolio adapters are implemented.
+
+The new paths are structural boundaries only. They do not change CLI behavior, report schemas, factor calculations, backtest behavior, trading simulation semantics, or no-lookahead guarantees. Existing public import paths remain supported through lightweight compatibility shims for at least one release.
+
+Most implementation files remain in their legacy locations in this phase. Future physical migration can happen gradually once callers have moved to the layered namespaces.
+
+```text
+quant/
+  core/          protocols, validation, warning helpers
+  data/          providers, data layer, fundamental data
+  factors/       price factors, fundamental factors, factor store
+  engines/       alpha, backtest, factor research, portfolio, risk, execution
+  services/      application orchestration services
+  reports/       agent export and visualization
+  interfaces/    CLI plus reserved MCP/API boundaries
+  adapters/      reserved external framework boundaries
+  scheduler/     daily offline research automation
+  utils/         small shared implementation helpers
+```
+
+Compatibility examples:
+
+```python
+from quant.core.protocols.account import AccountState
+from quant.core_protocols.account import AccountState as LegacyAccountState
+
+assert AccountState is LegacyAccountState
+```
+
+The reserved `quant.interfaces.mcp_server`, `quant.interfaces.api`, `quant.adapters.openclaw`, `quant.adapters.langchain`, `quant.adapters.quantstats`, and `quant.adapters.pyfolio` packages are placeholders only. They intentionally do not implement external integrations in v0.34.
+
 ## Components
 
 - `quant.cli`: Main CLI entry point. It builds the top-level parser, creates shared context, and dispatches to command modules.
 - `quant.cli_commands`: Dedicated parser registration and command handlers for data, data layer, scheduler, agent export, visualization, portfolio, rebalance, risk, optimizer, portfolio construction, alpha, factor, strategy evaluation, trading simulation, cost, execution, and backtest commands.
+- `quant.interfaces.cli_commands`: Layered alias for CLI command modules. `quant.cli_commands` remains the implementation path in v0.34.
 - `pyproject.toml`: PEP 621 packaging metadata, optional dependency groups, pytest defaults, and the `openclaw-quant` console entry point.
-- `quant.core_protocols`: JSON-safe account, position, order, fill, trade, signal, recommendation, and portfolio snapshot protocol objects for future MCP/OpenClaw interfaces.
-- `quant.agent_export.agent_exporter`: Converts detailed JSON reports into compact agent-friendly text, Markdown, or JSON summaries.
-- `quant.visualization`: Converts existing JSON reports into PNG, SVG, and HTML visual dashboards.
-- `quant.data_providers`: Defines the `DataProvider` interface, provider registry, yfinance provider, CSV provider, mock provider, and future-provider placeholders.
+- `quant.core.protocols`: Layered protocol namespace. `quant.core_protocols` remains supported.
+- `quant.reports.agent_export`: Layered report export namespace. `quant.agent_export` remains supported.
+- `quant.reports.visualization`: Layered visualization namespace. `quant.visualization` remains supported.
+- `quant.data.providers`: Layered data provider namespace. `quant.data_providers` remains supported.
+- `quant.data.layer`: Layered universe, metadata, coverage, and quality namespace. `quant.data_layer` remains supported.
+- `quant.data.fundamental`: Layered fundamental data namespace. `quant.fundamental_data` remains supported.
+- `quant.engines.*`: Layered aliases for pure engine modules such as alpha, backtest, factor evaluation, factor backtest, multi-factor, regime, portfolio construction, risk, execution, trading simulation, strategy evaluation, and walk-forward.
 - `quant.fundamental_data`: Stores, imports, queries, validates, and reports offline fundamental data.
 - `quant.fundamental_factors`: Computes report-date-aware accounting factors from `fundamental_metrics`.
 - `quant.multi_factor`: Combines price and fundamental factors into normalized, coverage-aware alpha scores.

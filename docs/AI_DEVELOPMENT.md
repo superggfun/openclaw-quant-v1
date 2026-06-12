@@ -4,7 +4,7 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v0.32.0-regime-detection`
+`v0.34.0-architecture-layout`
 
 The project currently includes:
 
@@ -36,6 +36,7 @@ The project currently includes:
 - A visualization layer that turns existing JSON reports into PNG, SVG, and HTML dashboards.
 - CLI commands for price updates, price inspection, account initialization, simulated buys and sells, portfolio snapshots, trade history, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtests, allocation, rebalance plans, cost estimates, optimization, risk, and execution simulation.
 - A modular CLI implementation under `quant/cli_commands/`.
+- A layered package layout under `quant/core`, `quant/data`, `quant/factors`, `quant/engines`, `quant/services`, `quant/reports`, `quant/interfaces`, and `quant/adapters`.
 
 The project intentionally does not include:
 
@@ -82,12 +83,14 @@ The project intentionally does not include:
 
 - `quant/config.py`: project defaults and symbol universe.
 - `quant/data_providers/`: provider interface, registry, yfinance provider, CSV provider, mock provider, and future-provider placeholders.
+- `quant/data/providers/`: preferred layered import path for data providers. `quant/data_providers/` remains compatibility-supported.
 - `quant/fundamental_data/`: fundamental store, importer, service, coverage, and quality checks.
 - `quant/fundamental_factors/`: accounting factor functions and registry extension metadata.
 - `quant/multi_factor/`: factor normalization, weighting, confidence, family contribution, and final alpha score model.
 - `quant/data_source/yfinance_client.py`: legacy yfinance normalization client used by the yfinance provider.
 - `quant/data_layer/`: universe, metadata, data quality, coverage, and readiness modules.
 - `quant/agent_export/agent_exporter.py`: compact report export layer for LLM/agent consumers.
+- `quant/reports/agent_export/`: preferred layered import path for agent export. `quant/agent_export/` remains compatibility-supported.
 - `quant/storage/sqlite_store.py`: price table persistence.
 - `quant/storage/portfolio_store.py`: account, position, and trade persistence.
 - `quant/services/price_service.py`: price update orchestration.
@@ -111,9 +114,12 @@ The project intentionally does not include:
 - `quant/trading_simulation/`: offline historical account-style simulation.
 - `quant/walk_forward/`: offline walk-forward and rolling validation.
 - `quant/visualization/`: report charts and dashboards from existing JSON reports.
+- `quant/reports/visualization/`: preferred layered import path for visualization. `quant/visualization/` remains compatibility-supported.
 - `quant/core_protocols/`: JSON-safe account, order, fill, position, signal, recommendation, trade, and snapshot protocol objects.
+- `quant/core/protocols/`: preferred layered import path for protocol objects. `quant/core_protocols/` remains compatibility-supported.
 - `quant/cli.py`: command line entry point and dispatcher.
 - `quant/cli_commands/`: command-specific parser registration and handlers.
+- `quant/interfaces/cli_commands/`: layered CLI command namespace. `quant/cli_commands/` remains the compatibility import path in v0.34.
 - `pyproject.toml`: packaging metadata, optional dependency groups, pytest defaults, and console script entry point.
 - `.github/workflows/`: CI and project audit workflows.
 - `docs/PACKAGING.md`: install, optional dependency, and CI guidance.
@@ -192,3 +198,17 @@ Short smoke:
 ```bash
 python -m quant.cli research-run --skip-data-refresh --skip-trade-sim
 ```
+
+## v0.34 Architecture Layout Notes
+
+New code should prefer layered imports:
+
+- `quant.core.protocols` for protocol objects.
+- `quant.data.providers`, `quant.data.layer`, and `quant.data.fundamental` for data boundaries.
+- `quant.factors.price`, `quant.factors.fundamental`, and `quant.factors.store` for factor boundaries.
+- `quant.engines.*` for pure quant engines.
+- `quant.reports.agent_export` and `quant.reports.visualization` for report consumers.
+- `quant.interfaces.*` for CLI/API/MCP boundaries.
+- `quant.adapters.*` for optional external framework adapters.
+
+v0.34 is phase 1 of the namespace refactor. Do not remove legacy imports during v0.34 work. Compatibility shims are intentional and should remain until a later release explicitly schedules their removal. Future physical module migration may happen gradually after new callers adopt the layered namespaces. The reserved MCP/API/OpenClaw/LangChain/QuantStats/PyFolio packages are placeholders only; do not add integrations under the architecture-refactor label.

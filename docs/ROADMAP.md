@@ -1,5 +1,12 @@
 # Roadmap
 
+## v0.34.0-architecture-layout
+
+- Adds a layered package layout under `quant/core`, `quant/data`, `quant/factors`, `quant/engines`, `quant/services`, `quant/reports`, `quant/interfaces`, and `quant/adapters`.
+- Keeps legacy import paths working through compatibility shims for at least one release.
+- Adds reserved MCP/API/OpenClaw/LangChain/QuantStats/PyFolio namespaces without implementing those integrations.
+- Structural refactor only: no new factors, data providers, trading logic, report schema changes, CLI behavior changes, or no-lookahead semantic changes.
+
 ## v0.32.0-regime-detection
 
 - Adds `quant/regime_detection` for deterministic market regime classification from stored benchmark prices.

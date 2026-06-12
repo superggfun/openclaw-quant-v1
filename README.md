@@ -6,22 +6,13 @@ This project is research infrastructure only. It is not investment advice, does 
 
 ## Current Version
 
-`v0.33.0-daily-research-scheduler`
+`v0.34.0-architecture-layout`
 
-This release adds an offline Daily Research Scheduler:
+This release is phase 1 of the layered namespace refactor. It adds a clearer package layout for future MCP, API, OpenClaw, LangChain, QuantStats, and PyFolio boundaries without implementing those adapters yet.
 
-- `research-run`
-- `research-status`
-- `research-history`
-- `research-report`
-- failure-isolated pipeline steps
-- daily research summaries
-- scheduler history in SQLite
+No alpha factors, data providers, broker integrations, live trading, machine learning, report schemas, CLI behavior, or no-lookahead rules are intentionally changed in v0.34.
 
-No alpha factors, data providers, broker integrations, live trading, machine learning, or no-lookahead rules are intentionally changed in v0.33.
-The scheduler automates offline research workflows. It is not a broker scheduler, not a live trading system, and not investment advice.
-
-The default scheduler config is lightweight daily/smoke mode. Full research remains available by editing `examples/research_scheduler_config.json` or passing another config with a larger universe, more factors, data refresh enabled, visualization/export enabled, and a longer trade simulation window.
+Existing import paths remain supported through lightweight compatibility shims. New internal code should prefer the layered paths documented below. Future physical module migration may happen gradually after these namespaces have settled.
 
 ## Quick Start
 
@@ -116,23 +107,19 @@ See `docs/CLI.md` and `docs/CLI_COMMANDS.md` for the full command reference.
 CLI -> Services / Engines -> Data Providers / Storage -> SQLite / yfinance / CSV / mock
 ```
 
-Important package areas:
+Layered package areas:
 
-- `quant/cli.py` and `quant/cli_commands/`: public CLI entry point and command modules.
-- `quant/data_providers/`: provider interface, registry, yfinance, CSV, mock, and placeholders.
-- `quant/data_layer/`: universes, metadata, data quality, coverage, readiness.
-- `quant/fundamental_data/`: fundamental import, storage, query, coverage, quality.
-- `quant/factors/` and `quant/fundamental_factors/`: deterministic factor registry and factor functions.
-- `quant/multi_factor/`: formal factor combination, confidence, and contribution model.
-- `quant/alpha/`: signal and target-weight generation.
-- `quant/factor_eval/`, `quant/factor_backtest/`, `quant/walk_forward/`: research validation.
-- `quant/factor_store/`: persistent factor research database and lifecycle analytics.
-- `quant/portfolio_construction/`, `quant/rebalance/`, `quant/cost/`, `quant/execution/`: portfolio and execution simulation layers.
-- `quant/market_realism/`: slippage, ADV liquidity, marketability, and position-size constraints for historical simulation.
-- `quant/trading_simulation/`: account-style historical simulation.
-- `quant/core_protocols/`: JSON-safe account, order, fill, position, signal, recommendation, and snapshot protocols.
+- `quant/core/`: protocols, validation, and shared warning helpers.
+- `quant/data/`: data providers, data quality/universe layer, and fundamental data.
+- `quant/factors/`: price factors, fundamental factors, and factor store access.
+- `quant/engines/`: pure quant/research/simulation engines.
+- `quant/services/`: application orchestration services.
+- `quant/reports/`: agent export and visualization.
+- `quant/interfaces/`: CLI boundary plus reserved MCP/API namespaces.
+- `quant/adapters/`: reserved external framework adapter namespaces.
 - `quant/scheduler/`: failure-isolated daily research pipeline automation.
-- `quant/agent_export/` and `quant/visualization/`: report summarization and visual review.
+
+Legacy paths such as `quant/core_protocols`, `quant/data_providers`, `quant/alpha`, and `quant/agent_export` remain import-compatible for at least this release. MCP/API/adapters are placeholders only; there is no MCP server or external adapter implementation in v0.34.
 
 ## No-Lookahead Contract
 

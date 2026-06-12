@@ -28,6 +28,12 @@ GENERATED_PATHS = [
     "examples/portfolio_constructed_targets.json",
 ]
 ALLOWED_EMPTY_PACKAGES = {
+    Path("quant/adapters/langchain"),
+    Path("quant/adapters/openclaw"),
+    Path("quant/adapters/pyfolio"),
+    Path("quant/adapters/quantstats"),
+    Path("quant/interfaces/api"),
+    Path("quant/interfaces/mcp_server"),
     Path("quant/openclaw"),
     Path("quant/portfolio"),
 }
@@ -119,7 +125,15 @@ def empty_package_dirs(root: Path | None = None) -> list[str]:
         files = [path for path in package_dir.iterdir() if path.is_file()]
         dirs = [path for path in package_dir.iterdir() if path.is_dir() and path.name != "__pycache__"]
         relative = package_dir.relative_to(base)
-        if len(files) == 1 and files[0].name == "__init__.py" and not dirs and relative not in ALLOWED_EMPTY_PACKAGES:
+        init_text = package_init.read_text(encoding="utf-8")
+        has_package_logic = any(token in init_text for token in ("alias_modules", "__all__", "import ", "from "))
+        if (
+            len(files) == 1
+            and files[0].name == "__init__.py"
+            and not dirs
+            and not has_package_logic
+            and relative not in ALLOWED_EMPTY_PACKAGES
+        ):
             empty.append(str(relative).replace("\\", "/"))
     return sorted(empty)
 
