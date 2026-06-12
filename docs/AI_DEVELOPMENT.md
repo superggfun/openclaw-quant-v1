@@ -182,3 +182,13 @@ Factor Store work belongs under `quant/factor_store`. It may persist factor defi
 ## v0.32 Regime Detection Notes
 
 Regime Detection work belongs under `quant/regime_detection`. It may classify stored benchmark price history into deterministic market regimes and persist factor-by-regime diagnostics. It must not add ML, news sentiment, broker integration, live trading, automatic factor disabling, or automatic portfolio changes. Regime diagnostics must preserve signal-date no-lookahead alignment.
+
+## v0.33 Scheduler Notes
+
+Scheduler work belongs under `quant/scheduler`. It may orchestrate existing offline research steps and persist `research_run_history`, but it must not add broker integration, live trading, AI-directed order execution, or new strategy logic. Scheduler steps should be failure-isolated and emit stable warning codes rather than hiding partial failures.
+
+Short smoke:
+
+```bash
+python -m quant.cli research-run --skip-data-refresh --skip-trade-sim
+```

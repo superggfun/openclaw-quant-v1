@@ -152,3 +152,6 @@ Agent Export supports `reports/factor_store_summary_*.json`, `reports/factor_his
 ## Regime Reports
 
 Agent Export supports `reports/regime_detection_*.json`, `reports/regime_history_*.json`, `reports/regime_report_*.json`, and `reports/regime_rank_*.json`. Summaries include current regime, regime confidence, factor-by-regime diagnostics, and next steps such as reviewing momentum exposure or comparing factor stability. These are not trading instructions.
+## Scheduler Reports
+
+Agent Export supports `research_run`, `research_status`, and `research_history` reports. Exports summarize run status, current regime, best and weak factors, trade simulation return, generated artifacts, warnings, and recommended next checks. These summaries are context compaction for LLM agents, not investment advice or autonomous trading instructions.

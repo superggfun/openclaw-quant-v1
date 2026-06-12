@@ -87,3 +87,6 @@ python -m quant.cli export-for-agent --report reports/trade_sim_YYYYMMDD_HHMMSS.
 ## Boundary
 
 Visualization is offline review infrastructure only. It is not investment advice, not a strategy, not a factor, not live trading, and not broker execution.
+## Scheduler Dashboards
+
+`visualize-report` supports `research_run`, `research_status`, and `research_history` reports. Scheduler dashboards can include pipeline status counts, trade simulation metrics, factor ICIR summaries, artifact counts, and run status history. The dashboard is static local HTML with generated chart assets under `reports/charts/`.

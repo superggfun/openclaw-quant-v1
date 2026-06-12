@@ -1,0 +1,13 @@
+{
+  "universe": ["SPY", "QQQ", "NVDA", "AAPL"],
+  "as_of_date": null,
+  "lookback_short": 20,
+  "lookback_long": 60,
+  "top_n": 3,
+  "weighting_mode": "equal_weight",
+  "min_cash_weight": 0.1,
+  "max_position_weight": 0.3,
+  "factor_weights": {
+    "momentum_60d": 1.0
+  }
+}

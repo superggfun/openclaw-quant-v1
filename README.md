@@ -6,18 +6,22 @@ This project is research infrastructure only. It is not investment advice, does 
 
 ## Current Version
 
-`v0.32.0-regime-detection`
+`v0.33.0-daily-research-scheduler`
 
-This release adds deterministic market regime detection and regime-aware factor diagnostics:
+This release adds an offline Daily Research Scheduler:
 
-- current market regime classification
-- persisted regime history
-- factor performance by regime
-- regime-aware factor rankings
-- Agent Export and Visualization support for regime reports
+- `research-run`
+- `research-status`
+- `research-history`
+- `research-report`
+- failure-isolated pipeline steps
+- daily research summaries
+- scheduler history in SQLite
 
-No alpha factors, data providers, broker integrations, live trading, machine learning, or no-lookahead rules are intentionally changed in v0.32.
-Regime detection is heuristic and diagnostic. It is not a market forecast, not a timing signal, and not investment advice.
+No alpha factors, data providers, broker integrations, live trading, machine learning, or no-lookahead rules are intentionally changed in v0.33.
+The scheduler automates offline research workflows. It is not a broker scheduler, not a live trading system, and not investment advice.
+
+The default scheduler config is lightweight daily/smoke mode. Full research remains available by editing `examples/research_scheduler_config.json` or passing another config with a larger universe, more factors, data refresh enabled, visualization/export enabled, and a longer trade simulation window.
 
 ## Quick Start
 
@@ -100,6 +104,7 @@ See `docs/CLI.md` and `docs/CLI_COMMANDS.md` for the full command reference.
 - Factor pipeline, factor evaluation, long-short factor backtest, and walk-forward validation.
 - Persistent factor store for definitions, values, IC history, backtest history, walk-forward folds, stability, coverage, and versions.
 - Deterministic regime detection and factor-by-regime diagnostics.
+- Daily Research Scheduler for offline pipeline automation.
 - Portfolio construction methods including equal weight, inverse volatility, risk parity, and minimum variance.
 - Simulated portfolio state, rebalance planning, cost estimation, execution simulation, historical trading simulation, and market realism constraints.
 - Unified account/order/fill/position protocol objects for future MCP/OpenClaw integration.
@@ -126,6 +131,7 @@ Important package areas:
 - `quant/market_realism/`: slippage, ADV liquidity, marketability, and position-size constraints for historical simulation.
 - `quant/trading_simulation/`: account-style historical simulation.
 - `quant/core_protocols/`: JSON-safe account, order, fill, position, signal, recommendation, and snapshot protocols.
+- `quant/scheduler/`: failure-isolated daily research pipeline automation.
 - `quant/agent_export/` and `quant/visualization/`: report summarization and visual review.
 
 ## No-Lookahead Contract
@@ -176,6 +182,7 @@ Generated local artifacts are intentionally ignored:
 - `docs/FACTOR_LIBRARY.md`
 - `docs/FACTOR_STORE.md`
 - `docs/REGIME_DETECTION.md`
+- `docs/SCHEDULER.md`
 - `docs/FACTOR_PIPELINE.md`
 - `docs/FACTOR_EVALUATION.md`
 - `docs/FACTOR_BACKTEST.md`
@@ -202,6 +209,7 @@ python tools/project_audit.py
 python -m quant.cli provider-list
 python -m quant.cli factor-list
 python -m quant.cli trade-sim --help
+python -m quant.cli research-run --skip-data-refresh --skip-trade-sim
 ```
 
 ## Contributing

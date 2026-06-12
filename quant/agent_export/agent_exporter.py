@@ -120,6 +120,9 @@ class AgentExporter:
             "regime_history",
             "regime_report",
             "regime_rank",
+            "research_run",
+            "research_status",
+            "research_history",
         }:
             return report_type
         if {"strategy", "folds", "stability_analysis", "summary"}.issubset(report):
@@ -826,6 +829,69 @@ class AgentExporter:
             ["review momentum exposure", "compare factor stability across regimes", "increase factor regime history"],
             [],
             ["regime rankings are diagnostics only, not forecasts, timing signals, or investment advice"],
+        )
+
+    def _export_research_run(self, report: dict[str, Any], generated_from: str) -> AgentExport:
+        summary = report.get("daily_research_summary") or {}
+        trade = summary.get("trade_sim_summary") or {}
+        metrics = {
+            "run_id": report.get("run_id"),
+            "status": report.get("status"),
+            "current_regime": summary.get("current_regime"),
+            "best_factors": summary.get("best_factors"),
+            "weak_factors": summary.get("weak_factors"),
+            "trade_sim_return": trade.get("total_return"),
+            "trade_sim_final_equity": trade.get("final_equity"),
+            "trade_sim_max_drawdown": trade.get("max_drawdown"),
+            "generated_reports": len(report.get("generated_reports") or []),
+            "generated_visualizations": len(report.get("generated_visualizations") or []),
+        }
+        findings = []
+        if summary.get("current_regime"):
+            findings.append(f"current regime: {summary['current_regime']}")
+        if summary.get("best_factors"):
+            findings.append(f"top factor: {summary['best_factors'][0]}")
+        if trade.get("total_return") is not None:
+            findings.append(f"trade simulation return: {trade['total_return']}")
+        warnings = self._clean_warnings(report.get("warnings"))
+        return self._base_export(
+            "research_run",
+            generated_from,
+            "Daily research pipeline completed as an offline diagnostics workflow.",
+            metrics,
+            findings,
+            warnings,
+            report.get("recommended_next_checks") or ["review generated artifacts", "inspect warnings"],
+            [],
+            ["scheduler output is research automation, not investment advice or live trading"],
+        )
+
+    def _export_research_status(self, report: dict[str, Any], generated_from: str) -> AgentExport:
+        latest = report.get("latest_run") or {}
+        return self._base_export(
+            "research_status",
+            generated_from,
+            f"Latest research scheduler status is {report.get('status', 'NO_RUNS')}.",
+            {"status": report.get("status"), "latest_run_id": latest.get("run_id"), "latest_regime": latest.get("regime")},
+            [],
+            self._clean_warnings(latest.get("warnings")),
+            ["run research-run", "review research-history"],
+            [],
+            ["research status is operational metadata only"],
+        )
+
+    def _export_research_history(self, report: dict[str, Any], generated_from: str) -> AgentExport:
+        runs = report.get("runs") or []
+        return self._base_export(
+            "research_history",
+            generated_from,
+            "Research scheduler history summarized.",
+            {"run_count": len(runs), "status_counts": (report.get("summary") or {}).get("status_counts")},
+            [f"latest run: {runs[0].get('run_id')}" if runs else "no scheduler runs found"],
+            [],
+            ["review repeated failures", "compare daily regime and factor summaries"],
+            [],
+            ["research history is offline workflow telemetry"],
         )
 
     def _base_export(

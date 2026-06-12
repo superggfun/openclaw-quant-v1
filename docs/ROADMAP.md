@@ -348,3 +348,19 @@ Strategy Evaluation / Performance Attribution is not implemented in v0.13. It is
 - Integrates Alpha Engine, Portfolio Construction, Cost Engine, and account state in one historical loop.
 - Adds `reports/trade_sim_*.json` and Agent Export support for trade simulation reports.
 - Offline simulation only: no broker API, no live execution, no high-frequency trading, and no change to existing backtest semantics.
+
+## v0.32.0-regime-detection
+
+- Adds deterministic heuristic regime detection for bull, bear, high-volatility, low-volatility, trending, range-bound, crisis, recovery, and unknown regimes.
+- Persists regime history and factor-by-regime diagnostics.
+- Adds `detect-regime`, `regime-history`, `regime-report`, and `regime-rank`.
+- Regime detection is observational research infrastructure, not a forecast or market timing signal.
+
+## v0.33.0-daily-research-scheduler
+
+- Adds `quant/scheduler` for daily offline research automation.
+- Adds `research-run`, `research-status`, `research-history`, and `research-report`.
+- Runs data refresh, coverage checks, factor evaluation, Factor Store update, regime detection, historical trade simulation, visualization, Agent Export, and research summary generation.
+- Adds scheduler history table `research_run_history`.
+- Failure isolation keeps later steps running when possible and records step warnings.
+- Automation layer only: no broker integration, no live trading, no news sentiment, and no machine learning.

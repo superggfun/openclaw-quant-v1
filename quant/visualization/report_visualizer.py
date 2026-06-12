@@ -31,6 +31,9 @@ SUPPORTED_REPORT_TYPES = {
     "regime_history",
     "regime_report",
     "regime_rank",
+    "research_run",
+    "research_status",
+    "research_history",
 }
 
 EXPECTED_CHARTS_BY_REPORT_TYPE = {
@@ -52,6 +55,9 @@ EXPECTED_CHARTS_BY_REPORT_TYPE = {
     "regime_history": {"regime_timeline", "regime_frequency", "regime_confidence"},
     "regime_report": {"regime_frequency", "factor_performance_by_regime"},
     "regime_rank": {"factor_performance_by_regime", "regime_stability"},
+    "research_run": {"pipeline_status", "trade_simulation", "factor_summary", "artifact_counts"},
+    "research_status": {"latest_run"},
+    "research_history": {"run_status"},
 }
 
 
@@ -342,6 +348,50 @@ class ReportVisualizer:
             builder.bar_chart(prefix, "regime_stability", "Regime Stability", self._items_to_mapping(report.get("most_stable_across_regimes"), "factor_name", "stability")),
         )
 
+    def _charts_research_run(self, builder: ChartBuilder, prefix: str, report: dict[str, Any]) -> list[ChartArtifact]:
+        summary = report.get("daily_research_summary") or {}
+        trade = summary.get("trade_sim_summary") or {}
+        factor_stability = summary.get("factor_stability_summary") or {}
+        factor_scores = {
+            factor: values.get("icir")
+            for factor, values in factor_stability.items()
+            if isinstance(values, dict)
+        }
+        artifact_counts = {
+            "reports": len(report.get("generated_reports") or []),
+            "visualizations": len(report.get("generated_visualizations") or []),
+            "agent_exports": len(report.get("agent_exports") or []),
+        }
+        statuses = {}
+        for step in report.get("pipeline_steps") or []:
+            status = str(step.get("status") or "UNKNOWN")
+            statuses[status] = statuses.get(status, 0) + 1
+        return self._keep(
+            builder.bar_chart(prefix, "pipeline_status", "Pipeline Step Status", statuses),
+            builder.bar_chart(
+                prefix,
+                "trade_simulation",
+                "Trade Simulation Metrics",
+                {
+                    "return": trade.get("total_return"),
+                    "drawdown": trade.get("max_drawdown"),
+                    "cost": trade.get("total_cost"),
+                },
+            ),
+            builder.bar_chart(prefix, "factor_summary", "Factor ICIR Summary", factor_scores),
+            builder.bar_chart(prefix, "artifact_counts", "Generated Artifact Counts", artifact_counts),
+        )
+
+    def _charts_research_status(self, builder: ChartBuilder, prefix: str, report: dict[str, Any]) -> list[ChartArtifact]:
+        latest = report.get("latest_run") or {}
+        return self._keep(
+            builder.bar_chart(prefix, "latest_run", "Latest Run", {"duration": latest.get("duration"), "trade_return": latest.get("trade_sim_return")}),
+        )
+
+    def _charts_research_history(self, builder: ChartBuilder, prefix: str, report: dict[str, Any]) -> list[ChartArtifact]:
+        counts = (report.get("summary") or {}).get("status_counts") or {}
+        return self._keep(builder.bar_chart(prefix, "run_status", "Run Status Counts", counts))
+
     @staticmethod
     def _series(items: Any, label_key: str, value_key: str) -> list[tuple[str, float]]:
         output = []
@@ -598,6 +648,20 @@ class ReportVisualizer:
                 "confidence": current.get("confidence"),
                 "regime_count": len(report.get("regime_counts") or {}),
             }
+        if report_type == "research_run":
+            summary = report.get("daily_research_summary") or {}
+            trade = summary.get("trade_sim_summary") or {}
+            return {
+                "status": report.get("status"),
+                "current_regime": summary.get("current_regime"),
+                "trade_sim_return": trade.get("total_return"),
+                "generated_reports": len(report.get("generated_reports") or []),
+            }
+        if report_type == "research_status":
+            latest = report.get("latest_run") or {}
+            return {"status": report.get("status"), "latest_run": latest.get("run_id")}
+        if report_type == "research_history":
+            return (report.get("summary") or {}).get("status_counts") or {}
         return {key: report.get(key) for key in keys if key in report}
 
     @staticmethod

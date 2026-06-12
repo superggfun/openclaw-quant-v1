@@ -245,7 +245,13 @@ class RegimeAnalytics:
 
     @staticmethod
     def _corr(left: pd.Series, right: pd.Series, method: str) -> float | None:
-        value = left.corr(right, method=method)
+        left_values = pd.to_numeric(left, errors="coerce")
+        right_values = pd.to_numeric(right, errors="coerce")
+        if method == "spearman":
+            left_values = left_values.rank(method="average")
+            right_values = right_values.rank(method="average")
+            method = "pearson"
+        value = left_values.corr(right_values, method=method)
         try:
             number = float(value)
             return number if math.isfinite(number) else None

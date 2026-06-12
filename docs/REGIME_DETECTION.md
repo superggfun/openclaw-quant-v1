@@ -123,3 +123,6 @@ Visualization supports:
 ## Boundary
 
 Regime Detection is diagnostic only. It does not disable factors, change alpha weights automatically, modify portfolio targets, place trades, or provide investment advice.
+## Scheduler Integration
+
+`research-run` can call regime detection as one step in the daily offline research pipeline. The generated scheduler summary includes the current regime and any low-sample regime warnings. This remains diagnostic only and does not automatically disable factors, alter target weights, or time the market.

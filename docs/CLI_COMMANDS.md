@@ -234,6 +234,17 @@ python -m quant.cli factor-backtest --factor momentum_20d --save-regime-history
 
 Regime Detection reads stored daily benchmark prices and writes deterministic market-state diagnostics. `detect-regime` persists `regime_history`, `regime-report` summarizes current regime and factor-by-regime history, and `regime-rank` ranks persisted factor diagnostics by regime. The layer is diagnostic only and does not disable factors, alter alpha weights, or execute trades.
 
+## Daily Research Scheduler
+
+```bash
+python -m quant.cli research-run
+python -m quant.cli research-status
+python -m quant.cli research-history
+python -m quant.cli research-report
+```
+
+`research-run` automates an offline research workflow and writes `reports/research_run_*.json`. The default `examples/research_scheduler_config.json` is lightweight daily/smoke mode, not full-universe validation. Full research remains available by config: larger universe, multiple factors, data refresh enabled, visualization/export enabled, and longer trade simulation windows. Use `--skip-data-refresh`, `--skip-trade-sim`, `--skip-visualization`, or `--skip-agent-export` for even shorter smoke runs.
+
 ## Strategy Evaluation
 
 ```bash

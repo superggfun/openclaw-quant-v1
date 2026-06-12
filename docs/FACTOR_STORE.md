@@ -147,3 +147,6 @@ Visualization supports:
 ## Boundary
 
 Factor Store is for reproducibility and lifecycle management. It does not change factor evaluation, factor backtest, walk-forward, alpha generation, or trading simulation behavior unless a CLI command explicitly uses `--save-factor-history`.
+## Scheduler Integration
+
+The Daily Research Scheduler can run factor evaluation and persist results through Factor Store during `research-run`. The scheduler does not change Factor Store semantics: factor values remain keyed by factor, symbol, signal date, and version, and no-lookahead rules remain owned by the factor engines.

@@ -17,7 +17,7 @@ SQLite / External APIs
 ## Components
 
 - `quant.cli`: Main CLI entry point. It builds the top-level parser, creates shared context, and dispatches to command modules.
-- `quant.cli_commands`: Dedicated parser registration and command handlers for data, data layer, agent export, visualization, portfolio, rebalance, risk, optimizer, portfolio construction, alpha, factor, strategy evaluation, trading simulation, cost, execution, and backtest commands.
+- `quant.cli_commands`: Dedicated parser registration and command handlers for data, data layer, scheduler, agent export, visualization, portfolio, rebalance, risk, optimizer, portfolio construction, alpha, factor, strategy evaluation, trading simulation, cost, execution, and backtest commands.
 - `pyproject.toml`: PEP 621 packaging metadata, optional dependency groups, pytest defaults, and the `openclaw-quant` console entry point.
 - `quant.core_protocols`: JSON-safe account, position, order, fill, trade, signal, recommendation, and portfolio snapshot protocol objects for future MCP/OpenClaw interfaces.
 - `quant.agent_export.agent_exporter`: Converts detailed JSON reports into compact agent-friendly text, Markdown, or JSON summaries.
@@ -38,6 +38,7 @@ SQLite / External APIs
 - `quant.factor_pipeline.factor_pipeline`: Preprocesses same-date factor cross-sections before alpha generation or evaluation.
 - `quant.factor_eval.factor_evaluation`: Evaluates factor predictive quality with no-lookahead IC, Rank IC, quintile, and decay metrics.
 - `quant.regime_detection`: Classifies deterministic market regimes, persists regime history, and summarizes factor performance by regime.
+- `quant.scheduler`: Orchestrates daily offline research pipeline runs and persists scheduler history.
 - `quant.strategy_eval.strategy_evaluation`: Explains returns, risk, drawdowns, rolling metrics, and attribution from generated reports.
 - `quant.trading_simulation`: Runs offline account-style historical simulations with in-memory cash, positions, trades, costs, and equity curves.
 - `quant.market_realism`: Applies deterministic slippage, ADV liquidity, marketability, and position-size constraints to simulated execution.
@@ -114,6 +115,14 @@ factor-eval/factor-backtest --save-regime-history -> RegimeAnalytics -> factor_r
 ```
 
 The regime layer is diagnostic only. It does not disable factors, adjust target weights automatically, or execute trades.
+
+Scheduler flow:
+
+```text
+research-run -> Data Refresh / Coverage -> Factor Evaluation -> Factor Store -> Regime Detection -> Trade Simulation -> Visualization -> Agent Export -> research_run report
+```
+
+The scheduler is an orchestration layer over existing engines. It does not introduce new quant calculations, modify existing report schemas, connect to brokers, or place orders.
 
 Agent export flow:
 

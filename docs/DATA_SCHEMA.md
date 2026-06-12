@@ -834,3 +834,18 @@ Generated files include:
 - `*_summary.html`
 
 The source JSON report is not modified. Agent Export may include chart paths in `visualization_paths` when matching chart files exist.
+## research_run_history
+
+Scheduler history table for offline daily research automation.
+
+- `run_id`
+- `timestamp`
+- `status`
+- `duration`
+- `warnings`
+- `factor_count`
+- `regime`
+- `trade_sim_return`
+- `generated_reports`
+
+Generated `reports/research_run_*.json` files remain ignored. The table stores compact operational history only.

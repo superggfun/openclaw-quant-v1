@@ -49,6 +49,7 @@ REQUIRED_MODULE_DOCS = {
     "docs/PORTFOLIO_CONSTRUCTION.md",
     "docs/PROTOCOLS.md",
     "docs/REGIME_DETECTION.md",
+    "docs/SCHEDULER.md",
     "docs/STRATEGY_EVALUATION.md",
     "docs/TRADING_SIMULATION.md",
     "docs/VISUALIZATION.md",
