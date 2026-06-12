@@ -30,6 +30,7 @@ Report type is auto-detected from schema keys:
 - `portfolio_construction`
 - `walk_forward`
 - `risk`
+- `multi_factor`
 
 ## Outputs
 
@@ -59,6 +60,8 @@ The summary dashboard includes:
 - warnings
 - interpretation notes
 - chart images
+
+Multi-factor reports generate charts for family contribution, factor contribution, confidence, and stability ranking.
 
 ## Agent Export
 

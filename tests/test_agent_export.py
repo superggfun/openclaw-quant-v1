@@ -86,6 +86,26 @@ def test_factor_eval_export_includes_fundamental_coverage() -> None:
     assert "WARN_PARTIAL_FUNDAMENTAL_DATA" in export["warnings"]
 
 
+def test_multi_factor_export() -> None:
+    report = {
+        "metadata": {"report_type": "multi_factor"},
+        "as_of_date": "2024-04-01",
+        "factor_families": {"momentum_60d": "PRICE", "fundamental_quality_score": "QUALITY"},
+        "factor_weights": {"momentum_60d": 0.4, "fundamental_quality_score": 0.6},
+        "family_weights": {"PRICE": 0.4, "QUALITY": 0.6},
+        "coverage": {"momentum_60d": 1.0, "fundamental_quality_score": 0.5},
+        "confidence": {"overall_confidence": 0.65},
+        "scores": [{"symbol": "AAPL", "final_alpha_score": 0.8, "overall_confidence": 0.7}],
+    }
+
+    export = AgentExporter().export_report(report).to_dict()
+
+    assert export["report_type"] == "multi_factor"
+    assert export["key_metrics"]["overall_confidence"] == 0.65
+    assert export["key_metrics"]["top_symbols"][0]["symbol"] == "AAPL"
+    assert "WARN_LOW_FACTOR_COVERAGE" in export["warnings"]
+
+
 def test_factor_backtest_export() -> None:
     report = {
         "factor": "momentum_20d",

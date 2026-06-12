@@ -513,7 +513,29 @@ Alpha factor rows may include:
 
 - `factor_values`: raw registered factor values by symbol.
 - `factor_contributions`: weighted normalized factor contributions when composite alpha is enabled.
+- `family_contributions`: weighted factor-family contributions when the v0.27 multi-factor model is enabled.
+- `factor_confidence`: per-factor confidence adjusted by coverage and stability.
+- `overall_confidence`: symbol-level confidence score.
 - `composite_alpha_score`: final blended score used for ranking when `factor_weights` are configured.
+
+## reports/multi_factor_*.json
+
+Multi-factor model reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `metadata.report_type`: `multi_factor`.
+- `as_of_date`: signal date used for all factor values.
+- `factors`: factor list included in the model.
+- `factor_families`: factor-to-family mapping.
+- `factor_weights`: normalized factor weights.
+- `factor_weights_by_family`: factor weights normalized within each active family.
+- `family_weights`: normalized family weights.
+- `coverage`: finite value coverage by factor.
+- `confidence`: factor and overall confidence.
+- `stability`: factor stability score and classification.
+- `scores`: per-symbol factor scores, family scores, contributions, final alpha, and confidence.
+- `warnings`: deterministic diagnostics such as low factor coverage.
 
 ## reports/walk_forward_*.json
 

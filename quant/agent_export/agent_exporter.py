@@ -92,6 +92,8 @@ class AgentExporter:
             return "factor_backtest"
         if "factor" in report and ("forward_days" in report or "ic_mean" in report) and "decay" in report:
             return "factor_eval"
+        if (report.get("metadata") or {}).get("report_type") == "multi_factor" or {"factor_families", "family_weights", "confidence", "scores"}.issubset(report):
+            return "multi_factor"
         if "method" in report and "risk_contribution_pct" in report and "covariance_matrix" in report:
             return "portfolio_construction"
         if "selected_symbols" in report and "target_weights" in report:
@@ -134,6 +136,8 @@ class AgentExporter:
             "target_weights": self._round_mapping(weights),
             "cash_weight": weights.get("cash"),
             "weighting_mode": (report.get("config") or {}).get("weighting_mode"),
+            "multi_factor_confidence": ((report.get("multi_factor_summary") or {}).get("confidence") or {}).get("overall_confidence"),
+            "multi_factor_report_path": report.get("multi_factor_report_path"),
         }
         return self._base_export(
             "alpha",
@@ -145,6 +149,48 @@ class AgentExporter:
             ["run factor evaluation", "run rebalance with costs", "expand universe"],
             [f"target {symbol} {self._format_pct(weight)}" for symbol, weight in weights.items()],
             self._exclusion_notes(report),
+        )
+
+    def _export_multi_factor(self, report: dict[str, Any], generated_from: str) -> AgentExport:
+        scores = report.get("scores") or []
+        top_scores = sorted(
+            [score for score in scores if isinstance(score, dict) and self._num(score.get("final_alpha_score")) is not None],
+            key=lambda item: (float(item.get("final_alpha_score") or 0.0), str(item.get("symbol"))),
+            reverse=True,
+        )[:5]
+        confidence = report.get("confidence") or {}
+        coverage = report.get("coverage") or {}
+        warnings = self._clean_warnings(report.get("warnings"))
+        low_coverage = {
+            factor: value
+            for factor, value in coverage.items()
+            if self._num(value) is not None and float(value) < 0.8
+        }
+        if low_coverage:
+            warnings.append("WARN_LOW_FACTOR_COVERAGE")
+        metrics = {
+            "as_of_date": report.get("as_of_date"),
+            "weighting_mode": report.get("weighting_mode"),
+            "overall_confidence": confidence.get("overall_confidence"),
+            "factor_weights": report.get("factor_weights"),
+            "factor_weights_by_family": report.get("factor_weights_by_family"),
+            "family_weights": report.get("family_weights"),
+            "coverage": coverage,
+            "top_symbols": [
+                {"symbol": item.get("symbol"), "score": item.get("final_alpha_score"), "confidence": item.get("overall_confidence")}
+                for item in top_scores
+            ],
+        }
+        return self._base_export(
+            "multi_factor",
+            generated_from,
+            "Multi-factor model produced a unified coverage-aware alpha score.",
+            metrics,
+            ["unified alpha score generated", "coverage-aware confidence generated"],
+            warnings,
+            ["review low-coverage factors", "run walk-forward validation", "compare family contributions"],
+            [f"inspect {item.get('symbol')} factor contributions" for item in top_scores],
+            [f"{factor}: coverage {float(value):.2%}" for factor, value in low_coverage.items()],
         )
 
     def _export_factor_eval(self, report: dict[str, Any], generated_from: str) -> AgentExport:

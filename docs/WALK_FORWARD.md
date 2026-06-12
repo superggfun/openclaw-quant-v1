@@ -64,6 +64,10 @@ For `factor_long_short`, returns are research spread returns. They may use overl
 
 `alpha` walk-forward uses the existing no-lookahead portfolio backtest path: signals are generated on `signal_date` with signal-date-and-earlier data, then executed on the next available trading day.
 
+The v0.27 multi-factor model can be used by `alpha` inside walk-forward runs. Stability-weighted alpha may use configured stability priors and coverage-aware confidence, but walk-forward validation itself still uses the existing no-lookahead signal/execution path.
+
+Full alpha walk-forward validation keeps the existing default fold behavior. Multi-factor alpha with fundamental factors can be more expensive than price-only alpha, so smoke checks may pass `--max-folds 1` or `--max-folds 2` explicitly without changing defaults.
+
 ## Factor Stability
 
 The report evaluates registered factors across folds and classifies them as `stable`, `moderate`, `unstable`, or `insufficient_data`.

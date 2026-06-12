@@ -37,11 +37,14 @@ Supported report types:
 - `execution`
 - `backtest`
 - `trade_sim`
+- `multi_factor`
 - `fundamental_import`
 - `fundamental_coverage`
 - `fundamental_quality`
 
 Factor evaluation and factor backtest exports include `factor_coverage` when source reports evaluate fundamental factors. Agent summaries do not recompute the factors; they only compact existing report fields such as coverage percentage, missing percentage, metrics used, and warnings.
+
+Multi-factor exports summarize top symbols, factor/family weights, coverage, confidence, warnings, and recommended validation checks. They do not embed chart bytes and do not make allocation decisions.
 
 ## Common Output Schema
 

@@ -72,3 +72,9 @@ python -m quant.cli walk-forward --strategy alpha --max-folds 1
 Full alpha walk-forward validation keeps the existing default fold behavior. Fundamental composite alpha can be more expensive than price-only alpha, so smoke checks should pass `--max-folds 1` or `--max-folds 2` explicitly.
 
 `factor-list` marks these factors with `fundamental_data_required=true`.
+
+## Multi-Factor Integration
+
+`v0.27.0` can blend these accounting factors with price factors through `quant/multi_factor`. The multi-factor model still uses the same report-date-aware lookup and does not treat missing fundamentals as true zero signals. Low fundamental coverage reduces confidence and can emit `LOW_FACTOR_COVERAGE`.
+
+Low coverage should be read as a reliability warning. It does not invalidate the report, but it weakens confidence in the factor blend until more symbols have report-date-available fundamental metrics.

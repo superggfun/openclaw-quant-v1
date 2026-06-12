@@ -23,6 +23,7 @@ SUPPORTED_REPORT_TYPES = {
     "risk",
     "fundamental_coverage",
     "fundamental_quality",
+    "multi_factor",
 }
 
 EXPECTED_CHARTS_BY_REPORT_TYPE = {
@@ -36,6 +37,7 @@ EXPECTED_CHARTS_BY_REPORT_TYPE = {
     "risk": {"risk_summary", "top_holdings"},
     "fundamental_coverage": {"statement_coverage"},
     "fundamental_quality": {"warnings_by_reason"},
+    "multi_factor": {"family_contribution", "factor_contribution", "confidence", "stability_ranking"},
 }
 
 
@@ -242,6 +244,31 @@ class ReportVisualizer:
             builder.bar_chart(prefix, "warnings_by_reason", "Warnings By Reason", self._warning_counts(report.get("warnings") or [])),
         )
 
+    def _charts_multi_factor(self, builder: ChartBuilder, prefix: str, report: dict[str, Any]) -> list[ChartArtifact]:
+        scores = [item for item in (report.get("scores") or []) if isinstance(item, dict)]
+        top = sorted(
+            scores,
+            key=lambda item: (float(item.get("final_alpha_score") or -999), str(item.get("symbol"))),
+            reverse=True,
+        )[:5]
+        family_contribution = self._average_nested(top, "family_contributions")
+        factor_contribution = self._average_nested(top, "factor_contributions")
+        confidence = {
+            item.get("symbol", f"symbol_{index + 1}"): item.get("overall_confidence")
+            for index, item in enumerate(top)
+        }
+        stability = {
+            factor: values.get("score")
+            for factor, values in (report.get("stability") or {}).items()
+            if isinstance(values, dict)
+        }
+        return self._keep(
+            builder.bar_chart(prefix, "family_contribution", "Family Contribution", family_contribution),
+            builder.bar_chart(prefix, "factor_contribution", "Factor Contribution", factor_contribution),
+            builder.bar_chart(prefix, "confidence", "Confidence", confidence),
+            builder.bar_chart(prefix, "stability_ranking", "Stability Ranking", stability),
+        )
+
     @staticmethod
     def _series(items: Any, label_key: str, value_key: str) -> list[tuple[str, float]]:
         output = []
@@ -254,6 +281,24 @@ class ReportVisualizer:
             if ReportVisualizer._finite(value):
                 output.append((str(item.get(label_key, len(output) + 1)), float(value)))
         return output
+
+    @staticmethod
+    def _average_nested(items: list[dict[str, Any]], key: str) -> dict[str, float]:
+        totals: dict[str, float] = {}
+        counts: dict[str, int] = {}
+        for item in items:
+            values = item.get(key) or {}
+            if not isinstance(values, dict):
+                continue
+            for label, value in values.items():
+                if ReportVisualizer._finite(value):
+                    totals[str(label)] = totals.get(str(label), 0.0) + float(value)
+                    counts[str(label)] = counts.get(str(label), 0) + 1
+        return {
+            label: totals[label] / counts[label]
+            for label in sorted(totals)
+            if counts.get(label)
+        }
 
     @staticmethod
     def _drawdown(points: list[tuple[str, float]]) -> list[tuple[str, float]]:
@@ -385,6 +430,14 @@ class ReportVisualizer:
         keys = ("strategy", "portfolio_method", "final_equity", "total_return", "max_drawdown", "total_cost", "trade_count", "risk_score", "factor", "ic_mean", "rank_ic_mean", "icir", "method")
         if report_type in {"fundamental_coverage", "fundamental_quality"}:
             return report.get("summary") or {}
+        if report_type == "multi_factor":
+            confidence = report.get("confidence") or {}
+            return {
+                "as_of_date": report.get("as_of_date"),
+                "weighting_mode": report.get("weighting_mode"),
+                "overall_confidence": confidence.get("overall_confidence"),
+                "factor_count": len(report.get("factors") or []),
+            }
         return {key: report.get(key) for key in keys if key in report}
 
     @staticmethod

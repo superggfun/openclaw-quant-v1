@@ -36,10 +36,17 @@ def handle(args, context) -> int:
     print(f"lookback_used: {json.dumps(result.lookback_used, sort_keys=True)}")
     print(f"suggested_execution_date: {result.suggested_execution_date or 'next_available_session'}")
     print(f"weighting_mode: {result.config['weighting_mode']}")
+    if result.config.get("target_weighting_mode") and result.config["target_weighting_mode"] != result.config["weighting_mode"]:
+        print(f"target_weighting_mode: {result.config['target_weighting_mode']}")
+    if result.multi_factor_summary:
+        confidence = result.multi_factor_summary.get("confidence") or {}
+        print("multi_factor:")
+        print(f"weighting_mode: {result.multi_factor_summary.get('weighting_mode')}")
+        print(f"overall_confidence: {format_optional_number(confidence.get('overall_confidence'))}")
     print("factors:")
     print(
         "symbol rank selected excluded momentum_20d momentum_60d volatility_20d "
-        "risk_adjusted_momentum composite_alpha_score factor_contributions"
+        "risk_adjusted_momentum composite_alpha_score overall_confidence family_contributions factor_contributions"
     )
     for row in result.factors:
         print(
@@ -51,6 +58,8 @@ def handle(args, context) -> int:
             f"{format_optional_number(row.volatility_20d):>14} "
             f"{format_optional_number(row.risk_adjusted_momentum):>23} "
             f"{format_optional_number(row.composite_alpha_score):>21} "
+            f"{format_optional_number(row.overall_confidence):>18} "
+            f"{json.dumps(row.family_contributions or {}, sort_keys=True)} "
             f"{json.dumps(row.factor_contributions or {}, sort_keys=True)}"
         )
     if result.excluded_symbols:
@@ -67,6 +76,8 @@ def handle(args, context) -> int:
         print(f"warning: {warning}", file=sys.stderr)
     if result.pipeline_report_path:
         print(f"pipeline_report: {result.pipeline_report_path}")
+    if result.multi_factor_report_path:
+        print(f"multi_factor_report: {result.multi_factor_report_path}")
     if result.targets_path:
         print(f"targets: {result.targets_path}")
     print(f"report: {result.report_path}")

@@ -69,6 +69,10 @@ The project intentionally does not include:
 - AkShare, Tushare, A-share data, real-time market data, Alpha Vantage, and Polygon are future provider additions unless explicitly implemented in a later release.
 - Agent export features must remain read-only and export-only. Do not change source report schemas, quant logic, factor evaluation, backtest behavior, portfolio state, or execution behavior.
 - Fundamental data features must remain storage/import/query/quality only until a later explicit factor-scoring release. Do not change existing price-only factor semantics.
+- Fundamental factors must use `report_date <= signal_date`; never use `fiscal_period_end` alone for tradable availability.
+- Multi-factor work should stay inside `quant/multi_factor` or Alpha integration. Do not add ML, news sentiment, broker APIs, or live execution under the multi-factor label.
+- Multi-factor confidence is coverage-aware. Missing fundamentals should lower confidence or produce warnings, not be silently treated as true zero signals.
+- Multi-factor confidence is diagnostic only. Do not present it as expected return, investment advice, or a guarantee.
 
 ## Important Files
 
@@ -76,6 +80,7 @@ The project intentionally does not include:
 - `quant/data_providers/`: provider interface, registry, yfinance provider, CSV provider, mock provider, and future-provider placeholders.
 - `quant/fundamental_data/`: fundamental store, importer, service, coverage, and quality checks.
 - `quant/fundamental_factors/`: accounting factor functions and registry extension metadata.
+- `quant/multi_factor/`: factor normalization, weighting, confidence, family contribution, and final alpha score model.
 - `quant/data_source/yfinance_client.py`: legacy yfinance normalization client used by the yfinance provider.
 - `quant/data_layer/`: universe, metadata, data quality, coverage, and readiness modules.
 - `quant/agent_export/agent_exporter.py`: compact report export layer for LLM/agent consumers.
@@ -146,3 +151,7 @@ Fundamental data code belongs under `quant/fundamental_data`. Store `report_date
 ## v0.26 Fundamental Factor Notes
 
 Fundamental factor code belongs under `quant/fundamental_factors` and must be registered through `quant/factors/factor_registry.py`. Every fundamental factor must enforce `report_date <= signal_date`; `fiscal_period_end` alone is not enough. Missing metrics must be skipped or excluded, never filled with fake zero values.
+
+## v0.27 Multi-Factor Notes
+
+Multi-factor code belongs under `quant/multi_factor`. It may combine registered price and fundamental factors, but it must not introduce new factors, ML models, broker integration, or live trading. Preserve the existing Alpha, FactorEval, FactorBacktest, WalkForward, and TradingSimulation no-lookahead contracts.

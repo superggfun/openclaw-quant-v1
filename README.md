@@ -6,7 +6,7 @@ This project is for research and simulation only. It is not investment advice.
 
 ## Current Version
 
-`v0.26.0-fundamental-factors`
+`v0.27.0-multi-factor-model`
 
 This release includes:
 
@@ -15,6 +15,7 @@ This release includes:
 - yfinance daily OHLCV ingestion through the provider interface.
 - Fundamental data storage, CSV import, query, coverage, and quality diagnostics.
 - Accounting-based fundamental factors using PE, PB, EV/EBITDA, ROE, ROA, margins, growth, leverage, and liquidity metrics.
+- Formal multi-factor model combining price and fundamental factors into coverage-aware alpha scores.
 - SQLite price storage with idempotent updates.
 - Expanded research universe management.
 - Static symbol metadata storage.
@@ -41,7 +42,7 @@ This release includes:
 - CLI commands for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtest, allocation, rebalance, risk, optimizer, portfolio construction, cost, and execution workflows.
 - pytest coverage for core state transitions.
 
-`v0.26.0` adds true fundamental factors using the v0.25 fundamental data layer. Fundamental factors enforce `report_date <= signal_date`, preserve existing price-only factor behavior, and do not connect brokers or add machine learning.
+`v0.27.0` adds a formal Multi-Factor Model v2. It combines existing price and fundamental factors into `multi_factor_alpha` scores with rank/z-score normalization, family weights, IC/stability-aware weighting, coverage-aware confidence, and per-factor/family contribution reporting. It does not add machine learning, news sentiment, broker connections, or live trading.
 
 ## Scope
 
@@ -86,6 +87,7 @@ openclaw-quant-v1/
 |  |- factors/
 |  |- fundamental_data/
 |  |- fundamental_factors/
+|  |- multi_factor/
 |  |- optimizer/
 |  |- portfolio_construction/
 |  |- rebalance/
@@ -120,6 +122,7 @@ Key modules:
 - `quant/data_providers/`: provider abstraction, registry, yfinance provider, CSV provider, mock provider, and future-provider placeholders.
 - `quant/fundamental_data/`: fundamental statement storage, CSV import, query, coverage, and quality diagnostics.
 - `quant/fundamental_factors/`: report-date-aware accounting factor functions and registry extensions.
+- `quant/multi_factor/`: formal price + fundamental factor normalization, weighting, confidence, and contribution model.
 - `quant/agent_export/agent_exporter.py`: compact report summaries for LLM/agent contexts.
 - `quant/visualization/`: PNG, SVG, and HTML visual reports from existing JSON reports.
 - `quant/alpha/alpha_engine.py`: factor calculation and target weight generation.
@@ -361,9 +364,11 @@ See `docs/PORTFOLIO_CONSTRUCTION.md` for details.
 
 ## Alpha Engine
 
-The alpha engine reads stored historical prices, calculates simple factors, ranks symbols, and generates target weights compatible with the Rebalance Engine.
+The alpha engine reads stored historical prices and report-date-aware fundamentals, calculates factors, ranks symbols, and generates target weights compatible with the Rebalance Engine.
 
 Alpha uses only rows at or before `as_of_date`. Generated targets are signal-date outputs and should be executed or backtested on the next trading day.
+
+`v0.27.0` enables a formal multi-factor model through `examples/alpha_config.json`. The model normalizes factors before blending, groups them into explicit families, reports factor/family contributions, and emits coverage-aware confidence. It remains a research signal layer; it does not decide live trades.
 
 Supported factors:
 
@@ -391,9 +396,10 @@ Reports:
 
 ```text
 reports/alpha_YYYYMMDD_HHMMSS.json
+reports/multi_factor_YYYYMMDD_HHMMSS.json
 ```
 
-See `docs/ALPHA.md` for details.
+See `docs/ALPHA.md` and `docs/MULTI_FACTOR.md` for details.
 
 ## Factor Pipeline
 
@@ -676,6 +682,7 @@ Important docs:
 - `docs/FACTOR_PIPELINE.md`
 - `docs/FACTOR_EVALUATION.md`
 - `docs/FACTOR_BACKTEST.md`
+- `docs/MULTI_FACTOR.md`
 - `docs/STRATEGY_EVALUATION.md`
 - `docs/OPTIMIZER.md`
 - `docs/PORTFOLIO_CONSTRUCTION.md`

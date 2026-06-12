@@ -64,6 +64,8 @@ python -m quant.cli alpha
 
 `factor-list` prints registered factor names, categories, descriptions, required inputs, no-lookahead metadata, `fundamental_data_required`, and lookback windows. Registered factors work with factor evaluation, factor pipeline, factor backtest, and composite alpha generation. Fundamental factors use `report_date <= signal_date` and include coverage fields in factor reports.
 
+`alpha` supports the v0.27 formal multi-factor model through `examples/alpha_config.json`. Multi-factor reports are written to `reports/multi_factor_*.json` and include coverage, confidence, stability, factor contributions, and family contributions.
+
 ## Walk Forward
 
 ```bash

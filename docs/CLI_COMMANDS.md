@@ -157,7 +157,9 @@ python -m quant.cli alpha --output-targets examples/alpha_targets.json
 python -m quant.cli rebalance --targets examples/alpha_targets.json --with-costs
 ```
 
-The alpha command reads `examples/alpha_config.json` by default, calculates momentum, volatility, and risk-adjusted momentum factors, ranks symbols, selects Top N, and generates target weights. It writes a JSON report and does not modify the simulated account. Alpha uses only rows at or before `as_of_date`; generated targets should be executed or backtested on the next trading day.
+The alpha command reads `examples/alpha_config.json` by default, calculates registered price and fundamental factors, ranks symbols, selects Top N, and generates target weights. It writes a JSON report and does not modify the simulated account. Alpha uses only rows at or before `as_of_date`; generated targets should be executed or backtested on the next trading day.
+
+In v0.27, `alpha` can run the formal Multi-Factor Model v2. When enabled, it writes `reports/multi_factor_*.json`, prints `multi_factor_report`, and includes factor/family contributions plus confidence in the alpha report.
 
 When `--pipeline` is supplied, Alpha Engine uses cleaned pipeline scores for ranking and score-weighted target generation.
 
@@ -324,7 +326,7 @@ python -m quant.cli factor-backtest --factor fundamental_value_score
 python -m quant.cli alpha
 ```
 
-The factor library is registry-driven. `factor-list` shows each factor's category, type, required inputs, lookback window, no-lookahead flag, `fundamental_data_required`, and description. The Alpha Engine can combine registered factors using `factor_weights` in `examples/alpha_config.json`, producing `composite_alpha_score` and per-factor contributions in alpha reports. Fundamental factors use `report_date <= signal_date` and report coverage/missing-data diagnostics.
+The factor library is registry-driven. `factor-list` shows each factor's category, type, required inputs, lookback window, no-lookahead flag, `fundamental_data_required`, and description. The Alpha Engine can combine registered factors through the formal multi-factor model in `examples/alpha_config.json`, producing `composite_alpha_score`, per-factor contributions, per-family contributions, coverage, and confidence. Fundamental factors use `report_date <= signal_date` and report coverage/missing-data diagnostics.
 
 ## Walk Forward Validation
 

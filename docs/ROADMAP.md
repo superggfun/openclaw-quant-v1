@@ -1,5 +1,11 @@
 # Roadmap
 
+## v0.27.0-multi-factor-model
+
+- Adds `quant/multi_factor` as the formal price + fundamental factor combination layer.
+- Supports rank/z-score normalization, optional winsorization, missing handling, equal/custom/IC/stability-aware weighting, explicit factor families, and coverage-aware confidence.
+- Integrates the multi-factor model with Alpha reports, Agent Export, and Visualization without adding machine learning, broker integration, live trading, or new data sources.
+
 ## v0.26.0-fundamental-factors
 
 - Adds `quant/fundamental_factors` for accounting-based value, quality, growth, and financial-health factors.

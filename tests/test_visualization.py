@@ -174,3 +174,33 @@ def test_factor_eval_quintile_chart(tmp_path: Path) -> None:
 
     assert result.report_type == "factor_eval"
     assert "quintile_returns" in {chart["chart_id"] for chart in result.charts}
+
+
+def test_multi_factor_charts(tmp_path: Path) -> None:
+    report = {
+        "metadata": {"report_type": "multi_factor"},
+        "factor_families": {"momentum_60d": "PRICE", "fundamental_quality_score": "QUALITY"},
+        "family_weights": {"PRICE": 0.4, "QUALITY": 0.6},
+        "confidence": {"overall_confidence": 0.6},
+        "stability": {
+            "momentum_60d": {"score": 0.8},
+            "fundamental_quality_score": {"score": 0.5},
+        },
+        "scores": [
+            {
+                "symbol": "AAPL",
+                "final_alpha_score": 0.7,
+                "overall_confidence": 0.6,
+                "family_contributions": {"PRICE": 0.2, "QUALITY": 0.5},
+                "factor_contributions": {"momentum_60d": 0.2, "fundamental_quality_score": 0.5},
+            }
+        ],
+    }
+    report_path = write_report(tmp_path, "multi_factor_sample.json", report)
+
+    result = ReportVisualizer().visualize_file(report_path, output_dir=tmp_path / "charts")
+
+    assert result.report_type == "multi_factor"
+    assert {"family_contribution", "factor_contribution", "confidence", "stability_ranking"} <= {
+        chart["chart_id"] for chart in result.charts
+    }

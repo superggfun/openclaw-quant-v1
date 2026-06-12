@@ -23,6 +23,7 @@ SQLite / External APIs
 - `quant.data_providers`: Defines the `DataProvider` interface, provider registry, yfinance provider, CSV provider, mock provider, and future-provider placeholders.
 - `quant.fundamental_data`: Stores, imports, queries, validates, and reports offline fundamental data.
 - `quant.fundamental_factors`: Computes report-date-aware accounting factors from `fundamental_metrics`.
+- `quant.multi_factor`: Combines price and fundamental factors into normalized, coverage-aware alpha scores.
 - `quant.data_layer.universe_manager`: Builds default, custom, sector, ETF, and large-cap universes.
 - `quant.data_layer.symbol_metadata`: Stores static symbol metadata in SQLite.
 - `quant.data_layer.data_quality`: Produces coverage, data quality, and research readiness reports.
@@ -78,9 +79,10 @@ Fundamental data flow:
 CLI fundamental-* commands -> FundamentalService -> FundamentalStore -> SQLite fundamental tables -> reports/fundamental_*.json
 
 CLI factor-eval/factor-backtest/alpha -> FactorRegistry -> FundamentalStore.latest_as_of(report_date <= signal_date) -> fundamental factor values
+CLI alpha -> MultiFactorModel -> normalized factor/family contributions -> coverage-aware alpha scores -> targets
 ```
 
-The fundamental data layer handles storage/import/query/quality. `v0.26.0` adds accounting-based factor calculations while preserving price-only factor behavior. Fundamental factors always use `report_date <= signal_date`; `fiscal_period_end` alone is not a valid no-lookahead filter.
+The fundamental data layer handles storage/import/query/quality. `v0.26.0` adds accounting-based factor calculations while preserving price-only factor behavior. `v0.27.0` adds the formal multi-factor combination layer. Fundamental factors always use `report_date <= signal_date`; `fiscal_period_end` alone is not a valid no-lookahead filter.
 
 Agent export flow:
 
@@ -153,7 +155,7 @@ The portfolio construction engine is side-effect free for portfolio state. It us
 Alpha flow:
 
 ```text
-CLI alpha -> AlphaEngine -> optional FactorPipeline -> SQLitePriceStore -> examples/alpha_targets.json -> reports/alpha_*.json
+CLI alpha -> AlphaEngine -> optional MultiFactorModel -> optional FactorPipeline -> SQLitePriceStore/FundamentalStore -> examples/alpha_targets.json -> reports/alpha_*.json
 ```
 
 The alpha engine is side-effect free for portfolio state. It reads stored prices, calculates factors and ranks, and generates target weights for downstream rebalance workflows.

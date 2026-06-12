@@ -143,3 +143,7 @@ The `v0.25.0` fundamental data layer imports, stores, queries, and validates sta
 ## v0.26 Fundamental Factors
 
 The `v0.26.0` fundamental factor layer implements accounting-based value, quality, growth, and financial-health factors using imported `fundamental_metrics`. Fundamental factors are registered in the central factor registry and must use `report_date <= signal_date`. Missing metrics are skipped inside composites; the system does not fill missing accounting data with zero or fabricated values. This release does not add ML, sentiment, broker integration, or live trading.
+
+## v0.27 Multi-Factor Model
+
+The `v0.27.0` multi-factor layer combines existing price and fundamental factors only. It normalizes factor values before combination, reports factor and family contributions, lowers confidence when coverage is weak, and preserves existing no-lookahead boundaries. It is not a machine-learning model and does not make live trading decisions.

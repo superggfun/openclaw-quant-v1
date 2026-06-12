@@ -115,3 +115,11 @@ Missing values receive zero contribution for that factor. Symbols with no valid 
 Factor direction comes from the central registry. Most score factors are `higher_is_better=true`; raw `volatility_20d` is `higher_is_better=false` because it is a risk measure, while `low_volatility_score` flips that into a preference score. Reversal factors use negative recent momentum, so a higher `reversal_20d` means the symbol recently underperformed more and has a stronger mean-reversion score.
 
 `value_score`, `quality_score`, and `growth_score` remain price-only proxies for backward compatibility. True accounting-based factors use the `fundamental_*` naming, such as `fundamental_value_score`, `fundamental_quality_score`, and `fundamental_growth_score`, and require report-date-filtered fundamental data.
+
+## Multi-Factor Model
+
+v0.27 adds a formal multi-factor model behind Alpha. It supports explicit factor families, rank/z-score normalization, optional winsorization, missing handling, equal/custom/IC/stability weighting, coverage-aware confidence, and factor/family contributions.
+
+When `examples/alpha_config.json` uses `weighting_mode` values such as `stability_weighted`, Alpha treats that as factor-combination weighting and keeps target allocation constrained by the existing cash and max-position settings. Alpha reports include `multi_factor_summary` and `multi_factor_report_path`.
+
+Multi-factor confidence is diagnostic only. It is meant to highlight coverage and stability limitations, not guarantee future returns. Low fundamental coverage lowers confidence and emits warnings.

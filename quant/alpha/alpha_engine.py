@@ -14,6 +14,7 @@ from quant.config import DEFAULT_SYMBOLS
 from quant.factor_pipeline.factor_pipeline import FactorPipeline
 from quant.factors.factor_registry import FactorRegistry
 from quant.fundamental_data.fundamental_store import FundamentalStore
+from quant.multi_factor.multi_factor_model import MultiFactorModel
 from quant.storage.sqlite_store import SQLitePriceStore
 
 
@@ -27,6 +28,8 @@ DEFAULT_ALPHA_CONFIG = {
     "min_cash_weight": 0.10,
     "max_position_weight": 0.20,
     "factor_weights": None,
+    "multi_factor": None,
+    "family_weights": None,
 }
 _UNSET = object()
 
@@ -48,6 +51,9 @@ class AlphaFactorRow:
     exclusion_reason: str | None
     factor_values: dict[str, float | None] | None = None
     factor_contributions: dict[str, float] | None = None
+    family_contributions: dict[str, float] | None = None
+    factor_confidence: dict[str, float] | None = None
+    overall_confidence: float | None = None
     composite_alpha_score: float | None = None
 
 
@@ -66,6 +72,8 @@ class AlphaResult:
     suggested_execution_date: str | None
     pipeline_config: dict | None
     pipeline_report_path: str | None
+    multi_factor_report_path: str | None
+    multi_factor_summary: dict | None
     warnings: list[str]
     report_path: str
     targets_path: str | None
@@ -85,6 +93,8 @@ class AlphaResult:
             "suggested_execution_date": self.suggested_execution_date,
             "pipeline_config": self.pipeline_config,
             "pipeline_report_path": self.pipeline_report_path,
+            "multi_factor_report_path": self.multi_factor_report_path,
+            "multi_factor_summary": self.multi_factor_summary,
             "warnings": self.warnings,
             "targets_path": self.targets_path,
         }
@@ -118,6 +128,8 @@ class AlphaEngine:
         pipeline_report_path: str | None = None
         pipeline_factor = "risk_adjusted_momentum"
         normalized_pipeline_config = None
+        multi_factor_report_path: str | None = None
+        multi_factor_summary: dict | None = None
 
         row_factor_names = self._row_factor_names(normalized_config, pipeline_config)
         factor_rows = [
@@ -125,7 +137,19 @@ class AlphaEngine:
             for symbol in normalized_config["universe"]
         ]
         composite_score_by_symbol: dict[str, float] | None = None
-        if normalized_config.get("factor_weights"):
+        multi_factor_config = self._multi_factor_config(normalized_config)
+        if multi_factor_config is not None:
+            factor_rows, composite_score_by_symbol, multi_factor_report_path, multi_factor_summary, mf_warnings = (
+                self._apply_multi_factor_scores(
+                    factor_rows,
+                    multi_factor_config,
+                    as_of_date=self._max_date(row.data_end_date for row in factor_rows),
+                    write_report=write_report,
+                )
+            )
+            warnings.extend(mf_warnings)
+            pipeline_factor = "multi_factor_alpha"
+        elif normalized_config.get("factor_weights"):
             factor_rows, composite_score_by_symbol = self._apply_composite_scores(
                 factor_rows,
                 normalized_config["factor_weights"],
@@ -170,7 +194,7 @@ class AlphaEngine:
 
         target_weights = self._target_weights(
             selected_rows,
-            normalized_config["weighting_mode"],
+            normalized_config["target_weighting_mode"],
             normalized_config["min_cash_weight"],
             normalized_config["max_position_weight"],
             warnings,
@@ -203,6 +227,8 @@ class AlphaEngine:
             suggested_execution_date=suggested_execution_date,
             pipeline_config=normalized_pipeline_config,
             pipeline_report_path=pipeline_report_path,
+            multi_factor_report_path=multi_factor_report_path,
+            multi_factor_summary=multi_factor_summary,
             warnings=warnings,
             report_path="",
             targets_path=str(target_output) if target_output else None,
@@ -222,6 +248,8 @@ class AlphaEngine:
             suggested_execution_date=result.suggested_execution_date,
             pipeline_config=result.pipeline_config,
             pipeline_report_path=result.pipeline_report_path,
+            multi_factor_report_path=result.multi_factor_report_path,
+            multi_factor_summary=result.multi_factor_summary,
             warnings=result.warnings,
             report_path=str(report_path),
             targets_path=result.targets_path,
@@ -297,8 +325,72 @@ class AlphaEngine:
             exclusion_reason=None,
             factor_values=factor_values,
             factor_contributions=None,
+            family_contributions=None,
+            factor_confidence=None,
+            overall_confidence=None,
             composite_alpha_score=None,
         )
+
+    def _apply_multi_factor_scores(
+        self,
+        rows: list[AlphaFactorRow],
+        multi_factor_config: dict,
+        as_of_date: str | None,
+        write_report: bool,
+    ) -> tuple[list[AlphaFactorRow], dict[str, float], str | None, dict, list[str]]:
+        raw_values = {
+            row.symbol: row.factor_values or {}
+            for row in rows
+            if not row.excluded
+        }
+        result = MultiFactorModel(self.factor_registry, report_dir=self.report_dir).run(
+            raw_values,
+            config=multi_factor_config,
+            as_of_date=as_of_date,
+            write_report=write_report,
+        )
+        score_by_symbol = {
+            score.symbol: score.final_alpha_score
+            for score in result.scores
+            if score.final_alpha_score is not None
+        }
+        detail_by_symbol = {score.symbol: score for score in result.scores}
+        updated_rows: list[AlphaFactorRow] = []
+        warnings: list[str] = list(result.warnings)
+        for row in rows:
+            detail = detail_by_symbol.get(row.symbol)
+            if row.excluded:
+                updated_rows.append(row)
+                continue
+            excluded = detail is None or detail.final_alpha_score is None
+            reason = row.exclusion_reason
+            if excluded:
+                reason = "no valid multi-factor alpha score"
+                warnings.append(f"excluded {row.symbol}: {reason}")
+            updated_rows.append(
+                self._copy_row(
+                    row,
+                    excluded=excluded,
+                    exclusion_reason=reason,
+                    factor_contributions=(detail.factor_contributions if detail else None),
+                    family_contributions=(detail.family_contributions if detail else None),
+                    factor_confidence=(detail.factor_confidence if detail else None),
+                    overall_confidence=(detail.overall_confidence if detail else None),
+                    composite_alpha_score=(detail.final_alpha_score if detail else None),
+                )
+            )
+        summary = {
+            "factors": result.factors,
+            "factor_families": result.factor_families,
+            "weighting_mode": result.weighting_mode,
+            "factor_weights": result.factor_weights,
+            "factor_weights_by_family": result.factor_weights_by_family,
+            "family_weights": result.family_weights,
+            "coverage": result.coverage,
+            "confidence": result.confidence,
+            "stability": result.stability,
+        }
+        return updated_rows, score_by_symbol, result.report_path or None, summary, warnings
 
     @staticmethod
     def _apply_composite_scores(
@@ -497,9 +589,11 @@ class AlphaEngine:
             return row.risk_adjusted_momentum
         if factor == "composite_alpha_score":
             return row.composite_alpha_score
+        if factor == "multi_factor_alpha":
+            return row.composite_alpha_score
         if row.factor_values and factor in row.factor_values:
             return row.factor_values[factor]
-        valid = sorted(FactorRegistry().factor_names() + ["composite_alpha_score"])
+        valid = sorted(FactorRegistry().factor_names() + ["composite_alpha_score", "multi_factor_alpha"])
         raise ValueError(f"pipeline factor must be one of: {', '.join(valid)}")
 
     @staticmethod
@@ -510,6 +604,9 @@ class AlphaEngine:
         excluded: bool | object = _UNSET,
         exclusion_reason: str | None | object = _UNSET,
         factor_contributions: dict[str, float] | None | object = _UNSET,
+        family_contributions: dict[str, float] | None | object = _UNSET,
+        factor_confidence: dict[str, float] | None | object = _UNSET,
+        overall_confidence: float | None | object = _UNSET,
         composite_alpha_score: float | None | object = _UNSET,
     ) -> AlphaFactorRow:
         return AlphaFactorRow(
@@ -531,6 +628,21 @@ class AlphaEngine:
                 row.factor_contributions
                 if factor_contributions is _UNSET
                 else factor_contributions
+            ),
+            family_contributions=(
+                row.family_contributions
+                if family_contributions is _UNSET
+                else family_contributions
+            ),
+            factor_confidence=(
+                row.factor_confidence
+                if factor_confidence is _UNSET
+                else factor_confidence
+            ),
+            overall_confidence=(
+                row.overall_confidence
+                if overall_confidence is _UNSET
+                else overall_confidence
             ),
             composite_alpha_score=(
                 row.composite_alpha_score
@@ -564,6 +676,9 @@ class AlphaEngine:
             exclusion_reason=reason,
             factor_values=None,
             factor_contributions=None,
+            family_contributions=None,
+            factor_confidence=None,
+            overall_confidence=None,
             composite_alpha_score=None,
         )
 
@@ -578,9 +693,18 @@ class AlphaEngine:
         merged["lookback_long"] = int(merged["lookback_long"])
         merged["top_n"] = int(merged["top_n"])
         merged["weighting_mode"] = str(merged["weighting_mode"]).lower()
+        merged["target_weighting_mode"] = merged["weighting_mode"]
+        if merged["weighting_mode"] in {"custom_weight", "ic_weighted", "stability_weighted"}:
+            multi_factor = dict(merged.get("multi_factor") or {})
+            multi_factor.setdefault("weighting_mode", merged["weighting_mode"])
+            if merged.get("family_weights"):
+                multi_factor.setdefault("family_weights", merged["family_weights"])
+            merged["multi_factor"] = multi_factor
+            merged["target_weighting_mode"] = "equal_weight"
         merged["min_cash_weight"] = float(merged["min_cash_weight"])
         merged["max_position_weight"] = float(merged["max_position_weight"])
         merged["factor_weights"] = AlphaEngine._normalize_factor_weights(merged.get("factor_weights"))
+        merged["multi_factor"] = AlphaEngine._normalize_multi_factor_config(merged.get("multi_factor"), merged)
 
         if not merged["universe"]:
             raise ValueError("alpha universe must not be empty")
@@ -590,8 +714,8 @@ class AlphaEngine:
             raise ValueError("lookback_long must be greater than lookback_short")
         if merged["top_n"] <= 0:
             raise ValueError("top_n must be positive")
-        if merged["weighting_mode"] not in {"equal_weight", "score_weighted"}:
-            raise ValueError("weighting_mode must be one of: equal_weight, score_weighted")
+        if merged["target_weighting_mode"] not in {"equal_weight", "score_weighted"}:
+            raise ValueError("weighting_mode must be one of: equal_weight, score_weighted, custom_weight, ic_weighted, stability_weighted")
         if not 0 <= merged["min_cash_weight"] <= 1:
             raise ValueError("min_cash_weight must be between 0 and 1")
         if not 0 < merged["max_position_weight"] <= 1:
@@ -609,6 +733,11 @@ class AlphaEngine:
         if factor_weights:
             registry = FactorRegistry()
             for factor in factor_weights:
+                lookbacks[factor] = registry.describe(factor).lookback_days
+        multi_factor = config.get("multi_factor") if isinstance(config, Mapping) else None
+        if multi_factor:
+            registry = FactorRegistry()
+            for factor in multi_factor.get("factors", []):
                 lookbacks[factor] = registry.describe(factor).lookback_days
         return dict(sorted(lookbacks.items()))
 
@@ -634,6 +763,22 @@ class AlphaEngine:
             factor: weight / total
             for factor, weight in sorted(normalized.items())
         }
+
+    @staticmethod
+    def _normalize_multi_factor_config(config, merged_config: Mapping) -> dict | None:
+        if config is None and not merged_config.get("family_weights"):
+            return None
+        raw = dict(config or {})
+        if merged_config.get("family_weights"):
+            raw.setdefault("family_weights", merged_config["family_weights"])
+        if merged_config.get("factor_weights") and raw.get("weighting_mode") == "custom_weight":
+            raw.setdefault("factor_weights", merged_config["factor_weights"])
+        return MultiFactorModel.normalize_config(raw)
+
+    @staticmethod
+    def _multi_factor_config(config: Mapping) -> dict | None:
+        value = config.get("multi_factor") if isinstance(config, Mapping) else None
+        return dict(value) if value else None
 
     @staticmethod
     def _round_targets(raw_weights: dict[str, float], min_cash_weight: float) -> dict[str, float]:
@@ -710,6 +855,8 @@ class AlphaEngine:
 
     def _row_factor_names(self, config: dict, pipeline_config: Mapping | None) -> list[str] | None:
         names = set((config.get("factor_weights") or {}).keys())
+        if config.get("multi_factor"):
+            names.update(config["multi_factor"].get("factors", []))
         if pipeline_config is not None:
             factor = str(dict(pipeline_config).get("factor", "")).strip().lower()
             if factor and factor not in {
@@ -718,6 +865,7 @@ class AlphaEngine:
                 "volatility_20d",
                 "risk_adjusted_momentum",
                 "composite_alpha_score",
+                "multi_factor_alpha",
             }:
                 names.add(factor)
         return sorted(names) if names else None

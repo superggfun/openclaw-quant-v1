@@ -28,7 +28,7 @@ python -m quant.cli alpha
 | `reversal_20d` | reversal | yes | close | 20-day mean-reversion score. Higher score means worse recent performance and stronger expected reversal. |
 | `low_volatility_score` | low volatility | yes | close | Higher scores for lower 20-day realized volatility. |
 
-## Composite Alpha
+## Composite And Multi-Factor Alpha
 
 `examples/alpha_config.json` can define `factor_weights`. The Alpha Engine normalizes positive weights, rank-normalizes each factor cross-section using signal-date data only, and combines weighted rank scores into `composite_alpha_score`.
 
@@ -45,6 +45,10 @@ python -m quant.cli alpha
 ```
 
 Alpha reports include per-symbol `factor_values`, `factor_contributions`, and `composite_alpha_score`. Target weights remain constrained by cash and max-position settings and are compatible with `rebalance --targets`.
+
+`v0.27.0` adds a formal Multi-Factor Model v2 in `quant/multi_factor`. It supports explicit families (`PRICE`, `VALUE`, `QUALITY`, `GROWTH`, `HEALTH`, `LOW_VOL`, `REVERSAL`), rank/z-score normalization, optional winsorization, equal/custom/IC/stability weighting, coverage-aware confidence, and factor/family contribution reporting.
+
+Multi-factor confidence is a deterministic diagnostic about coverage and supplied stability inputs. It is not a return guarantee.
 
 ## No-Lookahead
 

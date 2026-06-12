@@ -16,13 +16,36 @@
   "lookback_short": 20,
   "lookback_long": 60,
   "top_n": 5,
-  "weighting_mode": "equal_weight",
+  "weighting_mode": "stability_weighted",
   "min_cash_weight": 0.1,
   "max_position_weight": 0.2,
-  "factor_weights": {
-    "momentum_60d": 0.25,
-    "fundamental_value_score": 0.25,
-    "fundamental_quality_score": 0.25,
-    "fundamental_growth_score": 0.25
+  "family_weights": {
+    "PRICE": 0.25,
+    "VALUE": 0.25,
+    "QUALITY": 0.2,
+    "GROWTH": 0.2,
+    "HEALTH": 0.1
+  },
+  "multi_factor": {
+    "weighting_mode": "stability_weighted",
+    "normalization": "rank",
+    "missing": "drop",
+    "winsorize_pct": 0.0,
+    "factors": [
+      "momentum_60d",
+      "risk_adjusted_momentum",
+      "fundamental_value_score",
+      "fundamental_quality_score",
+      "fundamental_growth_score",
+      "fundamental_health_score"
+    ],
+    "stability_scores": {
+      "momentum_60d": 0.65,
+      "risk_adjusted_momentum": 0.6,
+      "fundamental_value_score": 0.55,
+      "fundamental_quality_score": 0.6,
+      "fundamental_growth_score": 0.5,
+      "fundamental_health_score": 0.5
+    }
   }
 }
