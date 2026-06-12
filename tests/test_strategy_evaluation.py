@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from quant.cli import main
@@ -387,6 +388,19 @@ def test_report_schema_contains_v14_sections(tmp_path: Path) -> None:
         "warnings",
         "interpretation_notes",
     }
+
+
+def test_period_aggregation_accepts_pandas_compatible_month_and_year_aliases() -> None:
+    returns = pd.Series(
+        [0.10, -0.05, 0.02],
+        index=pd.to_datetime(["2024-01-10", "2024-01-31", "2024-02-29"]),
+    )
+
+    monthly = StrategyEvaluation._period_aggregate_returns(returns, "ME")
+    yearly = StrategyEvaluation._period_aggregate_returns(returns, "YE")
+
+    assert monthly == pytest.approx({"2024-01": 0.045, "2024-02": 0.02})
+    assert yearly == pytest.approx({"2024": 0.0659})
 
 
 def test_cli_accepts_factor_backtest_report_flag(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

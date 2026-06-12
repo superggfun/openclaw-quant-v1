@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pandas as pd
 import pytest
@@ -108,7 +109,10 @@ def test_yfinance_provider_uses_same_download_arguments_and_normalizes(monkeypat
             index=pd.DatetimeIndex(["2024-01-02"], name="Date"),
         )
 
-    monkeypatch.setattr("quant.data_providers.yfinance_provider.yf.download", fake_download)
+    monkeypatch.setattr(
+        "quant.data_providers.yfinance_provider.yf",
+        SimpleNamespace(download=fake_download),
+    )
 
     history = YFinanceProvider().get_price_history("spy", start="2024-01-01", end="2024-01-03")
 

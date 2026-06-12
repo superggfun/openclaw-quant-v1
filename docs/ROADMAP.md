@@ -1,5 +1,12 @@
 # Roadmap
 
+## v0.28.0-packaging-ci
+
+- Adds `pyproject.toml`, MIT `LICENSE`, GitHub Actions workflows, issue templates, and a pull request template.
+- Keeps `requirements.txt` usable while making the project installable with `pip install -e .` or optional extras.
+- Adds lazy optional imports so missing `yfinance` marks only the yfinance provider as `NOT_INSTALLED` instead of breaking CLI startup.
+- Adds packaging and optional-dependency tests without changing factors, trading logic, data providers, report schemas, or no-lookahead behavior.
+
 ## v0.27.0-multi-factor-model
 
 - Adds `quant/multi_factor` as the formal price + fundamental factor combination layer.

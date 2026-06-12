@@ -71,6 +71,8 @@ Health checks return:
 
 `provider-health` does not download market data. The default `yfinance` health check verifies package availability and avoids network calls.
 
+As of `v0.28.0`, provider-specific dependencies are isolated behind lazy imports. Missing `yfinance` marks the yfinance provider as `NOT_INSTALLED`, but the rest of the CLI, project audit, CSV provider, mock provider, and placeholder provider metadata remain available. Install the core dependency set with `pip install -e ".[core]"` or continue using `pip install -r requirements.txt`.
+
 ## Boundaries
 
 The provider layer is offline research infrastructure. It does not provide live broker execution, real-time market data guarantees, investment advice, machine learning, options data, or high-frequency workflows.

@@ -56,6 +56,8 @@ The data layer commands manage providers, research universes, static metadata, s
 
 `provider-list` shows registered providers and placeholders. `provider-health` reports provider readiness without downloading market data. `provider-info` prints one provider's status and health details.
 
+Provider-specific packages are loaded lazily. Missing `yfinance` does not break CLI startup, project audit, provider listing, CSV/mock workflows, or help output; only yfinance provider health and download calls report that the dependency is not installed.
+
 ## Fundamental Data
 
 ```bash

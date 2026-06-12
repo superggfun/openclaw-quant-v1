@@ -8,6 +8,7 @@ from tools.project_audit import (
     ignored_generated_paths,
     missing_documented_commands,
     missing_module_docs,
+    missing_packaging_files,
     stale_version_references,
 )
 
@@ -47,6 +48,10 @@ def test_no_unintentional_empty_package_dirs() -> None:
 
 def test_required_module_docs_exist() -> None:
     assert missing_module_docs() == []
+
+
+def test_required_packaging_files_exist() -> None:
+    assert missing_packaging_files() == []
 
 
 def test_tracked_generated_dirs_only_keep_placeholders() -> None:

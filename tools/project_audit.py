@@ -43,11 +43,21 @@ REQUIRED_MODULE_DOCS = {
     "docs/FUNDAMENTAL_DATA.md",
     "docs/FUNDAMENTAL_FACTORS.md",
     "docs/MULTI_FACTOR.md",
+    "docs/PACKAGING.md",
     "docs/PORTFOLIO_CONSTRUCTION.md",
     "docs/STRATEGY_EVALUATION.md",
     "docs/TRADING_SIMULATION.md",
     "docs/VISUALIZATION.md",
     "docs/WALK_FORWARD.md",
+}
+REQUIRED_PACKAGING_FILES = {
+    "LICENSE",
+    "pyproject.toml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/project_audit.yml",
+    ".github/ISSUE_TEMPLATE/bug_report.md",
+    ".github/ISSUE_TEMPLATE/feature_request.md",
+    ".github/PULL_REQUEST_TEMPLATE.md",
 }
 
 
@@ -113,18 +123,24 @@ def missing_module_docs() -> list[str]:
     return sorted(path for path in REQUIRED_MODULE_DOCS if not (ROOT / path).exists())
 
 
+def missing_packaging_files() -> list[str]:
+    return sorted(path for path in REQUIRED_PACKAGING_FILES if not (ROOT / path).exists())
+
+
 def run_audit() -> list[AuditResult]:
     missing_commands = missing_documented_commands()
     stale_refs = stale_version_references()
     ignored = ignored_generated_paths()
     empty_packages = empty_package_dirs()
     missing_docs = missing_module_docs()
+    missing_packaging = missing_packaging_files()
     return [
         AuditResult("cli_docs", not missing_commands, missing_commands),
         AuditResult("stale_versions", not stale_refs, [f"{path}: {items}" for path, items in stale_refs.items()]),
         AuditResult("ignored_generated_paths", all(ignored.values()), [path for path, ok in ignored.items() if not ok]),
         AuditResult("empty_package_dirs", not empty_packages, empty_packages),
         AuditResult("module_docs", not missing_docs, missing_docs),
+        AuditResult("packaging_files", not missing_packaging, missing_packaging),
     ]
 
 

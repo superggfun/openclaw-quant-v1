@@ -18,6 +18,7 @@ SQLite / External APIs
 
 - `quant.cli`: Main CLI entry point. It builds the top-level parser, creates shared context, and dispatches to command modules.
 - `quant.cli_commands`: Dedicated parser registration and command handlers for data, data layer, agent export, visualization, portfolio, rebalance, risk, optimizer, portfolio construction, alpha, factor, strategy evaluation, trading simulation, cost, execution, and backtest commands.
+- `pyproject.toml`: PEP 621 packaging metadata, optional dependency groups, pytest defaults, and the `openclaw-quant` console entry point.
 - `quant.agent_export.agent_exporter`: Converts detailed JSON reports into compact agent-friendly text, Markdown, or JSON summaries.
 - `quant.visualization`: Converts existing JSON reports into PNG, SVG, and HTML visual dashboards.
 - `quant.data_providers`: Defines the `DataProvider` interface, provider registry, yfinance provider, CSV provider, mock provider, and future-provider placeholders.
@@ -72,6 +73,14 @@ CLI provider/data commands -> ProviderRegistry + UniverseManager + SymbolMetadat
 ```
 
 The data layer expands research coverage and diagnostics without changing factor evaluation, factor backtest, portfolio backtest, or no-lookahead semantics. `v0.24.0` changes the data access boundary only: yfinance remains the default provider, CSV and mock providers support offline workflows, and AkShare/Tushare/Alpha Vantage/Polygon are placeholders.
+
+`v0.28.0` adds dependency isolation around provider imports. CLI startup, project audit, provider listing, and mock/CSV workflows must not import or require `yfinance`; only the yfinance provider health check or data download path reports `NOT_INSTALLED` when the package is absent.
+
+Packaging and CI flow:
+
+```text
+pyproject.toml + requirements.txt -> editable/dev installs -> pytest + tools/project_audit.py -> GitHub Actions
+```
 
 Fundamental data flow:
 

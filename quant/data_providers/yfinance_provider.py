@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from datetime import date
+import importlib
 from typing import Iterable
 
 import pandas as pd
-import yfinance as yf
 
 from quant.data_providers.base import DataProvider, PRICE_COLUMNS, ProviderHealth
+
+yf = None
 
 
 class YFinanceProvider(DataProvider):
@@ -26,7 +28,8 @@ class YFinanceProvider(DataProvider):
         if not ticker:
             raise ValueError("symbol must not be empty")
 
-        raw = yf.download(
+        yfinance = self._load_yfinance()
+        raw = yfinance.download(
             ticker,
             start=start,
             end=end,
@@ -79,12 +82,12 @@ class YFinanceProvider(DataProvider):
 
     def health_check(self) -> ProviderHealth:
         try:
-            import yfinance  # noqa: F401
+            self._load_yfinance(force_reload=True)
         except Exception as exc:
             return ProviderHealth(
                 provider=self.name,
                 healthy=False,
-                status="ERROR",
+                status="NOT_INSTALLED",
                 error=str(exc),
                 messages=("yfinance import failed",),
             )
@@ -94,6 +97,17 @@ class YFinanceProvider(DataProvider):
             status="PASS",
             messages=("yfinance package import succeeded", "network not probed during health check"),
         )
+
+    @staticmethod
+    def _load_yfinance(force_reload: bool = False):
+        global yf
+        if yf is not None and not force_reload:
+            return yf
+        try:
+            yf = importlib.import_module("yfinance")
+        except Exception as exc:
+            raise RuntimeError("yfinance is not installed; install openclaw-quant[core] or add yfinance") from exc
+        return yf
 
     @staticmethod
     def _flatten_single_ticker_columns(frame: pd.DataFrame, ticker: str) -> pd.DataFrame:

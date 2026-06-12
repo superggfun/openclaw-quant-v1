@@ -586,7 +586,7 @@ class StrategyEvaluation:
     def _period_aggregate_returns(returns: pd.Series, frequency: str) -> dict[str, float]:
         if returns.empty:
             return {}
-        aggregated = (1.0 + returns).resample(frequency).prod() - 1.0
+        aggregated = (1.0 + returns).resample(StrategyEvaluation._compatible_period_frequency(frequency)).prod() - 1.0
         if frequency == "ME":
             return {index.strftime("%Y-%m"): float(value) for index, value in aggregated.items()}
         return {index.strftime("%Y"): float(value) for index, value in aggregated.items()}
@@ -594,6 +594,15 @@ class StrategyEvaluation:
     @staticmethod
     def _period_attribution(returns: pd.Series) -> dict[str, float]:
         return StrategyEvaluation._period_aggregate_returns(returns, "ME")
+
+    @staticmethod
+    def _compatible_period_frequency(frequency: str) -> str:
+        try:
+            pd.tseries.frequencies.to_offset(frequency)
+            return frequency
+        except ValueError:
+            aliases = {"ME": "M", "YE": "Y"}
+            return aliases.get(frequency, frequency)
 
     @staticmethod
     def _benchmark_metrics(

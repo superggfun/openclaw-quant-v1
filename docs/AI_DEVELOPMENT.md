@@ -67,6 +67,7 @@ The project intentionally does not include:
 - Portfolio construction features must use stored prices only, respect the requested end/as-of date, generate target weights only, and leave rebalance or execution simulation to downstream modules.
 - Data layer and provider features must not change factor evaluation or backtest semantics. They should improve metadata, coverage, quality, provider boundaries, and readiness only.
 - AkShare, Tushare, A-share data, real-time market data, Alpha Vantage, and Polygon are future provider additions unless explicitly implemented in a later release.
+- Optional provider dependencies must stay isolated. Missing `yfinance` may mark the yfinance provider as `NOT_INSTALLED`, but it must not break CLI startup, project audit, provider listing, CSV/mock tests, or `--help` commands.
 - Agent export features must remain read-only and export-only. Do not change source report schemas, quant logic, factor evaluation, backtest behavior, portfolio state, or execution behavior.
 - Fundamental data features must remain storage/import/query/quality only until a later explicit factor-scoring release. Do not change existing price-only factor semantics.
 - Fundamental factors must use `report_date <= signal_date`; never use `fiscal_period_end` alone for tradable availability.
@@ -106,6 +107,9 @@ The project intentionally does not include:
 - `quant/visualization/`: report charts and dashboards from existing JSON reports.
 - `quant/cli.py`: command line entry point and dispatcher.
 - `quant/cli_commands/`: command-specific parser registration and handlers.
+- `pyproject.toml`: packaging metadata, optional dependency groups, pytest defaults, and console script entry point.
+- `.github/workflows/`: CI and project audit workflows.
+- `docs/PACKAGING.md`: install, optional dependency, and CI guidance.
 - `tests/`: pytest coverage for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtest, rebalance, optimizer, risk, cost, and execution behavior.
 
 ## Recommended Workflow
@@ -155,3 +159,7 @@ Fundamental factor code belongs under `quant/fundamental_factors` and must be re
 ## v0.27 Multi-Factor Notes
 
 Multi-factor code belongs under `quant/multi_factor`. It may combine registered price and fundamental factors, but it must not introduce new factors, ML models, broker integration, or live trading. Preserve the existing Alpha, FactorEval, FactorBacktest, WalkForward, and TradingSimulation no-lookahead contracts.
+
+## v0.28 Packaging And CI Notes
+
+Packaging work belongs in `pyproject.toml`, `requirements.txt`, `.github/`, repository templates, and documentation. It must not change quant calculations, report schemas, or no-lookahead behavior. Keep `requirements.txt` usable, add optional dependencies through packaging metadata, and run both `pytest` and `python tools/project_audit.py` before release.
