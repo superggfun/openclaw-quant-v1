@@ -146,6 +146,17 @@ python -m quant.cli research-validation --mode quick
 
 `research-validation` is the v0.39 bounded evidence and coverage sprint. Use `--mode quick` for local smoke validation and `--mode full` for long-running validation over broader factor and strategy sets. It records partial results, skipped steps, timeouts, slow steps, warning frequencies, and recommendations without changing engine semantics.
 
+## Performance Profiling
+
+```bash
+python -m quant.cli performance-profile
+python -m quant.cli performance-profile --target factor_eval --factor momentum_20d --max-symbols 5
+python -m quant.cli performance-summary
+python -m quant.cli performance-report
+```
+
+`performance-profile` is the v0.40 measurement-only workflow. It records runtime by target, slowest modules, slowest functions, store/query timing, and recommendations. It does not optimize, tune, parallelize, change schemas, or change quant semantics.
+
 ## Strategy DSL
 
 ```bash

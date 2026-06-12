@@ -128,6 +128,7 @@ class AgentExporter:
             "strategy_validation",
             "strategy_run",
             "strategy_gate",
+            "performance_profile",
         }:
             return report_type
         if {"strategy", "folds", "stability_analysis", "summary"}.issubset(report):
@@ -1008,6 +1009,35 @@ class AgentExporter:
                 "Gates are deterministic diagnostics, not investment advice.",
                 "Gate reports do not submit orders or mutate live accounts.",
             ],
+        )
+
+    def _export_performance_profile(self, report: dict[str, Any], generated_from: str) -> AgentExport:
+        slowest = report.get("slowest_modules") or []
+        queries = report.get("slowest_queries") or []
+        top = slowest[0] if slowest else {}
+        metrics = {
+            "total_runtime_seconds": (report.get("summary") or {}).get("total_runtime_seconds"),
+            "event_count": (report.get("summary") or {}).get("event_count"),
+            "slowest_module": top.get("module"),
+            "slowest_module_runtime": top.get("runtime_seconds"),
+            "database_runtime_seconds": (report.get("database_profile") or {}).get("runtime_seconds"),
+            "query_count": (report.get("database_profile") or {}).get("query_count"),
+            "slowest_query": (queries[0] or {}).get("name") if queries else None,
+        }
+        findings = [
+            f"slowest module: {top.get('module')}" if top else "no slow module recorded",
+            "profiling is measurement-only",
+        ]
+        return self._base_export(
+            "performance_profile",
+            generated_from,
+            "Performance profile summarizes runtime bottlenecks without changing quant semantics.",
+            metrics,
+            findings,
+            self._clean_warnings(report.get("warnings")),
+            report.get("recommendations") or ["profile more targets before optimizing"],
+            [],
+            ["Performance recommendations are candidates for future optimization, not implemented changes."],
         )
 
     def _base_export(

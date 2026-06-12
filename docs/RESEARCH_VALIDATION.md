@@ -88,6 +88,8 @@ Fundamental coverage remains the largest bottleneck. In the bounded 50-symbol fu
 
 `factor_eval` remains the dominant runtime bottleneck. v0.39 records this bottleneck through `SLOW_STEP`, runtime-per-batch, and slowest-step diagnostics. It intentionally does not add multiprocessing, numba, parquet, vectorized backtest rewrites, or other performance optimizations. `v0.40` should focus on Performance Baseline & Profiling.
 
+`v0.40` adds the measurement-only performance layer described in `docs/PERFORMANCE.md`. It profiles bottlenecks observed here without changing research-validation semantics.
+
 Expanded universe evidence is now passed internally by `research-validation`. The default `factor-eval` CLI workflow is unchanged and does not automatically use the expanded research universe unless a caller uses an engine/API path that supplies `universe`.
 
 ## Boundaries

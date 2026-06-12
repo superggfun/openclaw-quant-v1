@@ -1,5 +1,13 @@
 # Roadmap
 
+## v0.40.0-performance-baseline-profiling
+
+- Adds measurement-only `performance-profile`, `performance-summary`, and `performance-report`.
+- Measures bounded factor-eval, factor-backtest, walk-forward, strategy-run, research-validation, SQLite store calls, Factor Store lookup, and fundamental lookup runtime.
+- Generates `reports/performance_profile_*.json` and `reports/performance_profile_summary.md`.
+- Supports Agent Export and Visualization for performance reports.
+- Does not add numba, multiprocessing, parquet, vectorized rewrites, strategy tuning, warning suppression, report schema changes, or quant semantic changes.
+
 ## v0.39.0-research-validation-coverage-expansion
 
 - Adds bounded `research-validation` workflow for evidence collection using existing engines.

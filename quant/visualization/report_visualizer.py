@@ -39,6 +39,7 @@ SUPPORTED_REPORT_TYPES = {
     "strategy_validation",
     "strategy_run",
     "strategy_gate",
+    "performance_profile",
 }
 
 EXPECTED_CHARTS_BY_REPORT_TYPE = {
@@ -68,6 +69,7 @@ EXPECTED_CHARTS_BY_REPORT_TYPE = {
     "strategy_validation": {"validation_status"},
     "strategy_run": {"strategy_summary", "factor_allocation"},
     "strategy_gate": {"gate_status_summary", "warning_count_by_gate", "evidence_metric"},
+    "performance_profile": {"runtime_breakdown", "slowest_modules", "slowest_queries", "call_counts"},
 }
 
 
@@ -476,6 +478,34 @@ class ReportVisualizer:
             builder.bar_chart(prefix, "evidence_metric", "Evidence Metrics", metrics),
         )
 
+    def _charts_performance_profile(self, builder: ChartBuilder, prefix: str, report: dict[str, Any]) -> list[ChartArtifact]:
+        runtime = {
+            category: values.get("runtime_seconds")
+            for category, values in ((report.get("runtime_breakdown") or {}).get("by_category") or {}).items()
+            if isinstance(values, dict)
+        }
+        modules = {
+            row.get("module", f"module_{index + 1}"): row.get("runtime_seconds")
+            for index, row in enumerate(report.get("slowest_modules") or [])
+            if isinstance(row, dict)
+        }
+        queries = {
+            row.get("name", f"query_{index + 1}"): row.get("runtime_seconds")
+            for index, row in enumerate(report.get("slowest_queries") or [])
+            if isinstance(row, dict)
+        }
+        call_counts = {
+            category: values.get("count")
+            for category, values in ((report.get("runtime_breakdown") or {}).get("by_category") or {}).items()
+            if isinstance(values, dict)
+        }
+        return self._keep(
+            builder.bar_chart(prefix, "runtime_breakdown", "Runtime Breakdown", runtime),
+            builder.bar_chart(prefix, "slowest_modules", "Slowest Modules", modules),
+            builder.bar_chart(prefix, "slowest_queries", "Slowest Queries", queries),
+            builder.bar_chart(prefix, "call_counts", "Call Counts", call_counts),
+        )
+
     @staticmethod
     def _series(items: Any, label_key: str, value_key: str) -> list[tuple[str, float]]:
         output = []
@@ -756,6 +786,18 @@ class ReportVisualizer:
                 "valid": (report.get("validation") or report).get("valid"),
                 "total_return": summary.get("total_return"),
                 "gate_count": len(report.get("gate_results") or []),
+            }
+        if report_type == "performance_profile":
+            summary = report.get("summary") or {}
+            database = report.get("database_profile") or {}
+            slowest = (report.get("slowest_modules") or [{}])[0]
+            return {
+                "total_runtime_seconds": summary.get("total_runtime_seconds"),
+                "event_count": summary.get("event_count"),
+                "slowest_module": slowest.get("module"),
+                "slowest_module_runtime": slowest.get("runtime_seconds"),
+                "query_count": database.get("query_count"),
+                "database_runtime_seconds": database.get("runtime_seconds"),
             }
         if report_type == "strategy_list":
             return {"strategy_count": report.get("strategy_count")}

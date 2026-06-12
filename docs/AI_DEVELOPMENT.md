@@ -242,3 +242,9 @@ Strategy Evaluation Gate code belongs under `quant/strategy_gates`. It may read 
 Research validation code belongs under `quant/research_validation`. It may orchestrate existing factor evaluation, factor backtest, walk-forward, regime, Strategy DSL, and Strategy Gate engines. It must not add factors, change strategy logic, alter no-lookahead semantics, add broker/live trading behavior, or tune parameters.
 
 Use `research-validation --mode quick` for bounded local smoke validation. Use `--mode full` only for deliberate long-running research sessions. The workflow must record partial results, skipped steps, timeouts, slow steps, and runtime seconds.
+
+## v0.40 Performance Profiling Notes
+
+Performance profiling code belongs under `quant/performance`. It may time existing engines, store/query calls, Factor Store lookups, fundamental lookups, and report generation. It must not optimize, parallelize, cache, vectorize, tune, suppress warnings, change report schemas, or alter quant semantics.
+
+Use `performance-profile` to measure bottlenecks before proposing optimization work. Any future optimization must preserve no-lookahead behavior and existing factor evaluation, factor backtest, walk-forward, strategy, research validation, and trade simulation semantics.

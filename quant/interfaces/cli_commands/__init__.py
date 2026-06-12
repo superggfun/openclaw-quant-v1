@@ -21,6 +21,7 @@ alias_modules(
         "factor_store": "quant.cli_commands.factor_store",
         "fundamental_data": "quant.cli_commands.fundamental_data",
         "optimize": "quant.cli_commands.optimize",
+        "performance": "quant.cli_commands.performance",
         "portfolio": "quant.cli_commands.portfolio",
         "portfolio_construction": "quant.cli_commands.portfolio_construction",
         "providers": "quant.cli_commands.providers",

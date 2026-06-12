@@ -81,6 +81,7 @@ The reserved `quant.interfaces.api`, `quant.adapters.openclaw`, `quant.adapters.
 - `quant.factor_eval.factor_evaluation`: Evaluates factor predictive quality with no-lookahead IC, Rank IC, quintile, and decay metrics.
 - `quant.regime_detection`: Classifies deterministic market regimes, persists regime history, and summarizes factor performance by regime.
 - `quant.scheduler`: Orchestrates daily offline research pipeline runs and persists scheduler history.
+- `quant.performance`: Measures runtime, store/query calls, slowest modules, and profiling recommendations without changing engine semantics.
 - `quant.strategy_eval.strategy_evaluation`: Explains returns, risk, drawdowns, rolling metrics, and attribution from generated reports.
 - `quant.trading_simulation`: Runs offline account-style historical simulations with in-memory cash, positions, trades, costs, and equity curves.
 - `quant.market_realism`: Applies deterministic slippage, ADV liquidity, marketability, and position-size constraints to simulated execution.

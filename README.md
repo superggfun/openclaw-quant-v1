@@ -6,13 +6,13 @@ This project is research infrastructure only. It is not investment advice, does 
 
 ## Current Version
 
-`v0.39.0-research-validation-coverage-expansion`
+`v0.40.0-performance-baseline-profiling`
 
-This release adds a bounded Research Validation Sprint workflow for evidence collection over existing factors, strategies, gates, regimes, and warnings.
+This release adds a measurement-only Performance Baseline & Profiling layer for existing factor evaluation, factor backtest, walk-forward, strategy-run, and research-validation workflows.
 
-No alpha factors, data providers, MCP features, broker integrations, live trading, order submission, machine learning, strategy logic, quant calculation behavior, or no-lookahead rules are intentionally changed in v0.39.
+No alpha factors, data providers, MCP features, broker integrations, live trading, order submission, machine learning, strategy logic, quant calculation behavior, report schemas, validation logic, optimization, or no-lookahead rules are intentionally changed in v0.40.
 
-`research-validation --mode quick` is the bounded local smoke/research workflow. `--mode full` remains available for long-running all-factor/all-strategy validation. MCP capability gates still enable only `READ_ONLY` and `OFFLINE_SIMULATION`; paper/live trading capabilities are reserved or forbidden and blocked before execution.
+`performance-profile` is the bounded local smoke profiling workflow. It records slowest modules, functions, database calls, and recommendations without implementing numba, multiprocessing, parquet, or vectorized rewrites. MCP capability gates still enable only `READ_ONLY` and `OFFLINE_SIMULATION`; paper/live trading capabilities are reserved or forbidden and blocked before execution.
 
 ## Quick Start
 
@@ -85,6 +85,8 @@ python -m quant.cli strategy-validate
 python -m quant.cli strategy-gate --strategy momentum_fundamental
 python -m quant.cli strategy-run --strategy momentum_fundamental --with-gates
 python -m quant.cli research-validation --mode quick
+python -m quant.cli performance-profile
+python -m quant.cli performance-summary
 ```
 
 See `docs/CLI.md` and `docs/CLI_COMMANDS.md` for the full command reference.
@@ -107,6 +109,7 @@ See `docs/CLI.md` and `docs/CLI_COMMANDS.md` for the full command reference.
 - Strategy DSL definitions for reproducible research strategy configuration.
 - Strategy Evaluation Gates for offline quality checks before relying on strategy research.
 - Bounded Research Validation Sprint workflow for ranking current evidence and warning frequency.
+- Performance Baseline & Profiling reports for measuring runtime bottlenecks before optimization.
 - Portfolio construction methods including equal weight, inverse volatility, risk parity, and minimum variance.
 - Simulated portfolio state, rebalance planning, cost estimation, execution simulation, historical trading simulation, and market realism constraints.
 - Unified account/order/fill/position protocol objects for future MCP/OpenClaw integration.
