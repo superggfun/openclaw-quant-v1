@@ -150,3 +150,7 @@ Factor Store is for reproducibility and lifecycle management. It does not change
 ## Scheduler Integration
 
 The Daily Research Scheduler can run factor evaluation and persist results through Factor Store during `research-run`. The scheduler does not change Factor Store semantics: factor values remain keyed by factor, symbol, signal date, and version, and no-lookahead rules remain owned by the factor engines.
+
+## Strategy Metadata
+
+Strategy DSL metadata is persisted separately in `strategy_registry`, `strategy_versions`, and `strategy_runs`. Factor Store semantics and factor history tables are unchanged.

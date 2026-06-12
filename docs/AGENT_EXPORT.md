@@ -159,3 +159,7 @@ Agent Export supports `reports/regime_detection_*.json`, `reports/regime_history
 ## Scheduler Reports
 
 Agent Export supports `research_run`, `research_status`, and `research_history` reports. Exports summarize run status, current regime, best and weak factors, trade simulation return, generated artifacts, warnings, and recommended next checks. These summaries are context compaction for LLM agents, not investment advice or autonomous trading instructions.
+
+## Strategy DSL Reports
+
+Agent Export supports `strategy_list`, `strategy_definition`, `strategy_validation`, and `strategy_run` reports. These summaries describe reproducible research configuration, validation gates, and offline simulation results; they are not trading advice.

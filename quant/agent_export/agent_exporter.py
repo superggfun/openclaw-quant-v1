@@ -123,6 +123,10 @@ class AgentExporter:
             "research_run",
             "research_status",
             "research_history",
+            "strategy_list",
+            "strategy_definition",
+            "strategy_validation",
+            "strategy_run",
         }:
             return report_type
         if {"strategy", "folds", "stability_analysis", "summary"}.issubset(report):
@@ -892,6 +896,86 @@ class AgentExporter:
             ["review repeated failures", "compare daily regime and factor summaries"],
             [],
             ["research history is offline workflow telemetry"],
+        )
+
+    def _export_strategy_list(self, report: dict[str, Any], generated_from: str) -> AgentExport:
+        strategies = report.get("strategies") or []
+        return self._base_export(
+            "strategy_list",
+            generated_from,
+            f"Strategy registry contains {len(strategies)} offline research definitions.",
+            {
+                "strategy_count": len(strategies),
+                "strategies": [row.get("name") for row in strategies[:10]],
+            },
+            ["strategy definitions are versioned research objects"],
+            self._clean_warnings(report.get("warnings")),
+            ["validate a strategy before running", "run strategy-run for offline simulation"],
+            [],
+            ["Strategy DSL does not enable broker execution or live trading."],
+        )
+
+    def _export_strategy_definition(self, report: dict[str, Any], generated_from: str) -> AgentExport:
+        strategy = report.get("strategy") or {}
+        validation = report.get("validation") or {}
+        return self._base_export(
+            "strategy_definition",
+            generated_from,
+            f"Strategy {strategy.get('name')} version {strategy.get('version')} summarized.",
+            {
+                "name": strategy.get("name"),
+                "version": strategy.get("version"),
+                "factor_count": len(strategy.get("factors") or []),
+                "portfolio_method": (strategy.get("portfolio") or {}).get("method"),
+                "valid": validation.get("valid"),
+            },
+            ["strategy DSL definition loaded"],
+            self._clean_warnings(validation.get("warnings")),
+            ["run strategy-validate", "run strategy-run offline"],
+            [],
+            ["Strategy definitions are reproducibility metadata, not investment advice."],
+        )
+
+    def _export_strategy_validation(self, report: dict[str, Any], generated_from: str) -> AgentExport:
+        return self._base_export(
+            "strategy_validation",
+            generated_from,
+            f"Strategy validation {'passed' if report.get('valid') else 'failed'} for {report.get('strategy_name')}.",
+            {
+                "strategy_name": report.get("strategy_name"),
+                "strategy_version": report.get("strategy_version"),
+                "valid": report.get("valid"),
+                "errors": report.get("errors"),
+                "gates": report.get("gates"),
+            },
+            ["validation gates checked"],
+            self._clean_warnings(report.get("warnings")) + [f"ERROR: {error}" for error in report.get("errors", [])],
+            ["fix validation errors before research runs", "run walk-forward if required"],
+            [],
+            ["Validation gates are deterministic checks, not return guarantees."],
+        )
+
+    def _export_strategy_run(self, report: dict[str, Any], generated_from: str) -> AgentExport:
+        summary = report.get("trade_sim_summary") or {}
+        return self._base_export(
+            "strategy_run",
+            generated_from,
+            f"Strategy {report.get('strategy_name')} ran through offline historical simulation.",
+            {
+                "strategy_name": report.get("strategy_name"),
+                "strategy_version": report.get("strategy_version"),
+                "status": report.get("status"),
+                "final_equity": summary.get("final_equity"),
+                "total_return": summary.get("total_return"),
+                "max_drawdown": summary.get("max_drawdown"),
+                "trade_count": summary.get("trade_count"),
+                "trade_sim_report_path": (report.get("artifacts") or {}).get("trade_sim_report_path"),
+            },
+            ["strategy DSL orchestrated existing engines"],
+            self._clean_warnings(report.get("warnings")),
+            ["review trade simulation report", "run walk-forward validation", "inspect strategy validation gates"],
+            [],
+            ["Strategy runs are offline research simulation only, not live trading."],
         )
 
     def _base_export(

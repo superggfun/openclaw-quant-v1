@@ -55,6 +55,7 @@ The reserved `quant.interfaces.api`, `quant.adapters.openclaw`, `quant.adapters.
 - `quant.cli_commands`: Dedicated parser registration and command handlers for data, data layer, scheduler, agent export, visualization, portfolio, rebalance, risk, optimizer, portfolio construction, alpha, factor, strategy evaluation, trading simulation, cost, execution, and backtest commands.
 - `quant.interfaces.cli_commands`: Layered alias for CLI command modules. `quant.cli_commands` remains the implementation path in v0.34.
 - `quant.interfaces.mcp_server`: Local MCP-compatible research interface that exposes safe JSON tools over existing offline engines.
+- `quant.strategy_dsl`: Versioned YAML/JSON strategy definitions, validation, metadata persistence, and offline orchestration.
 - `pyproject.toml`: PEP 621 packaging metadata, optional dependency groups, pytest defaults, and the `openclaw-quant` console entry point.
 - `quant.core.protocols`: Layered protocol namespace. `quant.core_protocols` remains supported.
 - `quant.reports.agent_export`: Layered report export namespace. `quant.agent_export` remains supported.

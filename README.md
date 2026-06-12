@@ -6,13 +6,13 @@ This project is research infrastructure only. It is not investment advice, does 
 
 ## Current Version
 
-`v0.35.0-mcp-server-foundation`
+`v0.36.0-strategy-dsl`
 
-This release adds a local MCP-compatible research interface foundation for OpenClaw-style agents.
+This release adds Strategy DSL definitions as structured, versioned offline research objects.
 
-No alpha factors, data providers, broker integrations, live trading, order submission, machine learning, report schemas, quant calculation behavior, or no-lookahead rules are intentionally changed in v0.35.
+No alpha factors, data providers, broker integrations, live trading, order submission, machine learning, report schemas, quant calculation behavior, or no-lookahead rules are intentionally changed in v0.36.
 
-MCP tools declare capability levels. v0.35 enables only `READ_ONLY` and `OFFLINE_SIMULATION`; paper/live trading capabilities are reserved or forbidden and blocked before execution.
+Strategy DSL commands and MCP tools orchestrate existing offline engines only. MCP capability gates still enable only `READ_ONLY` and `OFFLINE_SIMULATION`; paper/live trading capabilities are reserved or forbidden and blocked before execution.
 
 ## Quick Start
 
@@ -80,6 +80,8 @@ python -m quant.cli export-for-agent --report reports/example.json
 python -m quant.cli visualize-report --report reports/example.json
 python -m quant.cli mcp-list-tools
 python -m quant.cli mcp-smoke
+python -m quant.cli strategy-list
+python -m quant.cli strategy-validate
 ```
 
 See `docs/CLI.md` and `docs/CLI_COMMANDS.md` for the full command reference.
@@ -99,6 +101,7 @@ See `docs/CLI.md` and `docs/CLI_COMMANDS.md` for the full command reference.
 - Deterministic regime detection and factor-by-regime diagnostics.
 - Daily Research Scheduler for offline pipeline automation.
 - Local MCP-compatible research interface for OpenClaw-style tool access.
+- Strategy DSL definitions for reproducible research strategy configuration.
 - Portfolio construction methods including equal weight, inverse volatility, risk parity, and minimum variance.
 - Simulated portfolio state, rebalance planning, cost estimation, execution simulation, historical trading simulation, and market realism constraints.
 - Unified account/order/fill/position protocol objects for future MCP/OpenClaw integration.
@@ -119,6 +122,7 @@ Layered package areas:
 - `quant/services/`: application orchestration services.
 - `quant/reports/`: agent export and visualization.
 - `quant/interfaces/`: CLI boundary, local MCP research interface, and reserved API namespace.
+- `quant/strategy_dsl/`: versioned research strategy definitions and validation.
 - `quant/adapters/`: reserved external framework adapter namespaces.
 - `quant/scheduler/`: failure-isolated daily research pipeline automation.
 
@@ -185,6 +189,7 @@ Generated local artifacts are intentionally ignored:
 - `docs/VISUALIZATION.md`
 - `docs/PACKAGING.md`
 - `docs/MCP_SERVER.md`
+- `docs/STRATEGY_DSL.md`
 - `docs/ROADMAP.md`
 - `docs/DECISIONS.md`
 

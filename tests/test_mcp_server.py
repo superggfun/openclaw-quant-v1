@@ -29,7 +29,7 @@ def test_mcp_tool_registration_and_categories() -> None:
     assert categories[RESEARCH] >= 4
     assert categories[SECURITY] == len(FORBIDDEN_TOOL_NAMES)
     assert registry.list_capabilities()[READ_ONLY] >= 20
-    assert registry.list_capabilities()[OFFLINE_SIMULATION] == 2
+    assert registry.list_capabilities()[OFFLINE_SIMULATION] == 3
     assert registry.list_capabilities()[LIVE_TRADING_FORBIDDEN] == len(FORBIDDEN_TOOL_NAMES)
 
 
@@ -41,7 +41,7 @@ def test_mcp_tool_lookup_and_metadata() -> None:
     assert metadata["name"] == "detect_regime"
     assert metadata["category"] == "REGIMES"
     assert metadata["capability_level"] == READ_ONLY
-    assert metadata["version"] == "v0.35.0"
+    assert metadata["version"] == "v0.36.0"
     assert metadata["return_schema"]["json_safe"] is True
     assert metadata["return_schema"]["binary_payloads"] is False
 
@@ -205,7 +205,7 @@ def test_all_registered_tools_have_required_metadata() -> None:
         assert row["description"]
         assert isinstance(row["arguments"], dict)
         assert isinstance(row["return_schema"], dict)
-        assert row["version"] == "v0.35.0"
+        assert row["version"] == "v0.36.0"
 
 
 def test_report_and_visualization_responses_have_no_binary_payloads(tmp_path: Path) -> None:

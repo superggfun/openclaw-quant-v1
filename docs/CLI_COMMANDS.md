@@ -373,6 +373,7 @@ The alpha strategy path records `signal_date` and `execution_date` and executes 
 - Factor backtest requires enough stored price history and future-return windows for at least one long-short cross-section.
 - Strategy evaluation requires a supported JSON report path or `--strategy alpha/factor_long_short`.
 - Trading simulation requires enough stored price history before the first signal date and at least one next execution date.
+- Strategy DSL validation requires known factors, non-negative weights, a supported portfolio method, and no live/broker execution fields.
 - Optimize requires at least one symbol in the optimizer universe with stored price data.
 - Portfolio construction requires at least one requested symbol with sufficient stored return history.
 - Cost requires a target allocation that can produce rebalance suggestions.
@@ -414,3 +415,14 @@ python -m quant.cli trade-sim --strategy alpha --portfolio-method equal_weight -
 The command generates alpha signals on rebalance dates, constructs target weights, simulates next-trading-day execution with costs and optional market realism constraints, updates an in-memory `PortfolioAccount`, and writes `reports/trade_sim_*.json`. It is offline research only and does not update persistent portfolio state or connect to brokers.
 
 If `--start` and `--end` are omitted, `trade-sim` uses the default smoke window `2024-01-01` to `2025-01-01`.
+
+## Strategy DSL
+
+```bash
+python -m quant.cli strategy-list
+python -m quant.cli strategy-show --strategy momentum_fundamental
+python -m quant.cli strategy-validate --file strategies/momentum_fundamental.yaml
+python -m quant.cli strategy-run --strategy momentum_fundamental
+```
+
+Strategy DSL commands operate on versioned YAML/JSON strategy definitions under `strategies/`. `strategy-run` orchestrates existing alpha and trade simulation paths only. Sample strategy files are examples for reproducible research, not recommendations.

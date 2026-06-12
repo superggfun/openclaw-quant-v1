@@ -24,6 +24,7 @@ class SchedulerConfig:
     run_factor_store_update: bool = True
     run_regime_detection: bool = True
     run_trade_sim: bool = True
+    run_strategy: bool = False
     run_visualization: bool = True
     run_agent_export: bool = True
     symbols: list[str] = field(default_factory=lambda: list(DEFAULT_SYMBOLS))
@@ -36,6 +37,11 @@ class SchedulerConfig:
     trade_sim_initial_cash: float = 100000.0
     trade_sim_rebalance_frequency: str = "monthly"
     trade_sim_portfolio_method: str = "equal_weight"
+    strategy_name: str = "momentum_fundamental"
+    strategy_start: str = "2024-01-01"
+    strategy_end: str = "2025-01-01"
+    strategy_initial_cash: float = 100000.0
+    strategy_rebalance_frequency: str = "monthly"
     alpha_config_path: str = "examples/alpha_config.json"
     cost_config_path: str = "examples/cost_config.json"
     market_realism_config_path: str = "examples/market_realism_config.json"
@@ -75,6 +81,7 @@ class SchedulerConfig:
             "run_factor_store_update": self.run_factor_store_update,
             "run_regime_detection": self.run_regime_detection,
             "run_trade_sim": self.run_trade_sim,
+            "run_strategy": self.run_strategy,
             "run_visualization": self.run_visualization,
             "run_agent_export": self.run_agent_export,
             "symbols": self.symbols,
@@ -87,6 +94,11 @@ class SchedulerConfig:
             "trade_sim_initial_cash": self.trade_sim_initial_cash,
             "trade_sim_rebalance_frequency": self.trade_sim_rebalance_frequency,
             "trade_sim_portfolio_method": self.trade_sim_portfolio_method,
+            "strategy_name": self.strategy_name,
+            "strategy_start": self.strategy_start,
+            "strategy_end": self.strategy_end,
+            "strategy_initial_cash": self.strategy_initial_cash,
+            "strategy_rebalance_frequency": self.strategy_rebalance_frequency,
             "alpha_config_path": self.alpha_config_path,
             "cost_config_path": self.cost_config_path,
             "market_realism_config_path": self.market_realism_config_path,

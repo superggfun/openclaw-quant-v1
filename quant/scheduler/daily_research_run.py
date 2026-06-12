@@ -11,6 +11,7 @@ from uuid import uuid4
 
 from quant.scheduler.research_pipeline import ResearchPipeline
 from quant.scheduler.scheduler_config import SchedulerConfig
+from quant.strategy_dsl.strategy_registry import StrategyRegistry
 
 
 class DailyResearchRun:
@@ -47,6 +48,7 @@ class DailyResearchRun:
         pipeline.run_step("factor_store_update", config.run_factor_store_update, lambda: self._factor_store_update(state))
         pipeline.run_step("regime_detection", config.run_regime_detection, lambda: self._regime_detection(state))
         pipeline.run_step("trade_simulation", config.run_trade_sim, lambda: self._trade_simulation(config, state))
+        pipeline.run_step("strategy_run", config.run_strategy, lambda: self._strategy_run(config, state))
         pipeline.run_step("visualization", config.run_visualization, lambda: self._visualization(state))
         pipeline.run_step("agent_export", config.run_agent_export, lambda: self._agent_export(state))
 
@@ -233,6 +235,30 @@ class DailyResearchRun:
                 "max_drawdown": result.max_drawdown,
                 "total_cost": result.total_cost,
                 "trade_count": result.trade_count,
+            },
+        }
+
+    def _strategy_run(self, config: SchedulerConfig, state: dict[str, Any]) -> dict[str, Any]:
+        report = StrategyRegistry(self.context).run(
+            strategy=config.strategy_name,
+            start=config.strategy_start,
+            end=config.strategy_end,
+            initial_cash=config.strategy_initial_cash,
+            rebalance_frequency=config.strategy_rebalance_frequency,
+        )
+        state["generated_reports"].append(report["report_path"])
+        trade_path = (report.get("artifacts") or {}).get("trade_sim_report_path")
+        if trade_path:
+            state["generated_reports"].append(trade_path)
+        state["strategy_run"] = report
+        return {
+            "status": report.get("status", "PASS"),
+            "warnings": report.get("warnings") or [],
+            "artifacts": [path for path in [report.get("report_path"), trade_path] if path],
+            "summary": {
+                "strategy_name": report.get("strategy_name"),
+                "strategy_version": report.get("strategy_version"),
+                "trade_sim_summary": report.get("trade_sim_summary"),
             },
         }
 

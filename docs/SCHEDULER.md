@@ -55,6 +55,8 @@ Agent Export supports `research_run`, `research_status`, and `research_history` 
 
 `v0.35.0` exposes scheduler status/history/report and local `run_research_pipeline` through MCP tools. These MCP tools remain offline research orchestration only. They do not run a daemon, schedule cron jobs, connect to brokers, or place orders.
 
+`v0.36.0` adds an optional `run_strategy` step. It is disabled by default in `examples/research_scheduler_config.json`, preserving existing daily scheduler behavior. When explicitly enabled, it runs a Strategy DSL definition through the existing offline strategy orchestration.
+
 ## Boundaries
 
 The scheduler automates offline research commands only. It does not place orders, connect to brokers, alter persistent portfolio state, or make autonomous trading decisions.

@@ -1,5 +1,14 @@
 # Roadmap
 
+## v0.36.0-strategy-dsl
+
+- Adds `quant/strategy_dsl` for versioned YAML/JSON strategy definitions.
+- Adds strategy examples under `strategies/`.
+- Adds CLI commands: `strategy-list`, `strategy-show`, `strategy-validate`, and `strategy-run`.
+- Adds SQLite strategy metadata tables: `strategy_registry`, `strategy_versions`, and `strategy_runs`.
+- Adds MCP, Agent Export, Visualization, and optional Scheduler integration.
+- Definition/orchestration only: no new factors, ML, news sentiment, broker/live trading, report schema changes, or no-lookahead semantic changes.
+
 ## v0.35.0-mcp-server-foundation
 
 - Adds `quant.interfaces.mcp_server` with JSON-safe MCP tool models, registry, runner, schemas, categories, and a local server facade.

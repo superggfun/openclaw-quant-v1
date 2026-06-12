@@ -34,6 +34,10 @@ SUPPORTED_REPORT_TYPES = {
     "research_run",
     "research_status",
     "research_history",
+    "strategy_list",
+    "strategy_definition",
+    "strategy_validation",
+    "strategy_run",
 }
 
 EXPECTED_CHARTS_BY_REPORT_TYPE = {
@@ -58,6 +62,10 @@ EXPECTED_CHARTS_BY_REPORT_TYPE = {
     "research_run": {"pipeline_status", "trade_simulation", "factor_summary", "artifact_counts"},
     "research_status": {"latest_run"},
     "research_history": {"run_status"},
+    "strategy_list": {"strategy_validity"},
+    "strategy_definition": {"factor_allocation", "portfolio_constraints"},
+    "strategy_validation": {"validation_status"},
+    "strategy_run": {"strategy_summary", "factor_allocation"},
 }
 
 
@@ -392,6 +400,60 @@ class ReportVisualizer:
         counts = (report.get("summary") or {}).get("status_counts") or {}
         return self._keep(builder.bar_chart(prefix, "run_status", "Run Status Counts", counts))
 
+    def _charts_strategy_list(self, builder: ChartBuilder, prefix: str, report: dict[str, Any]) -> list[ChartArtifact]:
+        valid = sum(1 for row in report.get("strategies") or [] if row.get("valid"))
+        total = len(report.get("strategies") or [])
+        return self._keep(builder.bar_chart(prefix, "strategy_validity", "Strategy Validity", {"valid": valid, "invalid": total - valid}))
+
+    def _charts_strategy_definition(self, builder: ChartBuilder, prefix: str, report: dict[str, Any]) -> list[ChartArtifact]:
+        strategy = report.get("strategy") or {}
+        factors = {
+            item.get("name", f"factor_{index + 1}"): item.get("weight", 0.0)
+            for index, item in enumerate(strategy.get("factors") or [])
+            if isinstance(item, dict)
+        }
+        portfolio = strategy.get("portfolio") or {}
+        constraints = {
+            "max_position_weight": portfolio.get("max_position_weight"),
+            "cash_buffer": portfolio.get("cash_buffer"),
+        }
+        return self._keep(
+            builder.bar_chart(prefix, "factor_allocation", "Factor Allocation", factors),
+            builder.bar_chart(prefix, "portfolio_constraints", "Portfolio Constraints", constraints),
+        )
+
+    def _charts_strategy_validation(self, builder: ChartBuilder, prefix: str, report: dict[str, Any]) -> list[ChartArtifact]:
+        return self._keep(
+            builder.bar_chart(
+                prefix,
+                "validation_status",
+                "Validation Status",
+                {"errors": len(report.get("errors") or []), "warnings": len(report.get("warnings") or []), "valid": 1 if report.get("valid") else 0},
+            )
+        )
+
+    def _charts_strategy_run(self, builder: ChartBuilder, prefix: str, report: dict[str, Any]) -> list[ChartArtifact]:
+        summary = report.get("trade_sim_summary") or {}
+        strategy = report.get("strategy") or {}
+        factors = {
+            item.get("name", f"factor_{index + 1}"): item.get("weight", 0.0)
+            for index, item in enumerate(strategy.get("factors") or [])
+            if isinstance(item, dict)
+        }
+        return self._keep(
+            builder.bar_chart(
+                prefix,
+                "strategy_summary",
+                "Strategy Summary",
+                {
+                    "total_return": summary.get("total_return"),
+                    "max_drawdown": summary.get("max_drawdown"),
+                    "total_cost": summary.get("total_cost"),
+                },
+            ),
+            builder.bar_chart(prefix, "factor_allocation", "Factor Allocation", factors),
+        )
+
     @staticmethod
     def _series(items: Any, label_key: str, value_key: str) -> list[tuple[str, float]]:
         output = []
@@ -662,6 +724,18 @@ class ReportVisualizer:
             return {"status": report.get("status"), "latest_run": latest.get("run_id")}
         if report_type == "research_history":
             return (report.get("summary") or {}).get("status_counts") or {}
+        if report_type in {"strategy_definition", "strategy_validation", "strategy_run"}:
+            strategy = report.get("strategy") or {}
+            summary = report.get("trade_sim_summary") or {}
+            return {
+                "strategy_name": report.get("strategy_name") or strategy.get("name"),
+                "strategy_version": report.get("strategy_version") or strategy.get("version"),
+                "status": report.get("status"),
+                "valid": (report.get("validation") or report).get("valid"),
+                "total_return": summary.get("total_return"),
+            }
+        if report_type == "strategy_list":
+            return {"strategy_count": report.get("strategy_count")}
         return {key: report.get(key) for key in keys if key in report}
 
     @staticmethod

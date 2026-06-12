@@ -38,6 +38,7 @@ The project currently includes:
 - A modular CLI implementation under `quant/cli_commands/`.
 - A layered package layout under `quant/core`, `quant/data`, `quant/factors`, `quant/engines`, `quant/services`, `quant/reports`, `quant/interfaces`, and `quant/adapters`.
 - A local MCP-compatible research interface under `quant/interfaces/mcp_server`.
+- A Strategy DSL layer under `quant/strategy_dsl` for versioned offline research definitions.
 
 The project intentionally does not include:
 
@@ -122,6 +123,7 @@ The project intentionally does not include:
 - `quant/cli_commands/`: command-specific parser registration and handlers.
 - `quant/interfaces/cli_commands/`: layered CLI command namespace. `quant/cli_commands/` remains the compatibility import path in v0.34.
 - `quant/interfaces/mcp_server/`: JSON-safe local MCP research tools. It is not a live trading or broker interface.
+- `quant/strategy_dsl/`: YAML/JSON strategy definitions, validation, metadata persistence, and offline orchestration.
 - `pyproject.toml`: packaging metadata, optional dependency groups, pytest defaults, and console script entry point.
 - `.github/workflows/`: CI and project audit workflows.
 - `docs/PACKAGING.md`: install, optional dependency, and CI guidance.
@@ -220,5 +222,11 @@ v0.34 is phase 1 of the namespace refactor. Do not remove legacy imports during 
 MCP code belongs under `quant/interfaces/mcp_server`. It may expose existing research capabilities through JSON-safe tool objects, but it must stay read-only or local offline simulation only. Do not add broker connectivity, live order submission, position mutation, automatic trading, ML, news sentiment, or new factors under the MCP label.
 
 Every MCP tool must declare exactly one `capability_level`: `READ_ONLY`, `OFFLINE_SIMULATION`, `PAPER_TRADING_RESERVED`, or `LIVE_TRADING_FORBIDDEN`. v0.35 may only enable `READ_ONLY` and `OFFLINE_SIMULATION`. Disabled capability levels must be blocked before runner execution.
+
+## v0.36 Strategy DSL Notes
+
+Strategy DSL code belongs under `quant/strategy_dsl`. It may parse YAML/JSON definitions, validate deterministic gates, persist strategy metadata, and orchestrate existing offline engines. It must not add live trading, broker integration, automatic strategy mutation, new factors, ML, news sentiment, report schema changes, or no-lookahead semantic changes.
+
+Strategy DSL validation must reject attempts to override no-lookahead behavior. Fundamental strategy definitions must still rely on existing factor engines using `report_date <= signal_date`.
 
 Forbidden trading/broker tool names must return `NOT_SUPPORTED`, including `place_order`, `submit_order`, `cancel_order`, `modify_position`, `connect_broker`, `execute_trade`, `live_trade`, `rebalance_live`, and `paper_trade_live`.

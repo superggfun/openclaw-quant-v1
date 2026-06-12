@@ -141,6 +141,17 @@ python -m quant.cli research-report
 
 `research-run` executes the offline daily research pipeline from `examples/research_scheduler_config.json`: coverage checks, factor evaluation, Factor Store update, regime detection, historical trade simulation, visualization, Agent Export, and a compact summary. The default config is lightweight daily/smoke mode, not full-universe validation. Full research remains available by enabling data refresh, expanding symbols, adding factors, and extending the trade simulation window in config. Steps are failure-isolated where possible. This is research automation only; it does not connect to brokers, place orders, or perform live trading.
 
+## Strategy DSL
+
+```bash
+python -m quant.cli strategy-list
+python -m quant.cli strategy-show --strategy momentum_fundamental
+python -m quant.cli strategy-validate --file strategies/momentum_fundamental.yaml
+python -m quant.cli strategy-run --strategy momentum_fundamental
+```
+
+Strategy DSL commands load YAML/JSON definitions, validate gates, and optionally run existing offline trade simulation. They do not change quant calculations, report schemas, no-lookahead rules, or broker/live trading boundaries.
+
 ## Optional Dependencies
 
 Provider commands are safe to run when optional provider packages are missing. If `yfinance` is not installed, `provider-list`, `provider-health`, `provider-info yfinance`, `factor-list`, and `--help` commands still start; the yfinance provider reports `NOT_INSTALLED` until the core extra or `requirements.txt` dependencies are installed.

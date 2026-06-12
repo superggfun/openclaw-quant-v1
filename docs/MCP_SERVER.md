@@ -1,6 +1,7 @@
 # MCP Server Foundation
 
 `v0.35.0` adds a local MCP-compatible research tool layer under `quant.interfaces.mcp_server`.
+`v0.36.0` adds Strategy DSL tools on top of the same capability gates.
 
 This is infrastructure for OpenClaw-style research agents. It is not a live trading API, not a broker API, not an order execution service, and not investment advice.
 
@@ -85,5 +86,14 @@ Every tool metadata record includes `name`, `category`, `capability_level`, `des
 ## Existing Engine Semantics
 
 The MCP layer wraps existing CLI/service/engine boundaries. It does not change factor evaluation semantics, factor backtest semantics, regime detection semantics, scheduler semantics, trading simulation semantics, report schemas, or no-lookahead guarantees.
+
+## Strategy DSL Tools
+
+- `list_strategies`: `READ_ONLY`
+- `show_strategy`: `READ_ONLY`
+- `validate_strategy`: `READ_ONLY`
+- `run_strategy`: `OFFLINE_SIMULATION`
+
+`run_strategy` is offline historical simulation only. It does not submit orders, mutate real portfolios, connect brokers, or schedule live jobs.
 
 `run_research_pipeline` and `run_trade_sim` are local offline research/simulation tools. They may generate reports, but they do not modify broker state or live account state.

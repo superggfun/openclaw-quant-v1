@@ -99,3 +99,7 @@ Confidence is a diagnostic reliability score, not a return forecast and not a pe
 Agent Export supports `multi_factor` reports and summarizes top symbols, family weights, coverage, confidence, warnings, and recommended next checks.
 
 Visualization supports multi-factor charts for family contribution, factor contribution, confidence, and stability ranking.
+
+## Strategy DSL
+
+Strategy DSL files can declare factor weights that are translated into existing alpha and multi-factor configuration. The DSL does not change factor calculation, normalization, coverage, confidence, or no-lookahead semantics.
