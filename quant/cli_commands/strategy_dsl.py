@@ -32,6 +32,8 @@ def register_parser(subparsers: argparse._SubParsersAction) -> None:
     run.add_argument("--end", default="2025-01-01")
     run.add_argument("--initial-cash", type=float, default=100000.0)
     run.add_argument("--rebalance-frequency", default="monthly", choices=["daily", "weekly", "monthly"])
+    run.add_argument("--with-gates", action="store_true", help="Run Strategy Evaluation Gates after the offline strategy run.")
+    run.add_argument("--gate-config", default="examples/strategy_gate_config.json")
 
 
 def handle(args: argparse.Namespace, context: CLIContext) -> int:
@@ -85,6 +87,8 @@ def handle(args: argparse.Namespace, context: CLIContext) -> int:
             end=args.end,
             initial_cash=args.initial_cash,
             rebalance_frequency=args.rebalance_frequency,
+            with_gates=args.with_gates,
+            gate_config_path=args.gate_config,
         )
         summary = result.get("trade_sim_summary") or {}
         print("Strategy Run Summary")
@@ -96,6 +100,11 @@ def handle(args: argparse.Namespace, context: CLIContext) -> int:
         print(f"max_drawdown: {format_optional_pct(summary.get('max_drawdown'))}")
         print(f"trade_count: {summary.get('trade_count')}")
         print(f"trade_sim_report: {(result.get('artifacts') or {}).get('trade_sim_report_path')}")
+        if result.get("gate_summary"):
+            gate = result["gate_summary"]
+            print(f"gate_status: {gate.get('overall_status')}")
+            print(f"gate_warnings: {gate.get('warning_count')}")
+            print(f"strategy_gate_report: {(result.get('artifacts') or {}).get('strategy_gate_report_path')}")
         print(f"report: {result['report_path']}")
         return 0
 

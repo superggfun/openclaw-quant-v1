@@ -38,6 +38,8 @@ There is no ML model, no external sentiment input, and no forward-looking label 
 
 The detector calculates every row from benchmark prices available at or before that row's date. Future returns, future drawdowns, future volatility, and future market states are not used to label earlier dates.
 
+`v0.37.0` Strategy Evaluation Gates may read regime sample counts and factor-by-regime history to warn about low support. Regime gates are diagnostics only; they do not forecast markets, disable factors, or change portfolio targets.
+
 ## CLI
 
 ```bash

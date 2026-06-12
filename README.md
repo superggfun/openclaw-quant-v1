@@ -6,13 +6,13 @@ This project is research infrastructure only. It is not investment advice, does 
 
 ## Current Version
 
-`v0.36.0-strategy-dsl`
+`v0.37.0-strategy-evaluation-gates`
 
-This release adds Strategy DSL definitions as structured, versioned offline research objects.
+This release adds Strategy Evaluation Gates for deterministic offline quality control around Strategy DSL definitions and strategy-run evidence.
 
-No alpha factors, data providers, broker integrations, live trading, order submission, machine learning, report schemas, quant calculation behavior, or no-lookahead rules are intentionally changed in v0.36.
+No alpha factors, data providers, broker integrations, live trading, order submission, machine learning, quant calculation behavior, or no-lookahead rules are intentionally changed in v0.37.
 
-Strategy DSL commands and MCP tools orchestrate existing offline engines only. MCP capability gates still enable only `READ_ONLY` and `OFFLINE_SIMULATION`; paper/live trading capabilities are reserved or forbidden and blocked before execution.
+Strategy Gates read existing DSL validation, Factor Store history, walk-forward history, regime diagnostics, and offline trade simulation evidence. They emit `PASS`, `WARNING`, `FAIL`, or `REJECTED` reports for research review only. MCP capability gates still enable only `READ_ONLY` and `OFFLINE_SIMULATION`; paper/live trading capabilities are reserved or forbidden and blocked before execution.
 
 ## Quick Start
 
@@ -82,6 +82,8 @@ python -m quant.cli mcp-list-tools
 python -m quant.cli mcp-smoke
 python -m quant.cli strategy-list
 python -m quant.cli strategy-validate
+python -m quant.cli strategy-gate --strategy momentum_fundamental
+python -m quant.cli strategy-run --strategy momentum_fundamental --with-gates
 ```
 
 See `docs/CLI.md` and `docs/CLI_COMMANDS.md` for the full command reference.
@@ -102,6 +104,7 @@ See `docs/CLI.md` and `docs/CLI_COMMANDS.md` for the full command reference.
 - Daily Research Scheduler for offline pipeline automation.
 - Local MCP-compatible research interface for OpenClaw-style tool access.
 - Strategy DSL definitions for reproducible research strategy configuration.
+- Strategy Evaluation Gates for offline quality checks before relying on strategy research.
 - Portfolio construction methods including equal weight, inverse volatility, risk parity, and minimum variance.
 - Simulated portfolio state, rebalance planning, cost estimation, execution simulation, historical trading simulation, and market realism constraints.
 - Unified account/order/fill/position protocol objects for future MCP/OpenClaw integration.

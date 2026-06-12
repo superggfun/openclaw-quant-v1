@@ -58,6 +58,7 @@ REQUIRED_MODULE_DOCS = {
     "docs/REGIME_DETECTION.md",
     "docs/SCHEDULER.md",
     "docs/STRATEGY_DSL.md",
+    "docs/STRATEGY_GATES.md",
     "docs/STRATEGY_EVALUATION.md",
     "docs/TRADING_SIMULATION.md",
     "docs/VISUALIZATION.md",

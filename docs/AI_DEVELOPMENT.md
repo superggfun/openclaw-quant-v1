@@ -230,3 +230,9 @@ Strategy DSL code belongs under `quant/strategy_dsl`. It may parse YAML/JSON def
 Strategy DSL validation must reject attempts to override no-lookahead behavior. Fundamental strategy definitions must still rely on existing factor engines using `report_date <= signal_date`.
 
 Forbidden trading/broker tool names must return `NOT_SUPPORTED`, including `place_order`, `submit_order`, `cancel_order`, `modify_position`, `connect_broker`, `execute_trade`, `live_trade`, `rebalance_live`, and `paper_trade_live`.
+
+## v0.37 Strategy Gate Notes
+
+Strategy Evaluation Gate code belongs under `quant/strategy_gates`. It may read Strategy DSL validation, Factor Store history, walk-forward history, regime diagnostics, and offline strategy-run/trade-sim reports. It must not add factors, alter quant calculations, change report schemas for existing reports, connect brokers, submit orders, mutate real accounts, or weaken no-lookahead rules.
+
+`strategy-gate` and `strategy-run --with-gates` are offline research quality-control commands. MCP `run_strategy_gates` must remain `OFFLINE_SIMULATION`; `latest_strategy_gate_report` must remain `READ_ONLY`.

@@ -270,7 +270,7 @@ def test_strategy_cli_commands_registered_and_smoke(tmp_path: Path, capsys) -> N
     parser = build_parser()
     subparsers_action = next(action for action in parser._actions if action.dest == "command")
 
-    for command in ("strategy-list", "strategy-show", "strategy-validate", "strategy-run"):
+    for command in ("strategy-list", "strategy-show", "strategy-validate", "strategy-run", "strategy-gate", "strategy-gate-report"):
         assert command in subparsers_action.choices
         assert command in COMMAND_HANDLERS
 

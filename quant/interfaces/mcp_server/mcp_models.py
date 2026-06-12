@@ -15,7 +15,7 @@ class MCPToolMetadata:
     description: str
     arguments: dict[str, Any]
     return_schema: dict[str, Any]
-    version: str = "v0.36.0"
+    version: str = "v0.37.0"
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

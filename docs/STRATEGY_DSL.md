@@ -32,9 +32,12 @@ python -m quant.cli strategy-list
 python -m quant.cli strategy-show --strategy momentum_fundamental
 python -m quant.cli strategy-validate --file strategies/momentum_fundamental.yaml
 python -m quant.cli strategy-run --strategy momentum_fundamental
+python -m quant.cli strategy-run --strategy momentum_fundamental --with-gates
 ```
 
 `strategy-run` loads the DSL, validates it, builds alpha configuration, calls existing portfolio construction and trade simulation, and writes a `strategy_run` report. It does not change factor, alpha, trade-sim, scheduler, MCP, or no-lookahead semantics.
+
+`--with-gates` runs v0.37 Strategy Evaluation Gates after the offline strategy run and attaches the `strategy_gate` report path and summary. The gates are quality-control diagnostics only; they do not change trading simulation results or authorize live trading.
 
 Factor weights are checked as supplied. When their sum is positive but not exactly `1.0`, validation emits `WARN_FACTOR_WEIGHTS_NORMALIZED` and reports the normalized weights used by downstream alpha configuration. Negative weights are invalid.
 
@@ -55,6 +58,7 @@ The sample strategies are small deterministic examples for testing and documenta
 - `execution_settings`
 - `validation_results`
 - `generated_reports`
+- optional `gate_summary`
 - `warnings`
 - `no_lookahead_notes`
 
@@ -76,6 +80,8 @@ v0.36 exposes these MCP tools:
 - `show_strategy`: `READ_ONLY`
 - `validate_strategy`: `READ_ONLY`
 - `run_strategy`: `OFFLINE_SIMULATION`
+- `latest_strategy_gate_report`: `READ_ONLY`
+- `run_strategy_gates`: `OFFLINE_SIMULATION`
 
 All broker, order, and live trading tools remain disabled by the capability model.
 

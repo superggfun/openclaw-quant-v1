@@ -55,6 +55,8 @@ report_date <= signal_date
 
 `fiscal_period_end` alone is not a valid tradable availability date.
 
+`v0.37.0` Strategy Evaluation Gates may read Factor Store history to check IC, RankIC, ICIR, coverage, and history depth. Gate checks are diagnostics only and do not recompute factors or change factor evaluation semantics.
+
 ## CLI
 
 Persist factor evaluation history:

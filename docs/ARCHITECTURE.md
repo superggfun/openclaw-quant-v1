@@ -56,6 +56,7 @@ The reserved `quant.interfaces.api`, `quant.adapters.openclaw`, `quant.adapters.
 - `quant.interfaces.cli_commands`: Layered alias for CLI command modules. `quant.cli_commands` remains the implementation path in v0.34.
 - `quant.interfaces.mcp_server`: Local MCP-compatible research interface that exposes safe JSON tools over existing offline engines.
 - `quant.strategy_dsl`: Versioned YAML/JSON strategy definitions, validation, metadata persistence, and offline orchestration.
+- `quant.strategy_gates`: Deterministic offline Strategy Evaluation Gates over DSL validation, Factor Store history, walk-forward evidence, regime diagnostics, and trade simulation evidence.
 - `pyproject.toml`: PEP 621 packaging metadata, optional dependency groups, pytest defaults, and the `openclaw-quant` console entry point.
 - `quant.core.protocols`: Layered protocol namespace. `quant.core_protocols` remains supported.
 - `quant.reports.agent_export`: Layered report export namespace. `quant.agent_export` remains supported.
@@ -63,7 +64,7 @@ The reserved `quant.interfaces.api`, `quant.adapters.openclaw`, `quant.adapters.
 - `quant.data.providers`: Layered data provider namespace. `quant.data_providers` remains supported.
 - `quant.data.layer`: Layered universe, metadata, coverage, and quality namespace. `quant.data_layer` remains supported.
 - `quant.data.fundamental`: Layered fundamental data namespace. `quant.fundamental_data` remains supported.
-- `quant.engines.*`: Layered aliases for pure engine modules such as alpha, backtest, factor evaluation, factor backtest, multi-factor, regime, portfolio construction, risk, execution, trading simulation, strategy evaluation, and walk-forward.
+- `quant.engines.*`: Layered aliases for pure engine modules such as alpha, backtest, factor evaluation, factor backtest, multi-factor, regime, portfolio construction, risk, execution, trading simulation, strategy evaluation, strategy gates, and walk-forward.
 - `quant.fundamental_data`: Stores, imports, queries, validates, and reports offline fundamental data.
 - `quant.fundamental_factors`: Computes report-date-aware accounting factors from `fundamental_metrics`.
 - `quant.multi_factor`: Combines price and fundamental factors into normalized, coverage-aware alpha scores.

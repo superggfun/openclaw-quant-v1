@@ -88,6 +88,8 @@ class StrategyRegistry:
         end: str = "2025-01-01",
         initial_cash: float = 100000.0,
         rebalance_frequency: str = "monthly",
+        with_gates: bool = False,
+        gate_config_path: str | Path = "examples/strategy_gate_config.json",
     ) -> dict[str, Any]:
         definition, path = self.load_strategy(strategy, file)
         validation = self.validator.validate(definition)
@@ -114,6 +116,28 @@ class StrategyRegistry:
             validation=validation.to_report(),
             trading_report=result.to_report(),
         )
+        if with_gates:
+            from quant.strategy_gates.gate_runner import StrategyGateRunner
+
+            gate_report = StrategyGateRunner(self.context, strategy_dir=self.loader.strategy_dir, report_dir=self.report_dir).run(
+                strategy=strategy,
+                file=file,
+                config_path=gate_config_path,
+                strategy_run_report=report,
+            )
+            artifacts = dict(report.get("artifacts") or {})
+            artifacts["strategy_gate_report_path"] = gate_report.get("report_path")
+            report["artifacts"] = artifacts
+            generated = list(report.get("generated_reports") or [])
+            generated.append(gate_report.get("report_path"))
+            report["generated_reports"] = _dedupe(generated)
+            report["gate_summary"] = {
+                "overall_status": gate_report.get("overall_status"),
+                "warning_count": len(gate_report.get("warnings") or []),
+                "rejection_reasons": gate_report.get("rejection_reasons") or [],
+            }
+            report["warnings"] = _dedupe(list(report.get("warnings") or []) + list(gate_report.get("warnings") or []))
+            Path(report["report_path"]).write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
         self.metadata_store.save_run(report)
         return report
 

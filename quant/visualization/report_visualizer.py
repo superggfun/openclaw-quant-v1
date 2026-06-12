@@ -38,6 +38,7 @@ SUPPORTED_REPORT_TYPES = {
     "strategy_definition",
     "strategy_validation",
     "strategy_run",
+    "strategy_gate",
 }
 
 EXPECTED_CHARTS_BY_REPORT_TYPE = {
@@ -66,6 +67,7 @@ EXPECTED_CHARTS_BY_REPORT_TYPE = {
     "strategy_definition": {"factor_allocation", "portfolio_constraints"},
     "strategy_validation": {"validation_status"},
     "strategy_run": {"strategy_summary", "factor_allocation"},
+    "strategy_gate": {"gate_status_summary", "warning_count_by_gate", "evidence_metric"},
 }
 
 
@@ -454,6 +456,26 @@ class ReportVisualizer:
             builder.bar_chart(prefix, "factor_allocation", "Factor Allocation", factors),
         )
 
+    def _charts_strategy_gate(self, builder: ChartBuilder, prefix: str, report: dict[str, Any]) -> list[ChartArtifact]:
+        gates = report.get("gate_results") or []
+        status_order = {"PASS": 1, "WARNING": 2, "FAIL": 3, "REJECTED": 4}
+        status_values = {gate.get("gate_name", f"gate_{index + 1}"): status_order.get(gate.get("status"), 0) for index, gate in enumerate(gates)}
+        warning_counts = {
+            gate.get("gate_name", f"gate_{index + 1}"): len(gate.get("warnings") or []) + len(gate.get("rejection_reasons") or [])
+            for index, gate in enumerate(gates)
+        }
+        metrics = {}
+        for gate in gates:
+            name = str(gate.get("gate_name", "gate"))
+            for key, value in (gate.get("evidence") or {}).items():
+                if self._finite(value):
+                    metrics[f"{name}:{key}"] = value
+        return self._keep(
+            builder.bar_chart(prefix, "gate_status_summary", "Gate Status Summary", status_values),
+            builder.bar_chart(prefix, "warning_count_by_gate", "Warning Count By Gate", warning_counts),
+            builder.bar_chart(prefix, "evidence_metric", "Evidence Metrics", metrics),
+        )
+
     @staticmethod
     def _series(items: Any, label_key: str, value_key: str) -> list[tuple[str, float]]:
         output = []
@@ -724,15 +746,16 @@ class ReportVisualizer:
             return {"status": report.get("status"), "latest_run": latest.get("run_id")}
         if report_type == "research_history":
             return (report.get("summary") or {}).get("status_counts") or {}
-        if report_type in {"strategy_definition", "strategy_validation", "strategy_run"}:
+        if report_type in {"strategy_definition", "strategy_validation", "strategy_run", "strategy_gate"}:
             strategy = report.get("strategy") or {}
             summary = report.get("trade_sim_summary") or {}
             return {
                 "strategy_name": report.get("strategy_name") or strategy.get("name"),
                 "strategy_version": report.get("strategy_version") or strategy.get("version"),
-                "status": report.get("status"),
+                "status": report.get("status") or report.get("overall_status"),
                 "valid": (report.get("validation") or report).get("valid"),
                 "total_return": summary.get("total_return"),
+                "gate_count": len(report.get("gate_results") or []),
             }
         if report_type == "strategy_list":
             return {"strategy_count": report.get("strategy_count")}

@@ -24,6 +24,7 @@ def test_layered_imports_resolve_to_existing_implementations() -> None:
     from quant.engines.multi_factor.multi_factor_model import MultiFactorModel
     from quant.engines.portfolio.portfolio_construction import PortfolioConstructionEngine
     from quant.engines.regime.regime_detector import RegimeDetector
+    from quant.engines.strategy_gates.gate_runner import StrategyGateRunner
     from quant.engines.trading_simulation.trading_simulator import TradingSimulator
     from quant.engines.walk_forward.walk_forward import WalkForwardEngine
     from quant.factor_backtest.factor_backtest import FactorBacktest as OldFactorBacktest
@@ -42,6 +43,7 @@ def test_layered_imports_resolve_to_existing_implementations() -> None:
     from quant.regime_detection.regime_detector import RegimeDetector as OldRegimeDetector
     from quant.reports.agent_export.agent_exporter import AgentExporter
     from quant.reports.visualization.report_visualizer import ReportVisualizer
+    from quant.strategy_gates.gate_runner import StrategyGateRunner as OldStrategyGateRunner
     from quant.trading_simulation.trading_simulator import TradingSimulator as OldTradingSimulator
     from quant.visualization.report_visualizer import ReportVisualizer as OldReportVisualizer
     from quant.walk_forward.walk_forward import WalkForwardEngine as OldWalkForwardEngine
@@ -59,6 +61,7 @@ def test_layered_imports_resolve_to_existing_implementations() -> None:
     assert ProviderRegistry is OldProviderRegistry
     assert RegimeDetector is OldRegimeDetector
     assert ReportVisualizer is OldReportVisualizer
+    assert StrategyGateRunner is OldStrategyGateRunner
     assert TradingSimulator is OldTradingSimulator
     assert UniverseManager is OldUniverseManager
     assert WalkForwardEngine is OldWalkForwardEngine
@@ -114,6 +117,7 @@ def test_layered_package_directories_exist() -> None:
         "factors/fundamental",
         "factors/store",
         "engines/alpha",
+        "engines/strategy_gates",
         "reports/agent_export",
         "interfaces/cli_commands",
         "adapters/openclaw",

@@ -1,0 +1,20 @@
+{
+  "minimum_price_coverage": 0.8,
+  "minimum_fundamental_coverage": 0.3,
+  "stale_data_days": 7,
+  "minimum_ic": 0.02,
+  "minimum_rank_ic": 0.02,
+  "minimum_icir": 0.0,
+  "minimum_factor_coverage": 0.3,
+  "minimum_factor_history_count": 3,
+  "minimum_walk_forward_folds": 3,
+  "minimum_test_sharpe": 0.2,
+  "maximum_train_test_gap": 0.5,
+  "maximum_drawdown": 0.25,
+  "maximum_turnover": 5.0,
+  "maximum_cost_drag": 0.05,
+  "minimum_regime_sample": 30,
+  "maximum_factor_count": 8,
+  "maximum_parameter_count": 20,
+  "reject_on_schema_error": true
+}

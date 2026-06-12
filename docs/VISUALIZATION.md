@@ -38,6 +38,11 @@ Report type is auto-detected from schema keys:
 - `regime_history`
 - `regime_report`
 - `regime_rank`
+- `strategy_list`
+- `strategy_definition`
+- `strategy_validation`
+- `strategy_run`
+- `strategy_gate`
 
 ## Outputs
 
@@ -93,4 +98,4 @@ Visualization is offline review infrastructure only. It is not investment advice
 
 ## Strategy DSL Dashboards
 
-`visualize-report` supports Strategy DSL reports. Dashboards may include factor allocation, portfolio constraints, validation status, and strategy run summaries. Missing fields are skipped with warnings.
+`visualize-report` supports Strategy DSL and Strategy Gate reports. Dashboards may include factor allocation, portfolio constraints, validation status, strategy run summaries, gate status, warning counts, and numeric gate evidence. Missing fields are skipped with warnings.

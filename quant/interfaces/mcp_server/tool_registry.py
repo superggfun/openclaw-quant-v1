@@ -147,8 +147,10 @@ def create_default_mcp_registry() -> MCPToolRegistry:
         ("list_strategies", RESEARCH, READ_ONLY, "List Strategy DSL definitions.", runner.list_strategies, ()),
         ("show_strategy", RESEARCH, READ_ONLY, "Show a Strategy DSL definition.", runner.show_strategy, ()),
         ("validate_strategy", RESEARCH, READ_ONLY, "Validate a Strategy DSL definition.", runner.validate_strategy, ()),
+        ("latest_strategy_gate_report", RESEARCH, READ_ONLY, "Return latest Strategy Evaluation Gate report.", runner.latest_strategy_gate_report, ()),
         ("run_research_pipeline", RESEARCH, OFFLINE_SIMULATION, "Run local offline research pipeline.", runner.run_research_pipeline, ()),
         ("run_strategy", RESEARCH, OFFLINE_SIMULATION, "Run a Strategy DSL definition through offline simulation.", runner.run_strategy, ()),
+        ("run_strategy_gates", RESEARCH, OFFLINE_SIMULATION, "Run Strategy Evaluation Gates for an offline strategy.", runner.run_strategy_gates, ()),
         ("run_trade_sim", SIMULATION, OFFLINE_SIMULATION, "Run offline historical trading simulation.", runner.run_trade_sim, ()),
         ("trade_sim_summary", SIMULATION, READ_ONLY, "Return latest trade simulation report summary.", runner.trade_sim_summary, ()),
         ("export_for_agent", REPORTS, READ_ONLY, "Export an existing report for agent context.", runner.export_for_agent, ("report",)),
@@ -179,4 +181,4 @@ def _tool(name: str, category: str, capability_level: str, description: str, han
 
 
 def _read_only(name: str) -> bool:
-    return name not in {"run_research_pipeline", "run_trade_sim"}
+    return name not in {"run_research_pipeline", "run_strategy", "run_strategy_gates", "run_trade_sim"}

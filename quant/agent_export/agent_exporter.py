@@ -127,6 +127,7 @@ class AgentExporter:
             "strategy_definition",
             "strategy_validation",
             "strategy_run",
+            "strategy_gate",
         }:
             return report_type
         if {"strategy", "folds", "stability_analysis", "summary"}.issubset(report):
@@ -976,6 +977,37 @@ class AgentExporter:
             ["review trade simulation report", "run walk-forward validation", "inspect strategy validation gates"],
             [],
             ["Strategy runs are offline research simulation only, not live trading."],
+        )
+
+    def _export_strategy_gate(self, report: dict[str, Any], generated_from: str) -> AgentExport:
+        gates = report.get("gate_results") or []
+        by_status = (report.get("evidence_summary") or {}).get("by_status") or {}
+        failed = [gate.get("gate_name") for gate in gates if gate.get("status") in {"FAIL", "REJECTED"}]
+        warning_gates = [gate.get("gate_name") for gate in gates if gate.get("status") == "WARNING"]
+        return self._base_export(
+            "strategy_gate",
+            generated_from,
+            f"Strategy gates completed with overall status {report.get('overall_status')}.",
+            {
+                "strategy_name": report.get("strategy_name"),
+                "strategy_version": report.get("strategy_version"),
+                "overall_status": report.get("overall_status"),
+                "gate_count": len(gates),
+                "by_status": by_status,
+                "warning_gates": warning_gates,
+                "rejection_reasons": report.get("rejection_reasons") or [],
+            },
+            [
+                "strategy gate report is quality control for offline research readiness",
+                f"{len(failed)} gates failed or rejected" if failed else "no failed or rejected gates",
+            ],
+            self._clean_warnings(report.get("warnings")) + [f"REJECTION: {reason}" for reason in report.get("rejection_reasons", [])],
+            report.get("recommended_next_checks") or ["review weak gates before relying on the strategy research"],
+            [],
+            [
+                "Gates are deterministic diagnostics, not investment advice.",
+                "Gate reports do not submit orders or mutate live accounts.",
+            ],
         )
 
     def _base_export(

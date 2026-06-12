@@ -48,6 +48,11 @@ Supported report types:
 - `regime_history`
 - `regime_report`
 - `regime_rank`
+- `strategy_list`
+- `strategy_definition`
+- `strategy_validation`
+- `strategy_run`
+- `strategy_gate`
 
 Factor evaluation and factor backtest exports include `factor_coverage` when source reports evaluate fundamental factors. Agent summaries do not recompute the factors; they only compact existing report fields such as coverage percentage, missing percentage, metrics used, and warnings.
 
@@ -162,4 +167,6 @@ Agent Export supports `research_run`, `research_status`, and `research_history` 
 
 ## Strategy DSL Reports
 
-Agent Export supports `strategy_list`, `strategy_definition`, `strategy_validation`, and `strategy_run` reports. These summaries describe reproducible research configuration, validation gates, and offline simulation results; they are not trading advice.
+Agent Export supports `strategy_list`, `strategy_definition`, `strategy_validation`, `strategy_run`, and `strategy_gate` reports. These summaries describe reproducible research configuration, validation gates, offline simulation results, and v0.37 Strategy Evaluation Gate outcomes; they are not trading advice.
+
+Strategy Gate exports include overall status, warning gates, failed or rejected gates, rejection reasons, and deterministic next checks. They do not authorize order placement or live trading.

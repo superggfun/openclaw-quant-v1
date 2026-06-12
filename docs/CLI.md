@@ -56,6 +56,8 @@ python -m quant.cli regime-rank
 python -m quant.cli strategy-eval --factor-backtest-report reports/factor_backtest_YYYYMMDD_HHMMSS.json
 python -m quant.cli strategy-eval --strategy factor_long_short --factor momentum_20d
 python -m quant.cli strategy-eval --strategy alpha --pipeline examples/factor_pipeline_config.json
+python -m quant.cli strategy-gate --strategy momentum_fundamental
+python -m quant.cli strategy-gate-report --latest
 python -m quant.cli optimize
 python -m quant.cli portfolio-construct --method risk_parity --symbols SPY QQQ NVDA --output-targets examples/portfolio_constructed_targets.json
 python -m quant.cli cost
@@ -148,9 +150,13 @@ python -m quant.cli strategy-list
 python -m quant.cli strategy-show --strategy momentum_fundamental
 python -m quant.cli strategy-validate --file strategies/momentum_fundamental.yaml
 python -m quant.cli strategy-run --strategy momentum_fundamental
+python -m quant.cli strategy-gate --strategy momentum_fundamental
+python -m quant.cli strategy-run --strategy momentum_fundamental --with-gates
 ```
 
 Strategy DSL commands load YAML/JSON definitions, validate gates, and optionally run existing offline trade simulation. They do not change quant calculations, report schemas, no-lookahead rules, or broker/live trading boundaries.
+
+`strategy-gate` runs deterministic Strategy Evaluation Gates over DSL validation, data coverage, Factor Store history, walk-forward history, regime support, and offline simulation evidence. Gate reports are quality-control diagnostics only; they do not submit orders, mutate real accounts, or authorize live trading.
 
 ## Optional Dependencies
 

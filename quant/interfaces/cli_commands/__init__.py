@@ -28,10 +28,10 @@ alias_modules(
         "regime": "quant.cli_commands.regime",
         "risk": "quant.cli_commands.risk",
         "scheduler": "quant.cli_commands.scheduler",
+        "strategy_gates": "quant.cli_commands.strategy_gates",
         "strategy_eval": "quant.cli_commands.strategy_eval",
         "trading_simulation": "quant.cli_commands.trading_simulation",
         "visualization": "quant.cli_commands.visualization",
         "walk_forward": "quant.cli_commands.walk_forward",
     },
 )
-

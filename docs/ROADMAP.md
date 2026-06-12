@@ -1,5 +1,14 @@
 # Roadmap
 
+## v0.37.0-strategy-evaluation-gates
+
+- Adds `quant/strategy_gates` for deterministic Strategy Evaluation Gates.
+- Adds CLI commands: `strategy-gate` and `strategy-gate-report`.
+- Adds optional `strategy-run --with-gates` to append gate evidence after existing offline strategy simulation.
+- Adds MCP tools: `run_strategy_gates` (`OFFLINE_SIMULATION`) and `latest_strategy_gate_report` (`READ_ONLY`).
+- Adds Agent Export and Visualization support for `strategy_gate` reports.
+- Quality-control only: no new factors, ML, news sentiment, broker/live trading, report-schema changes to existing reports, quant calculation changes, or no-lookahead semantic changes.
+
 ## v0.36.0-strategy-dsl
 
 - Adds `quant/strategy_dsl` for versioned YAML/JSON strategy definitions.

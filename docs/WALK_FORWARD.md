@@ -15,6 +15,8 @@ The CLI defaults to the latest 5 folds to keep interactive runs fast on large lo
 
 Fundamental-factor composite alpha can increase walk-forward runtime because each signal date may need report-date-aware fundamental lookups in addition to price history. Validation smoke checks can use `--max-folds 1` or `--max-folds 2`; full validation can still use the default or `--max-folds 0`.
 
+`v0.37.0` Strategy Evaluation Gates may inspect saved walk-forward history to warn about low fold count, weak test Sharpe, or train/test gaps. The gates do not rerun or alter walk-forward semantics.
+
 Optional parameters:
 
 - `--train-years`

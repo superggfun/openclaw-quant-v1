@@ -10,6 +10,8 @@ The simulator unifies signal generation, portfolio construction, rebalance plann
 
 `v0.30.0` adds deterministic market realism checks for slippage, ADV liquidity caps, position-size limits, minimum trade diagnostics, and missing-price skips. These are still historical simulation assumptions, not broker fills.
 
+`v0.37.0` Strategy Evaluation Gates may inspect strategy-run and trade-sim summaries for drawdown, turnover, and cost-drag diagnostics. Gate checks do not change simulated fills, cash accounting, report schemas, or no-lookahead execution dates.
+
 The execution model is simulated. By default it fills on the next available historical close after a signal date. Results can differ from live trading, paper trading, broker fills, opening auction behavior, intraday execution, delayed data, liquidity limits, and real slippage.
 
 It is different from the existing backtest engine:

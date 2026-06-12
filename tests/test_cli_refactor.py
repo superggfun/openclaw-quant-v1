@@ -44,6 +44,8 @@ EXPECTED_COMMANDS = {
     "strategy-show",
     "strategy-validate",
     "strategy-run",
+    "strategy-gate",
+    "strategy-gate-report",
     "alpha",
     "factor-eval",
     "factor-list",

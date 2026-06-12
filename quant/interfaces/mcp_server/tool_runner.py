@@ -11,6 +11,7 @@ from quant.config import DEFAULT_SYMBOLS
 from quant.factors.factor_registry import FactorRegistry
 from quant.scheduler.research_scheduler import ResearchScheduler
 from quant.strategy_dsl.strategy_registry import StrategyRegistry
+from quant.strategy_gates.gate_runner import StrategyGateRunner
 
 
 class MCPToolRunner:
@@ -131,6 +132,16 @@ class MCPToolRunner:
             initial_cash=float(arguments.get("initial_cash", 100000.0)),
             rebalance_frequency=str(arguments.get("rebalance_frequency", "monthly")),
         )
+
+    def run_strategy_gates(self, arguments: dict[str, Any], context) -> dict[str, Any]:
+        return StrategyGateRunner(context, strategy_dir=arguments.get("strategy_dir", "strategies")).run(
+            strategy=arguments.get("strategy", "momentum_fundamental"),
+            file=arguments.get("file"),
+            config_path=arguments.get("config", "examples/strategy_gate_config.json"),
+        )
+
+    def latest_strategy_gate_report(self, arguments: dict[str, Any], context) -> dict[str, Any]:
+        return StrategyGateRunner(context, strategy_dir=arguments.get("strategy_dir", "strategies")).latest_report()
 
     def run_trade_sim(self, arguments: dict[str, Any], context) -> dict[str, Any]:
         result = context.trading_simulator.run(

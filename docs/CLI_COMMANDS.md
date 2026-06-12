@@ -423,6 +423,11 @@ python -m quant.cli strategy-list
 python -m quant.cli strategy-show --strategy momentum_fundamental
 python -m quant.cli strategy-validate --file strategies/momentum_fundamental.yaml
 python -m quant.cli strategy-run --strategy momentum_fundamental
+python -m quant.cli strategy-run --strategy momentum_fundamental --with-gates
+python -m quant.cli strategy-gate --strategy momentum_fundamental
+python -m quant.cli strategy-gate-report --latest
 ```
 
 Strategy DSL commands operate on versioned YAML/JSON strategy definitions under `strategies/`. `strategy-run` orchestrates existing alpha and trade simulation paths only. Sample strategy files are examples for reproducible research, not recommendations.
+
+`strategy-gate` runs the v0.37 Strategy Evaluation Gates over existing research evidence. It emits `PASS`, `WARNING`, `FAIL`, or `REJECTED` statuses for research review only. It is not live trading, broker execution, or investment advice.

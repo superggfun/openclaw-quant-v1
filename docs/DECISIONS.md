@@ -1,5 +1,9 @@
 # Decisions
 
+## 2026-06-12: Strategy Gates Are Quality Control Only
+
+`v0.37.0` adds Strategy Evaluation Gates as deterministic offline checks over Strategy DSL validation, data coverage, Factor Store history, walk-forward evidence, regime support, and strategy-run/trade-sim summaries. Gates can emit `PASS`, `WARNING`, `FAIL`, or `REJECTED`, but they do not submit orders, connect brokers, mutate real accounts, change factor semantics, or alter no-lookahead behavior.
+
 ## 2026-06-11: Start With SQLite
 
 SQLite is the local source of truth for v0.1.0 because it is simple, durable, testable, and easy for AI assistants to inspect.

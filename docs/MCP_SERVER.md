@@ -2,6 +2,7 @@
 
 `v0.35.0` adds a local MCP-compatible research tool layer under `quant.interfaces.mcp_server`.
 `v0.36.0` adds Strategy DSL tools on top of the same capability gates.
+`v0.37.0` adds Strategy Evaluation Gate tools without expanding live or paper-trading permissions.
 
 This is infrastructure for OpenClaw-style research agents. It is not a live trading API, not a broker API, not an order execution service, and not investment advice.
 
@@ -93,7 +94,11 @@ The MCP layer wraps existing CLI/service/engine boundaries. It does not change f
 - `show_strategy`: `READ_ONLY`
 - `validate_strategy`: `READ_ONLY`
 - `run_strategy`: `OFFLINE_SIMULATION`
+- `latest_strategy_gate_report`: `READ_ONLY`
+- `run_strategy_gates`: `OFFLINE_SIMULATION`
 
 `run_strategy` is offline historical simulation only. It does not submit orders, mutate real portfolios, connect brokers, or schedule live jobs.
+
+`run_strategy_gates` runs deterministic offline quality gates over existing Strategy DSL and research evidence. It may generate a local JSON report, but it does not submit orders, mutate real accounts, connect brokers, or authorize execution.
 
 `run_research_pipeline` and `run_trade_sim` are local offline research/simulation tools. They may generate reports, but they do not modify broker state or live account state.

@@ -557,6 +557,27 @@ Top-level keys:
 - `warnings`: warning objects with `code` and `reason`.
 - `interpretation_notes`: scope notes for offline interpretation.
 
+## reports/strategy_gate_*.json
+
+Strategy Evaluation Gate reports are generated files, not database tables. They are ignored by git.
+
+Top-level keys:
+
+- `metadata.report_type`: `strategy_gate`.
+- `strategy_name`
+- `strategy_version`
+- `strategy_file`
+- `gate_config_path`
+- `gate_config`
+- `gate_results`
+- `overall_status`
+- `rejection_reasons`
+- `evidence_summary`
+- `input_reports`
+- `warnings`
+- `no_lookahead_notes`
+- `recommended_next_checks`
+
 ## reports/data_quality_*.json
 
 Data quality reports are generated files, not database tables. They are ignored by git.
