@@ -283,6 +283,7 @@ class PortfolioBacktestEngine:
                     alpha_result = alpha_engine.generate(
                         config=signal_alpha_config,
                         pipeline_config=alpha_pipeline_config,
+                        write_report=False,
                     )
                 except ValueError:
                     alpha_result = None

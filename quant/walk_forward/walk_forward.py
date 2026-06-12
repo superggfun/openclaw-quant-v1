@@ -14,6 +14,7 @@ from quant.backtest.backtest_engine import PortfolioBacktestEngine
 from quant.config import DEFAULT_SYMBOLS
 from quant.factor_backtest.factor_backtest import FactorBacktest
 from quant.factors.factor_registry import FactorRegistry
+from quant.fundamental_data.fundamental_store import FundamentalStore
 from quant.storage.sqlite_store import SQLitePriceStore
 from quant.walk_forward.rolling_validation import RollingValidation
 
@@ -27,6 +28,11 @@ DEFAULT_STABILITY_FACTORS = [
     "reversal_5d",
     "reversal_20d",
     "risk_adjusted_momentum",
+    "fundamental_value_score",
+    "fundamental_quality_score",
+    "fundamental_growth_score",
+    "fundamental_health_score",
+    "fundamental_composite_score",
 ]
 
 
@@ -85,10 +91,16 @@ class WalkForwardResult:
 class WalkForwardEngine:
     """Run deterministic out-of-sample validation without changing strategy semantics."""
 
-    def __init__(self, price_store: SQLitePriceStore, report_dir: str | Path = "reports") -> None:
+    def __init__(
+        self,
+        price_store: SQLitePriceStore,
+        fundamental_store: FundamentalStore | None = None,
+        report_dir: str | Path = "reports",
+    ) -> None:
         self.price_store = price_store
         self.report_dir = Path(report_dir)
-        self.factor_registry = FactorRegistry()
+        self.fundamental_store = fundamental_store or FundamentalStore(price_store.db_path)
+        self.factor_registry = FactorRegistry(self.fundamental_store)
 
     def run(
         self,
@@ -300,7 +312,12 @@ class WalkForwardEngine:
                 future_index = index + forward_days
                 if future_index >= len(history):
                     continue
-                factor_value = self.factor_registry.factor_value(history.iloc[: index + 1]["close"], factor)
+                factor_value = self.factor_registry.factor_value(
+                    history.iloc[: index + 1]["close"],
+                    factor,
+                    symbol=symbol,
+                    as_of_date=signal_date,
+                )
                 if factor_value is None or pd.isna(factor_value):
                     continue
                 signal_close = float(history.iloc[index]["close"])
@@ -411,7 +428,7 @@ class WalkForwardEngine:
         symbols: list[str],
         pipeline_config: dict | None,
     ) -> WalkForwardFold:
-        backtest = FactorBacktest(self.price_store, report_dir=self.report_dir)
+        backtest = FactorBacktest(self.price_store, self.fundamental_store, report_dir=self.report_dir)
         train = backtest.run(
             factor=factor,
             start=window["train_start"],

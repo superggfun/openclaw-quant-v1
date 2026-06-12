@@ -13,6 +13,7 @@ import pandas as pd
 from quant.alpha.alpha_engine import AlphaEngine
 from quant.config import DEFAULT_SYMBOLS
 from quant.cost.cost_engine import CostEngine, DEFAULT_COST_CONFIG, TradeInput
+from quant.fundamental_data.fundamental_store import FundamentalStore
 from quant.portfolio_construction.portfolio_construction import (
     SUPPORTED_METHODS,
     PortfolioConstructionEngine,
@@ -59,11 +60,13 @@ class TradingSimulator:
     def __init__(
         self,
         price_store: SQLitePriceStore,
+        fundamental_store: FundamentalStore | None = None,
         report_dir: str | Path = "reports",
     ) -> None:
         self.price_store = price_store
         self.report_dir = Path(report_dir)
-        self.alpha_engine = AlphaEngine(price_store, report_dir=report_dir)
+        self.fundamental_store = fundamental_store or FundamentalStore(price_store.db_path)
+        self.alpha_engine = AlphaEngine(price_store, self.fundamental_store, report_dir=report_dir)
         self.portfolio_constructor = PortfolioConstructionEngine(price_store, report_dir=report_dir)
 
     def run(

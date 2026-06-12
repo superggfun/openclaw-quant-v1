@@ -41,6 +41,8 @@ Supported report types:
 - `fundamental_coverage`
 - `fundamental_quality`
 
+Factor evaluation and factor backtest exports include `factor_coverage` when source reports evaluate fundamental factors. Agent summaries do not recompute the factors; they only compact existing report fields such as coverage percentage, missing percentage, metrics used, and warnings.
+
 ## Common Output Schema
 
 All exports include:

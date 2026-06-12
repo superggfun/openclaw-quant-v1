@@ -60,6 +60,32 @@ def test_factor_eval_export() -> None:
     assert "negative predictive quality" in export["key_findings"]
 
 
+def test_factor_eval_export_includes_fundamental_coverage() -> None:
+    report = {
+        "factor": "fundamental_quality_score",
+        "forward_days": 20,
+        "ic_mean": 0.07,
+        "rank_ic_mean": 0.05,
+        "icir": 0.2,
+        "ic_count": 10,
+        "decay": {"20d": {"ic": 0.07}},
+        "factor_coverage": {
+            "coverage_percentage": 0.65,
+            "missing_percentage": 0.35,
+            "covered_symbols": ["AAPL", "MSFT"],
+            "missing_symbols": ["SPY"],
+            "fundamental_metrics_used": ["roe", "roa"],
+            "no_lookahead_filter": "report_date <= signal_date",
+        },
+    }
+
+    export = AgentExporter().export_report(report).to_dict()
+
+    assert export["report_type"] == "factor_eval"
+    assert export["key_metrics"]["factor_coverage"]["coverage_percentage"] == 0.65
+    assert "WARN_PARTIAL_FUNDAMENTAL_DATA" in export["warnings"]
+
+
 def test_factor_backtest_export() -> None:
     report = {
         "factor": "momentum_20d",

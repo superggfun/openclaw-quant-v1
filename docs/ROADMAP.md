@@ -1,5 +1,14 @@
 # Roadmap
 
+## v0.26.0-fundamental-factors
+
+- Adds `quant/fundamental_factors` for accounting-based value, quality, growth, and financial-health factors.
+- Extends the central factor registry with PE, PB, EV/EBITDA, ROE, ROA, margin, growth, leverage, liquidity, and composite fundamental factors.
+- Enforces no-lookahead with `report_date <= signal_date` for every fundamental factor.
+- Adds factor coverage metadata to factor evaluation and long-short factor backtest reports.
+- Integrates fundamental factors with composite alpha, factor evaluation, factor backtest, walk-forward validation, Agent Export, and existing CLI workflows.
+- Does not add machine learning, news sentiment, broker/live trading, or high-frequency features.
+
 ## v0.25.0-fundamental-data-layer
 
 - Adds `quant/fundamental_data` for fundamental storage, CSV import, query, coverage, and quality checks.

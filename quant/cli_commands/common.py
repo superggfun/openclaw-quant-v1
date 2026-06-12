@@ -94,17 +94,17 @@ def create_context(db_path: Path) -> CLIContext:
         optimizer_engine=OptimizerEngine(price_store, portfolio_store),
         portfolio_construction_engine=PortfolioConstructionEngine(price_store),
         execution_engine=ExecutionEngine(price_store, portfolio_store),
-        alpha_engine=AlphaEngine(price_store),
-        factor_evaluation=FactorEvaluation(price_store),
-        factor_backtest_engine=FactorBacktest(price_store),
+        alpha_engine=AlphaEngine(price_store, fundamental_store),
+        factor_evaluation=FactorEvaluation(price_store, fundamental_store),
+        factor_backtest_engine=FactorBacktest(price_store, fundamental_store),
         strategy_evaluation=StrategyEvaluation(),
         universe_manager=UniverseManager(metadata_store, data_provider),
         data_quality_analyzer=DataQualityAnalyzer(price_store, metadata_store),
         data_refresh_manager=DataRefreshManager(price_store, data_provider),
         fundamental_service=FundamentalService(fundamental_store),
         agent_exporter=AgentExporter(),
-        walk_forward_engine=WalkForwardEngine(price_store),
-        trading_simulator=TradingSimulator(price_store),
+        walk_forward_engine=WalkForwardEngine(price_store, fundamental_store),
+        trading_simulator=TradingSimulator(price_store, fundamental_store),
         report_visualizer=ReportVisualizer(),
     )
 
@@ -219,6 +219,8 @@ def factor_values_for_pipeline(
     symbols: list[str],
     as_of_date: str | None,
 ) -> dict[str, float | None]:
+    fundamental_store = FundamentalStore(price_store.db_path)
+    factor_registry = FactorEvaluation(price_store, fundamental_store).factor_registry
     values: dict[str, float | None] = {}
     for symbol in symbols:
         ticker = symbol.upper().strip()
@@ -228,7 +230,14 @@ def factor_values_for_pipeline(
             continue
         history = history.sort_values("date")
         closes = pd.to_numeric(history["close"], errors="coerce").dropna()
-        values[ticker] = FactorEvaluation._factor_value(closes, factor)
+        signal_date = as_of_date or str(history.iloc[-1]["date"])
+        values[ticker] = FactorEvaluation._factor_value(
+            closes,
+            factor,
+            symbol=ticker,
+            signal_date=signal_date,
+            registry=factor_registry,
+        )
     return values
 
 

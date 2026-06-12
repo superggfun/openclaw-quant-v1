@@ -57,10 +57,12 @@ python -m quant.cli backtest --start 2023-01-01 --end 2024-12-31 --initial-cash 
 python -m quant.cli factor-list
 python -m quant.cli factor-eval --factor quality_score
 python -m quant.cli factor-backtest --factor reversal_20d
+python -m quant.cli factor-eval --factor fundamental_quality_score
+python -m quant.cli factor-backtest --factor fundamental_value_score
 python -m quant.cli alpha
 ```
 
-`factor-list` prints registered factor names, categories, descriptions, required inputs, and lookback windows. Registered factors work with factor evaluation, factor pipeline, factor backtest, and composite alpha generation.
+`factor-list` prints registered factor names, categories, descriptions, required inputs, no-lookahead metadata, `fundamental_data_required`, and lookback windows. Registered factors work with factor evaluation, factor pipeline, factor backtest, and composite alpha generation. Fundamental factors use `report_date <= signal_date` and include coverage fields in factor reports.
 
 ## Walk Forward
 

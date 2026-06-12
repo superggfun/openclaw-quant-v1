@@ -12,6 +12,7 @@ import pandas as pd
 from quant.config import DEFAULT_SYMBOLS
 from quant.factor_pipeline.factor_pipeline import FactorPipeline
 from quant.factors.factor_registry import FactorRegistry
+from quant.fundamental_data.fundamental_store import FundamentalStore
 from quant.storage.sqlite_store import SQLitePriceStore
 
 
@@ -60,6 +61,7 @@ class FactorEvaluationResult:
     factor_inputs: list[str]
     factor_higher_is_better: bool
     factor_no_lookahead: bool
+    factor_coverage: dict | None
     warnings: list[str]
     pipeline_config: dict | None
     report_path: str
@@ -94,6 +96,7 @@ class FactorEvaluationResult:
             "factor_inputs": self.factor_inputs,
             "factor_higher_is_better": self.factor_higher_is_better,
             "factor_no_lookahead": self.factor_no_lookahead,
+            "factor_coverage": self.factor_coverage,
             "warnings": self.warnings,
             "pipeline_config": self.pipeline_config,
         }
@@ -105,11 +108,13 @@ class FactorEvaluation:
     def __init__(
         self,
         price_store: SQLitePriceStore,
+        fundamental_store: FundamentalStore | None = None,
         report_dir: str | Path = "reports",
     ) -> None:
         self.price_store = price_store
         self.report_dir = Path(report_dir)
-        self.factor_registry = FACTOR_REGISTRY
+        self.fundamental_store = fundamental_store or FundamentalStore(price_store.db_path)
+        self.factor_registry = FactorRegistry(self.fundamental_store)
 
     def evaluate(
         self,
@@ -144,6 +149,8 @@ class FactorEvaluation:
         warnings.extend(pipeline_warnings)
         if not observations:
             raise ValueError("no factor observations available for evaluation")
+        factor_coverage = self._factor_coverage(factor, symbols, observations)
+        warnings.extend(self._factor_coverage_warnings(factor, factor_coverage))
 
         ic_values, rank_ic_values = self._correlations(observations)
         quintiles = self._quintiles(observations)
@@ -190,6 +197,7 @@ class FactorEvaluation:
             factor_inputs=list(factor_metadata["factor_inputs"]),
             factor_higher_is_better=bool(factor_metadata["higher_is_better"]),
             factor_no_lookahead=bool(factor_metadata["no_lookahead"]),
+            factor_coverage=factor_coverage,
             warnings=warnings,
             pipeline_config=normalized_pipeline_config,
             report_path="",
@@ -224,6 +232,7 @@ class FactorEvaluation:
             factor_inputs=result.factor_inputs,
             factor_higher_is_better=result.factor_higher_is_better,
             factor_no_lookahead=result.factor_no_lookahead,
+            factor_coverage=result.factor_coverage,
             warnings=result.warnings,
             pipeline_config=result.pipeline_config,
             report_path=str(report_path),
@@ -298,7 +307,13 @@ class FactorEvaluation:
                 continue
 
             historical = history.iloc[: index + 1]
-            factor_value = self._factor_value(historical["close"], factor)
+            factor_value = self._factor_value(
+                historical["close"],
+                factor,
+                symbol=symbol,
+                signal_date=signal_date,
+                registry=self.factor_registry,
+            )
             if factor_value is None:
                 continue
 
@@ -317,8 +332,64 @@ class FactorEvaluation:
         return observations
 
     @staticmethod
-    def _factor_value(closes: pd.Series, factor: str) -> float | None:
-        return FACTOR_REGISTRY.factor_value(closes, factor)
+    def _factor_value(
+        closes: pd.Series,
+        factor: str,
+        symbol: str | None = None,
+        signal_date: str | None = None,
+        registry: FactorRegistry | None = None,
+    ) -> float | None:
+        factor_registry = registry or FACTOR_REGISTRY
+        return factor_registry.factor_value(closes, factor, symbol=symbol, as_of_date=signal_date)
+
+    def _factor_coverage(
+        self,
+        factor: str,
+        symbols: list[str],
+        observations: list[FactorObservation],
+    ) -> dict | None:
+        if not self.factor_registry.is_fundamental(factor):
+            return None
+        covered_symbols = sorted({observation.symbol for observation in observations})
+        missing_symbols = sorted(set(symbols) - set(covered_symbols))
+        total_symbols = len(symbols)
+        covered_count = len(covered_symbols)
+        coverage_pct = (covered_count / total_symbols) if total_symbols else 0.0
+        metadata = self.factor_registry.metadata(factor)
+        report_dates = []
+        for observation in observations:
+            row = self.factor_registry.latest_fundamental_row(
+                observation.symbol,
+                str(metadata.get("fundamental_statement") or "fundamental_metrics"),
+                observation.signal_date,
+            )
+            if row and row.get("report_date"):
+                report_dates.append(str(row["report_date"]))
+        return {
+            "coverage_percentage": coverage_pct,
+            "missing_percentage": 1.0 - coverage_pct,
+            "covered_symbols": covered_symbols,
+            "missing_symbols": missing_symbols,
+            "fundamental_metrics_used": metadata.get("fundamental_metrics_used") or [],
+            "report_date_coverage": {
+                "earliest_report_date": min(report_dates) if report_dates else None,
+                "latest_report_date": max(report_dates) if report_dates else None,
+                "observations_with_report_date": len(report_dates),
+            },
+            "no_lookahead_filter": "report_date <= signal_date",
+        }
+
+    def _factor_coverage_warnings(self, factor: str, coverage: dict | None) -> list[str]:
+        if coverage is None:
+            return []
+        warnings = []
+        if not coverage["covered_symbols"]:
+            warnings.append(f"MISSING_FUNDAMENTAL_DATA: {factor} has no symbols with usable report_date-filtered fundamentals")
+        elif coverage["missing_symbols"]:
+            warnings.append(
+                f"PARTIAL_FUNDAMENTAL_DATA: {factor} covers {coverage['coverage_percentage']:.2%} of the universe"
+            )
+        return warnings
 
     @staticmethod
     def _correlations(observations: list[FactorObservation]) -> tuple[list[float], list[float]]:

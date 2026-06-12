@@ -13,6 +13,7 @@ from quant.config import DEFAULT_SYMBOLS
 from quant.factor_eval.factor_evaluation import SUPPORTED_FACTORS, FactorEvaluation
 from quant.factor_pipeline.factor_pipeline import FactorPipeline
 from quant.factors.factor_registry import FactorRegistry
+from quant.fundamental_data.fundamental_store import FundamentalStore
 from quant.storage.sqlite_store import SQLitePriceStore
 
 
@@ -86,6 +87,7 @@ class FactorBacktestResult:
     factor_inputs: list[str]
     factor_higher_is_better: bool
     factor_no_lookahead: bool
+    factor_coverage: dict | None
     excluded_symbols: list[str]
     exclusion_reasons: dict[str, str]
     no_lookahead: bool
@@ -138,6 +140,7 @@ class FactorBacktestResult:
             "factor_inputs": self.factor_inputs,
             "factor_higher_is_better": self.factor_higher_is_better,
             "factor_no_lookahead": self.factor_no_lookahead,
+            "factor_coverage": self.factor_coverage,
             "excluded_symbols": self.excluded_symbols,
             "exclusion_reasons": self.exclusion_reasons,
             "no_lookahead": self.no_lookahead,
@@ -156,11 +159,13 @@ class FactorBacktest:
     def __init__(
         self,
         price_store: SQLitePriceStore,
+        fundamental_store: FundamentalStore | None = None,
         report_dir: str | Path = "reports",
     ) -> None:
         self.price_store = price_store
         self.report_dir = Path(report_dir)
-        self.factor_registry = FactorRegistry()
+        self.fundamental_store = fundamental_store or FundamentalStore(price_store.db_path)
+        self.factor_registry = FactorRegistry(self.fundamental_store)
 
     def run(
         self,
@@ -201,6 +206,8 @@ class FactorBacktest:
         warnings.extend(pipeline_warnings)
         if not observations:
             raise ValueError("no factor backtest observations available")
+        factor_coverage = self._factor_coverage(factor, symbols, observations)
+        warnings.extend(self._factor_coverage_warnings(factor, factor_coverage))
 
         observations = self._assign_quantiles(observations, quantiles)
         periods = self._periods(observations, quantiles, long_quantile, short_quantile)
@@ -286,6 +293,7 @@ class FactorBacktest:
             factor_inputs=list(factor_metadata["factor_inputs"]),
             factor_higher_is_better=bool(factor_metadata["higher_is_better"]),
             factor_no_lookahead=bool(factor_metadata["no_lookahead"]),
+            factor_coverage=factor_coverage,
             excluded_symbols=excluded_symbols,
             exclusion_reasons=exclusion_reasons,
             no_lookahead=True,
@@ -338,6 +346,7 @@ class FactorBacktest:
             factor_inputs=result.factor_inputs,
             factor_higher_is_better=result.factor_higher_is_better,
             factor_no_lookahead=result.factor_no_lookahead,
+            factor_coverage=result.factor_coverage,
             excluded_symbols=result.excluded_symbols,
             exclusion_reasons=result.exclusion_reasons,
             no_lookahead=result.no_lookahead,
@@ -403,7 +412,13 @@ class FactorBacktest:
             if future_index >= len(history):
                 continue
             historical = history.iloc[: index + 1]
-            factor_value = FactorEvaluation._factor_value(historical["close"], factor)
+            factor_value = FactorEvaluation._factor_value(
+                historical["close"],
+                factor,
+                symbol=symbol,
+                signal_date=signal_date,
+                registry=self.factor_registry,
+            )
             if factor_value is None:
                 continue
             signal_close = float(history.iloc[index]["close"])
@@ -656,6 +671,52 @@ class FactorBacktest:
         excluded_symbols.append(symbol)
         exclusion_reasons[symbol] = reason
         warnings.append(f"excluded {symbol}: {reason}")
+
+    def _factor_coverage(
+        self,
+        factor: str,
+        symbols: list[str],
+        observations: list[FactorBacktestObservation],
+    ) -> dict | None:
+        if not self.factor_registry.is_fundamental(factor):
+            return None
+        covered_symbols = sorted({observation.symbol for observation in observations})
+        missing_symbols = sorted(set(symbols) - set(covered_symbols))
+        total_symbols = len(symbols)
+        coverage_pct = (len(covered_symbols) / total_symbols) if total_symbols else 0.0
+        metadata = self.factor_registry.metadata(factor)
+        report_dates = []
+        for observation in observations:
+            row = self.factor_registry.latest_fundamental_row(
+                observation.symbol,
+                str(metadata.get("fundamental_statement") or "fundamental_metrics"),
+                observation.signal_date,
+            )
+            if row and row.get("report_date"):
+                report_dates.append(str(row["report_date"]))
+        return {
+            "coverage_percentage": coverage_pct,
+            "missing_percentage": 1.0 - coverage_pct,
+            "covered_symbols": covered_symbols,
+            "missing_symbols": missing_symbols,
+            "fundamental_metrics_used": metadata.get("fundamental_metrics_used") or [],
+            "report_date_coverage": {
+                "earliest_report_date": min(report_dates) if report_dates else None,
+                "latest_report_date": max(report_dates) if report_dates else None,
+                "observations_with_report_date": len(report_dates),
+            },
+            "no_lookahead_filter": "report_date <= signal_date",
+        }
+
+    @staticmethod
+    def _factor_coverage_warnings(factor: str, coverage: dict | None) -> list[str]:
+        if coverage is None:
+            return []
+        if not coverage["covered_symbols"]:
+            return [f"MISSING_FUNDAMENTAL_DATA: {factor} has no symbols with usable report_date-filtered fundamentals"]
+        if coverage["missing_symbols"]:
+            return [f"PARTIAL_FUNDAMENTAL_DATA: {factor} covers {coverage['coverage_percentage']:.2%} of the universe"]
+        return []
 
     @staticmethod
     def _normalize_symbols(symbols: list[str]) -> list[str]:

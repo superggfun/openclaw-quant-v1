@@ -4,7 +4,7 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v0.25.0-fundamental-data-layer`
+`v0.26.0-fundamental-factors`
 
 The project currently includes:
 
@@ -12,6 +12,7 @@ The project currently includes:
 - SQLite storage for normalized price data.
 - An offline data layer for universe management, static metadata, coverage, quality, and readiness diagnostics.
 - A fundamental data layer for CSV import, storage, query, coverage, and quality diagnostics.
+- Report-date-aware accounting fundamental factors for value, quality, growth, and financial health.
 - An agent export layer that compresses existing reports for LLM and OpenClaw-style agent context windows.
 - A simulated portfolio state module with accounts, positions, and trades.
 - An alpha engine that calculates deterministic factors and target weights from stored prices.
@@ -74,6 +75,7 @@ The project intentionally does not include:
 - `quant/config.py`: project defaults and symbol universe.
 - `quant/data_providers/`: provider interface, registry, yfinance provider, CSV provider, mock provider, and future-provider placeholders.
 - `quant/fundamental_data/`: fundamental store, importer, service, coverage, and quality checks.
+- `quant/fundamental_factors/`: accounting factor functions and registry extension metadata.
 - `quant/data_source/yfinance_client.py`: legacy yfinance normalization client used by the yfinance provider.
 - `quant/data_layer/`: universe, metadata, data quality, coverage, and readiness modules.
 - `quant/agent_export/agent_exporter.py`: compact report export layer for LLM/agent consumers.
@@ -139,4 +141,8 @@ Provider code belongs under `quant/data_providers`. `PriceService` and data refr
 
 ## v0.25 Fundamental Data Notes
 
-Fundamental data code belongs under `quant/fundamental_data`. Store `report_date` separately from `fiscal_period_end`; future factor code must use `report_date` for no-lookahead alignment. CSV import is the main supported path in v0.25. Do not add true fundamental factor scores until a later release explicitly asks for them.
+Fundamental data code belongs under `quant/fundamental_data`. Store `report_date` separately from `fiscal_period_end`; factor code must use `report_date` for no-lookahead alignment. CSV import is the main supported path in v0.25.
+
+## v0.26 Fundamental Factor Notes
+
+Fundamental factor code belongs under `quant/fundamental_factors` and must be registered through `quant/factors/factor_registry.py`. Every fundamental factor must enforce `report_date <= signal_date`; `fiscal_period_end` alone is not enough. Missing metrics must be skipped or excluded, never filled with fake zero values.

@@ -22,6 +22,7 @@ SQLite / External APIs
 - `quant.visualization`: Converts existing JSON reports into PNG, SVG, and HTML visual dashboards.
 - `quant.data_providers`: Defines the `DataProvider` interface, provider registry, yfinance provider, CSV provider, mock provider, and future-provider placeholders.
 - `quant.fundamental_data`: Stores, imports, queries, validates, and reports offline fundamental data.
+- `quant.fundamental_factors`: Computes report-date-aware accounting factors from `fundamental_metrics`.
 - `quant.data_layer.universe_manager`: Builds default, custom, sector, ETF, and large-cap universes.
 - `quant.data_layer.symbol_metadata`: Stores static symbol metadata in SQLite.
 - `quant.data_layer.data_quality`: Produces coverage, data quality, and research readiness reports.
@@ -75,9 +76,11 @@ Fundamental data flow:
 
 ```text
 CLI fundamental-* commands -> FundamentalService -> FundamentalStore -> SQLite fundamental tables -> reports/fundamental_*.json
+
+CLI factor-eval/factor-backtest/alpha -> FactorRegistry -> FundamentalStore.latest_as_of(report_date <= signal_date) -> fundamental factor values
 ```
 
-The fundamental data layer is storage/import/query/quality only in `v0.25.0`. It does not create PE/PB/ROE factors yet and does not change existing price-only factor behavior.
+The fundamental data layer handles storage/import/query/quality. `v0.26.0` adds accounting-based factor calculations while preserving price-only factor behavior. Fundamental factors always use `report_date <= signal_date`; `fiscal_period_end` alone is not a valid no-lookahead filter.
 
 Agent export flow:
 

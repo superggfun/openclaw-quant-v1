@@ -61,6 +61,12 @@ def handle(args, context) -> int:
     print(f"ic_mean: {format_optional_number(result.ic_mean)}")
     print(f"rank_ic_mean: {format_optional_number(result.rank_ic_mean)}")
     print(f"icir: {format_optional_number(result.icir)}")
+    if result.factor_coverage:
+        print("factor_coverage:")
+        print(f"coverage_percentage: {format_optional_pct(result.factor_coverage.get('coverage_percentage'))}")
+        print(f"missing_percentage: {format_optional_pct(result.factor_coverage.get('missing_percentage'))}")
+        print(f"metrics_used: {','.join(result.factor_coverage.get('fundamental_metrics_used') or [])}")
+        print(f"no_lookahead_filter: {result.factor_coverage.get('no_lookahead_filter')}")
     if result.excluded_symbols:
         print("excluded_symbols:")
         for symbol in result.excluded_symbols:
@@ -69,4 +75,3 @@ def handle(args, context) -> int:
         print(f"warning: {warning}", file=sys.stderr)
     print(f"report: {result.report_path}")
     return 0
-

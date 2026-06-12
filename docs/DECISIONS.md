@@ -138,4 +138,8 @@ The `v0.24.0` provider layer introduces `DataProvider` and `ProviderRegistry` so
 
 ## 2026-06-12: Fundamental Data Is Storage Only
 
-The `v0.25.0` fundamental data layer imports, stores, queries, and validates statement and metric data. It preserves `report_date` separately from `fiscal_period_end` for future no-lookahead factor alignment. It does not implement PE, PB, ROE, ROA, revenue growth, EPS growth, or other fundamental factor scoring yet.
+The `v0.25.0` fundamental data layer imports, stores, queries, and validates statement and metric data. It preserves `report_date` separately from `fiscal_period_end` for no-lookahead factor alignment. Factor scoring is implemented separately in v0.26 so the storage layer stays reusable.
+
+## v0.26 Fundamental Factors
+
+The `v0.26.0` fundamental factor layer implements accounting-based value, quality, growth, and financial-health factors using imported `fundamental_metrics`. Fundamental factors are registered in the central factor registry and must use `report_date <= signal_date`. Missing metrics are skipped inside composites; the system does not fill missing accounting data with zero or fabricated values. This release does not add ML, sentiment, broker integration, or live trading.

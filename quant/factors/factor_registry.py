@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable
 
 import pandas as pd
 
@@ -12,8 +12,10 @@ from quant.factors.low_volatility_factors import low_volatility_score
 from quant.factors.quality_factors import quality_score
 from quant.factors.reversal_factors import reversal_5d, reversal_20d
 from quant.factors.value_factors import value_score
+from quant.fundamental_data.fundamental_store import FundamentalStore
+from quant.fundamental_factors.factor_registry_extension import fundamental_factor_definitions
 
-FactorFunction = Callable[[pd.Series], float | None]
+FactorFunction = Callable[[Any], float | None]
 
 
 @dataclass(frozen=True)
@@ -27,6 +29,10 @@ class FactorDefinition:
     higher_is_better: bool
     no_lookahead: bool
     compute: FactorFunction
+    data_source: str = "price"
+    fundamental_data_required: bool = False
+    fundamental_statement: str | None = None
+    fundamental_metrics_used: list[str] | None = None
 
 
 def _clean_closes(closes: pd.Series) -> pd.Series:
@@ -65,9 +71,11 @@ def _risk_adjusted_momentum(closes: pd.Series) -> float | None:
 
 
 class FactorRegistry:
-    """Resolve factor metadata and price-only computations."""
+    """Resolve factor metadata and deterministic no-lookahead computations."""
 
-    def __init__(self) -> None:
+    def __init__(self, fundamental_store: FundamentalStore | None = None) -> None:
+        self.fundamental_store = fundamental_store
+        self._fundamental_rows_cache: dict[tuple[str, str], list[dict]] = {}
         self._definitions = self._build_definitions()
 
     def list_factors(self) -> list[FactorDefinition]:
@@ -85,8 +93,17 @@ class FactorRegistry:
     def resolve(self, factor: str) -> FactorFunction:
         return self.describe(factor).compute
 
-    def factor_value(self, closes: pd.Series, factor: str) -> float | None:
-        return self.resolve(factor)(closes)
+    def factor_value(
+        self,
+        closes: pd.Series,
+        factor: str,
+        symbol: str | None = None,
+        as_of_date: str | None = None,
+    ) -> float | None:
+        definition = self.describe(factor)
+        if definition.data_source == "fundamental":
+            return self._fundamental_value(definition, symbol=symbol, as_of_date=as_of_date)
+        return definition.compute(closes)
 
     def metadata(self, factor: str) -> dict:
         definition = self.describe(factor)
@@ -99,7 +116,44 @@ class FactorRegistry:
             "lookback_days": definition.lookback_days,
             "higher_is_better": definition.higher_is_better,
             "no_lookahead": definition.no_lookahead,
+            "data_source": definition.data_source,
+            "fundamental_data_required": definition.fundamental_data_required,
+            "fundamental_statement": definition.fundamental_statement,
+            "fundamental_metrics_used": definition.fundamental_metrics_used or [],
         }
+
+    def is_fundamental(self, factor: str) -> bool:
+        return self.describe(factor).data_source == "fundamental"
+
+    def _fundamental_value(
+        self,
+        definition: FactorDefinition,
+        symbol: str | None,
+        as_of_date: str | None,
+    ) -> float | None:
+        if self.fundamental_store is None or symbol is None or as_of_date is None:
+            return None
+        statement = definition.fundamental_statement or "fundamental_metrics"
+        row = self.latest_fundamental_row(symbol, statement, as_of_date)
+        if not row:
+            return None
+        return definition.compute(row)
+
+    def latest_fundamental_row(self, symbol: str, statement: str, as_of_date: str) -> dict | None:
+        if self.fundamental_store is None:
+            return None
+        key = (statement, symbol.upper())
+        if key not in self._fundamental_rows_cache:
+            rows = self.fundamental_store.rows(statement, [symbol])
+            self._fundamental_rows_cache[key] = sorted(
+                [row for row in rows if row.get("report_date")],
+                key=lambda row: (str(row.get("report_date") or ""), str(row.get("fiscal_period_end") or "")),
+                reverse=True,
+            )
+        for row in self._fundamental_rows_cache[key]:
+            if str(row.get("report_date")) <= as_of_date:
+                return row
+        return None
 
     @staticmethod
     def _normalize(factor: str) -> str:
@@ -107,7 +161,7 @@ class FactorRegistry:
 
     @staticmethod
     def _build_definitions() -> dict[str, FactorDefinition]:
-        definitions = [
+        definitions: list[FactorDefinition] = [
             FactorDefinition(
                 name="momentum_20d",
                 category="momentum",
@@ -219,4 +273,24 @@ class FactorRegistry:
                 compute=low_volatility_score,
             ),
         ]
+        for spec in fundamental_factor_definitions():
+            definitions.append(
+                FactorDefinition(
+                    name=spec.name,
+                    category=spec.category,
+                    description=spec.description,
+                    required_inputs=["fundamental_metrics.report_date"] + [
+                        f"fundamental_metrics.{field}" for field in spec.metrics_used
+                    ],
+                    lookback_days=0,
+                    factor_type="fundamental_accounting",
+                    higher_is_better=True,
+                    no_lookahead=True,
+                    compute=spec.compute,
+                    data_source="fundamental",
+                    fundamental_data_required=True,
+                    fundamental_statement="fundamental_metrics",
+                    fundamental_metrics_used=spec.metrics_used,
+                )
+            )
         return {definition.name: definition for definition in definitions}

@@ -70,7 +70,7 @@ python -m quant.cli fundamental-quality
 python -m quant.cli fundamental-quality --symbol AAPL
 ```
 
-The fundamental commands import and inspect offline CSV fundamentals. They do not generate fundamental factors, target weights, trades, broker calls, or investment advice.
+The fundamental commands import and inspect offline CSV fundamentals. Factor generation happens through the registered factor commands. They do not place trades, call brokers, or provide investment advice.
 
 ## Agent Export
 
@@ -319,10 +319,12 @@ The alpha strategy path records `signal_date` and `execution_date` and executes 
 python -m quant.cli factor-list
 python -m quant.cli factor-eval --factor quality_score
 python -m quant.cli factor-backtest --factor reversal_20d
+python -m quant.cli factor-eval --factor fundamental_quality_score
+python -m quant.cli factor-backtest --factor fundamental_value_score
 python -m quant.cli alpha
 ```
 
-The factor library is registry-driven. `factor-list` shows each factor's category, type, required inputs, lookback window, and description. The Alpha Engine can combine registered factors using `factor_weights` in `examples/alpha_config.json`, producing `composite_alpha_score` and per-factor contributions in alpha reports.
+The factor library is registry-driven. `factor-list` shows each factor's category, type, required inputs, lookback window, no-lookahead flag, `fundamental_data_required`, and description. The Alpha Engine can combine registered factors using `factor_weights` in `examples/alpha_config.json`, producing `composite_alpha_score` and per-factor contributions in alpha reports. Fundamental factors use `report_date <= signal_date` and report coverage/missing-data diagnostics.
 
 ## Walk Forward Validation
 
@@ -332,7 +334,7 @@ python -m quant.cli walk-forward --strategy factor_long_short --factor momentum_
 python -m quant.cli walk-forward --strategy factor_long_short --factor momentum_20d --train-years 3 --test-years 1 --max-folds 0
 ```
 
-The command generates rolling train/test folds, computes out-of-sample metrics, factor stability rankings, and warnings such as `WARN_OVERFIT`, `WARN_FACTOR_DECAY`, and `WARN_REGIME_DEPENDENT`. It writes `reports/walk_forward_*.json` and does not modify portfolio state.
+The command generates rolling train/test folds, computes out-of-sample metrics, factor stability rankings, and warnings such as `WARN_OVERFIT`, `WARN_FACTOR_DECAY`, and `WARN_REGIME_DEPENDENT`. The CLI defaults to the latest 5 folds for runtime; use `--max-folds 0` to run every generated fold. Fundamental-factor composite alpha can increase walk-forward runtime, so smoke checks may explicitly use `--max-folds 1` or `--max-folds 2`. It writes `reports/walk_forward_*.json` and does not modify portfolio state.
 
 ## Historical Trading Simulation
 

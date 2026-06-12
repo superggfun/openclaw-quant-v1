@@ -157,6 +157,9 @@ class AgentExporter:
         warnings = self._clean_warnings(report.get("warnings"))
         if self._num(ic) is not None and self._num(ic) < 0:
             warnings.append("WARN_FACTOR_IC_NEGATIVE")
+        coverage = report.get("factor_coverage") or {}
+        if coverage and self._num(coverage.get("missing_percentage")) and self._num(coverage.get("missing_percentage")) > 0:
+            warnings.append("WARN_PARTIAL_FUNDAMENTAL_DATA")
         metrics = {
             "factor": report.get("factor"),
             "ic_mean": ic,
@@ -165,6 +168,7 @@ class AgentExporter:
             "ic_count": report.get("ic_count"),
             "best_horizon": best_horizon,
             "spread_return": report.get("spread_return"),
+            "factor_coverage": coverage or None,
         }
         return self._base_export(
             "factor_eval",
@@ -187,6 +191,9 @@ class AgentExporter:
         warnings.extend(self._performance_warnings(total_return=ret, sharpe=sharpe, drawdown=drawdown))
         if len(report.get("rebalance_dates") or []) < 20:
             warnings.append("WARN_LOW_OBSERVATION_COUNT")
+        coverage = report.get("factor_coverage") or {}
+        if coverage and self._num(coverage.get("missing_percentage")) and self._num(coverage.get("missing_percentage")) > 0:
+            warnings.append("WARN_PARTIAL_FUNDAMENTAL_DATA")
         metrics = {
             "factor": report.get("factor"),
             "long_short_return": ret,
@@ -198,6 +205,7 @@ class AgentExporter:
             "ic_mean": report.get("ic_mean"),
             "rank_ic_mean": report.get("rank_ic_mean"),
             "icir": report.get("icir"),
+            "factor_coverage": coverage or None,
         }
         return self._base_export(
             "factor_backtest",

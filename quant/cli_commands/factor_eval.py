@@ -44,6 +44,12 @@ def handle(args, context) -> int:
     for quintile in ["q1", "q2", "q3", "q4", "q5"]:
         print(f"{quintile}: {format_optional_number(result.quintiles.get(quintile))}")
     print(f"spread_return: {format_optional_number(result.spread_return)}")
+    if result.factor_coverage:
+        print("factor_coverage:")
+        print(f"coverage_percentage: {format_optional_pct(result.factor_coverage.get('coverage_percentage'))}")
+        print(f"missing_percentage: {format_optional_pct(result.factor_coverage.get('missing_percentage'))}")
+        print(f"metrics_used: {','.join(result.factor_coverage.get('fundamental_metrics_used') or [])}")
+        print(f"no_lookahead_filter: {result.factor_coverage.get('no_lookahead_filter')}")
     print("decay:")
     for horizon, metrics in result.decay.items():
         print(
@@ -59,4 +65,3 @@ def handle(args, context) -> int:
         print(f"warning: {warning}", file=sys.stderr)
     print(f"report: {result.report_path}")
     return 0
-

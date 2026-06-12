@@ -11,7 +11,7 @@ def register_parser(subparsers) -> None:
 
 def handle(args, context) -> int:
     registry = FactorRegistry()
-    print("factor_name category factor_type higher_is_better no_lookahead lookback_days required_inputs description")
+    print("factor_name category factor_type higher_is_better no_lookahead fundamental_data_required lookback_days required_inputs description")
     for definition in registry.list_factors():
         inputs = ",".join(definition.required_inputs)
         print(
@@ -20,6 +20,7 @@ def handle(args, context) -> int:
             f"{definition.factor_type:<30} "
             f"{str(definition.higher_is_better).lower():<16} "
             f"{str(definition.no_lookahead).lower():<12} "
+            f"{str(definition.fundamental_data_required).lower():<26} "
             f"{definition.lookback_days:<13} "
             f"{inputs:<15} "
             f"{definition.description}"

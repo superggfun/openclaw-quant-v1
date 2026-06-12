@@ -115,6 +115,24 @@ class FundamentalStore:
                 rows.append(dict(row))
         return rows
 
+    def latest_as_of(self, symbol: str, statement: str, as_of_date: str) -> dict | None:
+        """Return the newest row whose report_date was available on as_of_date."""
+
+        with self.connect() as connection:
+            row = connection.execute(
+                f"""
+                SELECT *, ? AS statement_type
+                FROM {statement}
+                WHERE symbol = ?
+                  AND report_date IS NOT NULL
+                  AND report_date <= ?
+                ORDER BY report_date DESC, fiscal_period_end DESC
+                LIMIT 1
+                """,
+                (statement, symbol.upper(), as_of_date),
+            ).fetchone()
+        return dict(row) if row else None
+
     def query(self, symbol: str, statement: str | None = None, limit: int = 10) -> list[dict]:
         statements = [statement] if statement else list(STATEMENT_FIELDS)
         rows = []

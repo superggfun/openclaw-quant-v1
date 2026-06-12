@@ -2,7 +2,7 @@
 
 `v0.25.0` adds the storage, CSV import, query, coverage, and quality foundation for future fundamental factors.
 
-This release does not create trading factors, change existing price-only factor semantics, connect brokers, provide paid API integration, use machine learning, or provide investment advice. `v0.26` is the planned layer for true PE/PB/ROE/ROA/revenue growth/EPS growth style factors built on this data.
+This release created the data foundation. `v0.26.0` builds true PE/PB/ROE/ROA/revenue growth/EPS growth style factors on this data. Neither layer connects brokers, provides paid API integration, uses machine learning, or provides investment advice.
 
 ## Commands
 
@@ -107,3 +107,5 @@ Summaries include readiness score, symbols covered, missing symbols, latest repo
 
 - statement coverage in `fundamental_coverage`
 - warning reason counts in `fundamental_quality`
+
+See `docs/FUNDAMENTAL_FACTORS.md` for the v0.26 factor layer built on this data.

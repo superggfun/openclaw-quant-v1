@@ -81,6 +81,8 @@ Important columns:
 - common: `symbol`, `fiscal_period_end`, `report_date`, `fiscal_year`, `fiscal_quarter`, `currency`
 - metrics: `market_cap`, `enterprise_value`, `book_value_per_share`, `pe_ratio`, `pb_ratio`, `ps_ratio`, `ev_to_ebitda`, `roe`, `roa`, `gross_margin`, `net_margin`, `debt_to_equity`, `current_ratio`, `quick_ratio`, `revenue_growth`, `eps_growth`, `free_cash_flow_yield`
 
+Fundamental factors must select rows using `report_date <= signal_date`; `fiscal_period_end` alone is not a no-lookahead availability filter.
+
 ## fundamental_import_log
 
 Append-only import log for CSV imports. It stores file path, statement override, force flag, inserted/updated/skipped/error counts, and warnings.
@@ -505,6 +507,7 @@ Factor evaluation and factor backtest reports include registry metadata:
 - `factor_inputs`
 - `factor_higher_is_better`
 - `factor_no_lookahead`
+- `factor_coverage` for fundamental factors, including coverage percentage, missing percentage, metrics used, report-date coverage, and the `report_date <= signal_date` filter note.
 
 Alpha factor rows may include:
 

@@ -1,6 +1,6 @@
 # Factor Library
 
-v0.19.0 expands the deterministic factor library while preserving the existing no-lookahead contract. Every factor is computed from stored price history at or before the signal date. No machine learning, news sentiment, paid fundamentals, broker data, or live market data is used.
+v0.19.0 expanded deterministic price-history factors. v0.26.0 adds accounting-based fundamental factors while preserving the no-lookahead contract. Price factors use stored price history at or before the signal date. Fundamental factors use only rows whose `report_date <= signal_date`. No machine learning, news sentiment, broker data, or live market data is used.
 
 ## CLI
 
@@ -8,6 +8,8 @@ v0.19.0 expands the deterministic factor library while preserving the existing n
 python -m quant.cli factor-list
 python -m quant.cli factor-eval --factor quality_score
 python -m quant.cli factor-backtest --factor reversal_20d
+python -m quant.cli factor-eval --factor fundamental_quality_score
+python -m quant.cli factor-backtest --factor fundamental_value_score
 python -m quant.cli alpha
 ```
 
@@ -50,6 +52,8 @@ Factor scores are calculated from price rows up to the signal date. Future retur
 
 ## Limitations
 
-These are research proxies, not full fundamental factors. `value_score`, `quality_score`, and `growth_score` use price-derived approximations until future data-provider work adds audited fundamentals. In particular, `value_score` is not a true valuation factor such as book-to-market, earnings yield, sales yield, or cash-flow yield.
+`value_score`, `quality_score`, and `growth_score` remain price-derived proxies for backward compatibility.
+
+Accounting factors added in v0.26 include `fundamental_value_score`, `fundamental_quality_score`, `fundamental_growth_score`, `fundamental_health_score`, and `fundamental_composite_score`. These use imported `fundamental_metrics` rows and require `report_date <= signal_date`.
 
 Long-short factor backtests compound overlapping forward-return spread observations. A leveraged spread period can be less than `-100%`; if that happens, the report emits a warning and the compounded spread can reach `-100%`. Treat this as a research diagnostic, not as a broker-executable portfolio equity curve.

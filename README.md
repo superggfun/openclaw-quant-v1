@@ -6,7 +6,7 @@ This project is for research and simulation only. It is not investment advice.
 
 ## Current Version
 
-`v0.25.0-fundamental-data-layer`
+`v0.26.0-fundamental-factors`
 
 This release includes:
 
@@ -14,6 +14,7 @@ This release includes:
 - Data provider abstraction with yfinance as the default provider.
 - yfinance daily OHLCV ingestion through the provider interface.
 - Fundamental data storage, CSV import, query, coverage, and quality diagnostics.
+- Accounting-based fundamental factors using PE, PB, EV/EBITDA, ROE, ROA, margins, growth, leverage, and liquidity metrics.
 - SQLite price storage with idempotent updates.
 - Expanded research universe management.
 - Static symbol metadata storage.
@@ -40,7 +41,7 @@ This release includes:
 - CLI commands for data, portfolio, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtest, allocation, rebalance, risk, optimizer, portfolio construction, cost, and execution workflows.
 - pytest coverage for core state transitions.
 
-`v0.25.0` adds a fundamental-data foundation for future true value, quality, and growth factors. It does not create fundamental factor scores yet, change price-only factor semantics, connect brokers, or add machine learning.
+`v0.26.0` adds true fundamental factors using the v0.25 fundamental data layer. Fundamental factors enforce `report_date <= signal_date`, preserve existing price-only factor behavior, and do not connect brokers or add machine learning.
 
 ## Scope
 
@@ -84,6 +85,7 @@ openclaw-quant-v1/
 |  |- factor_pipeline/
 |  |- factors/
 |  |- fundamental_data/
+|  |- fundamental_factors/
 |  |- optimizer/
 |  |- portfolio_construction/
 |  |- rebalance/
@@ -117,6 +119,7 @@ Key modules:
 - `quant/data_layer/`: universe management, symbol metadata, coverage, quality, and readiness diagnostics.
 - `quant/data_providers/`: provider abstraction, registry, yfinance provider, CSV provider, mock provider, and future-provider placeholders.
 - `quant/fundamental_data/`: fundamental statement storage, CSV import, query, coverage, and quality diagnostics.
+- `quant/fundamental_factors/`: report-date-aware accounting factor functions and registry extensions.
 - `quant/agent_export/agent_exporter.py`: compact report summaries for LLM/agent contexts.
 - `quant/visualization/`: PNG, SVG, and HTML visual reports from existing JSON reports.
 - `quant/alpha/alpha_engine.py`: factor calculation and target weight generation.
@@ -180,6 +183,7 @@ python -m quant.cli visualize-report --report reports/trade_sim_YYYYMMDD_HHMMSS.
 
 See `docs/DATA_LAYER.md` and `docs/DATA_PROVIDERS.md` for universe, provider, metadata, coverage, quality, and readiness details.
 See `docs/FUNDAMENTAL_DATA.md` for fundamental CSV import, query, coverage, and quality details.
+See `docs/FUNDAMENTAL_FACTORS.md` for accounting-based value, quality, growth, and financial health factor details.
 
 ## Agent Export
 

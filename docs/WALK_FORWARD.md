@@ -12,6 +12,8 @@ python -m quant.cli walk-forward --strategy factor_long_short --factor momentum_
 
 The CLI defaults to the latest 5 folds to keep interactive runs fast on large local histories. Use `--max-folds 0` to run every generated fold.
 
+Fundamental-factor composite alpha can increase walk-forward runtime because each signal date may need report-date-aware fundamental lookups in addition to price history. Validation smoke checks can use `--max-folds 1` or `--max-folds 2`; full validation can still use the default or `--max-folds 0`.
+
 Optional parameters:
 
 - `--train-years`

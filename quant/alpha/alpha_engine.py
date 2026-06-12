@@ -13,6 +13,7 @@ import pandas as pd
 from quant.config import DEFAULT_SYMBOLS
 from quant.factor_pipeline.factor_pipeline import FactorPipeline
 from quant.factors.factor_registry import FactorRegistry
+from quant.fundamental_data.fundamental_store import FundamentalStore
 from quant.storage.sqlite_store import SQLitePriceStore
 
 
@@ -95,17 +96,20 @@ class AlphaEngine:
     def __init__(
         self,
         price_store: SQLitePriceStore,
+        fundamental_store: FundamentalStore | None = None,
         report_dir: str | Path = "reports",
     ) -> None:
         self.price_store = price_store
         self.report_dir = Path(report_dir)
-        self.factor_registry = FactorRegistry()
+        self.fundamental_store = fundamental_store or FundamentalStore(price_store.db_path)
+        self.factor_registry = FactorRegistry(self.fundamental_store)
 
     def generate(
         self,
         config: Mapping | None = None,
         output_targets: str | Path | None = None,
         pipeline_config: Mapping | None = None,
+        write_report: bool = True,
     ) -> AlphaResult:
         normalized_config = self._normalize_config(config or {})
         warnings: list[str] = []
@@ -115,8 +119,9 @@ class AlphaEngine:
         pipeline_factor = "risk_adjusted_momentum"
         normalized_pipeline_config = None
 
+        row_factor_names = self._row_factor_names(normalized_config, pipeline_config)
         factor_rows = [
-            self._factor_row(symbol, normalized_config, warnings)
+            self._factor_row(symbol, normalized_config, warnings, row_factor_names)
             for symbol in normalized_config["universe"]
         ]
         composite_score_by_symbol: dict[str, float] | None = None
@@ -202,7 +207,7 @@ class AlphaEngine:
             report_path="",
             targets_path=str(target_output) if target_output else None,
         )
-        report_path = self._write_report(result)
+        report_path = self._write_report(result) if write_report else ""
         return AlphaResult(
             config=result.config,
             as_of_date=result.as_of_date,
@@ -222,7 +227,13 @@ class AlphaEngine:
             targets_path=result.targets_path,
         )
 
-    def _factor_row(self, symbol: str, config: dict, warnings: list[str]) -> AlphaFactorRow:
+    def _factor_row(
+        self,
+        symbol: str,
+        config: dict,
+        warnings: list[str],
+        factor_names: list[str] | None = None,
+    ) -> AlphaFactorRow:
         history = self.price_store.get_price_history(symbol, end=config["as_of_date"])
         if history.empty:
             return self._excluded_row(symbol, "no price data", warnings)
@@ -261,8 +272,13 @@ class AlphaEngine:
 
         risk_adjusted = momentum_long / volatility_short
         factor_values = {
-            definition.name: self.factor_registry.factor_value(closes, definition.name)
-            for definition in self.factor_registry.list_factors()
+            definition.name: self.factor_registry.factor_value(
+                closes,
+                definition.name,
+                symbol=symbol,
+                as_of_date=as_of_date,
+            )
+            for definition in self._factor_definitions_for_row(factor_names)
         }
 
         return AlphaFactorRow(
@@ -306,6 +322,11 @@ class AlphaEngine:
                 warnings.append(f"composite factor {factor} has no valid values")
                 normalized_scores_by_factor[factor] = {}
                 continue
+            missing_symbols = sorted(set(raw_values) - set(clean_values))
+            if missing_symbols and FactorRegistry().metadata(factor).get("data_source") == "fundamental":
+                warnings.append(
+                    f"PARTIAL_FUNDAMENTAL_DATA: {factor} missing for {', '.join(missing_symbols[:5])}"
+                )
             series = pd.Series(clean_values, dtype="float64").sort_index()
             if len(series) == 1 or float(series.std()) == 0:
                 normalized_scores_by_factor[factor] = {symbol: 1.0 for symbol in series.index}
@@ -681,6 +702,25 @@ class AlphaEngine:
                 normalized.append(ticker)
                 seen.add(ticker)
         return normalized
+
+    def _factor_definitions_for_row(self, factor_names: list[str] | None):
+        if factor_names is None:
+            return self.factor_registry.list_factors()
+        return [self.factor_registry.describe(factor) for factor in factor_names]
+
+    def _row_factor_names(self, config: dict, pipeline_config: Mapping | None) -> list[str] | None:
+        names = set((config.get("factor_weights") or {}).keys())
+        if pipeline_config is not None:
+            factor = str(dict(pipeline_config).get("factor", "")).strip().lower()
+            if factor and factor not in {
+                "momentum_20d",
+                "momentum_60d",
+                "volatility_20d",
+                "risk_adjusted_momentum",
+                "composite_alpha_score",
+            }:
+                names.add(factor)
+        return sorted(names) if names else None
 
     def _write_report(self, result: AlphaResult) -> Path:
         self.report_dir.mkdir(parents=True, exist_ok=True)
