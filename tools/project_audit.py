@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -19,7 +20,12 @@ DOC_PATHS = [
     ROOT / "docs" / "CLI.md",
     ROOT / "docs" / "CLI_COMMANDS.md",
 ]
-STALE_VERSION_PATTERN = re.compile(r"\b[vV]1\.\d+")
+CURRENT_VERSION_DOCS = [
+    ROOT / "README.md",
+    ROOT / "docs" / "AI_DEVELOPMENT.md",
+]
+CURRENT_VERSION_PATTERN = re.compile(r"(?ms)^## Current Version\s*\n\s*`([^`]+)`")
+STALE_VERSION_PATTERN = re.compile(r"\b[vV](?!0\.)\d+\.\d+")
 GENERATED_PATHS = [
     "data/quant.db",
     "reports/example.json",
@@ -143,16 +149,43 @@ def missing_documented_commands(paths: list[Path] | None = None) -> list[str]:
     return sorted(registered_commands() - documented_commands(paths))
 
 
+def project_version() -> str:
+    data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    return str(data["project"]["version"])
+
+
+def current_version_tag(path: Path) -> str | None:
+    match = CURRENT_VERSION_PATTERN.search(path.read_text(encoding="utf-8"))
+    return match.group(1).strip() if match else None
+
+
 def stale_version_references(paths: list[Path] | None = None) -> dict[str, list[str]]:
-    docs = paths or sorted((ROOT / "docs").glob("*.md")) + [ROOT / "README.md"]
+    docs = paths or CURRENT_VERSION_DOCS
     references: dict[str, list[str]] = {}
+    expected_prefix = f"v{project_version()}"
+    tags: dict[str, str] = {}
     for path in docs:
-        matches = []
+        matches: list[str] = []
+        tag = current_version_tag(path)
+        if tag is not None:
+            tags[str(path.relative_to(ROOT) if path.is_relative_to(ROOT) else path)] = tag
+            if not tag.startswith(expected_prefix):
+                matches.append(f"Current Version `{tag}` does not start with `{expected_prefix}`")
+        elif path.name in {"README.md", "AI_DEVELOPMENT.md"}:
+            matches.append("missing ## Current Version block")
         for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             if STALE_VERSION_PATTERN.search(line):
                 matches.append(f"{line_number}: {line.strip()}")
         if matches:
-            references[str(path.relative_to(ROOT))] = matches
+            key = str(path.relative_to(ROOT) if path.is_relative_to(ROOT) else path)
+            references[key] = matches
+    if tags:
+        expected_tag = next(iter(tags.values()))
+        for path, tag in tags.items():
+            if tag != expected_tag:
+                references.setdefault(path, []).append(
+                    f"Current Version `{tag}` does not match `{expected_tag}`"
+                )
     return references
 
 

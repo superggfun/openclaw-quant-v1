@@ -4,7 +4,7 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v0.35.0-mcp-server-foundation`
+`v0.41.0-factor-eval-cache`
 
 The project currently includes:
 
@@ -39,6 +39,9 @@ The project currently includes:
 - A layered package layout under `quant/core`, `quant/data`, `quant/factors`, `quant/engines`, `quant/services`, `quant/reports`, and `quant/interfaces`.
 - A local MCP-compatible research interface under `quant/interfaces/mcp_server`.
 - A Strategy DSL layer under `quant/strategy_dsl` for versioned offline research definitions.
+- An opt-in in-memory Factor Eval Cache and bulk factor matrix path for semantic-preserving factor research acceleration.
+- Safe parallel research-validation factor batches with SQLite writes kept in the main process.
+- Centralized report path and JSON writing helpers under `quant/reports/report_io.py`.
 
 The project intentionally does not include:
 

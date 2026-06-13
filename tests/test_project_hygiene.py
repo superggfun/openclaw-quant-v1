@@ -42,6 +42,18 @@ def test_no_stale_v1_version_references_in_docs() -> None:
     assert stale_version_references() == {}
 
 
+def test_stale_version_audit_catches_current_version_drift(tmp_path: Path) -> None:
+    readme = tmp_path / "README.md"
+    ai_development = tmp_path / "AI_DEVELOPMENT.md"
+    readme.write_text("# Project\n\n## Current Version\n\n`v0.41.0-factor-eval-cache`\n", encoding="utf-8")
+    ai_development.write_text("# AI\n\n## Current Version\n\n`v0.35.0-mcp-server-foundation`\n", encoding="utf-8")
+
+    stale = stale_version_references([readme, ai_development])
+
+    assert str(ai_development) in stale
+    assert "does not start with `v0.41.0`" in stale[str(ai_development)][0]
+
+
 def test_no_unintentional_empty_package_dirs() -> None:
     assert empty_package_dirs() == []
 
