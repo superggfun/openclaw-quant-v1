@@ -7,6 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
 
+import numpy as np
+
 from quant.factors.price.factor_registry import FactorRegistry
 from quant.engines.multi_factor.factor_combiner import FactorCombiner
 from quant.engines.multi_factor.factor_stability import FactorStability
@@ -60,6 +62,7 @@ class MultiFactorResult:
     coverage: dict[str, float]
     confidence: dict[str, Any]
     stability: dict[str, Any]
+    collinearity: dict[str, Any]
     scores: list[MultiFactorSymbolScore]
     warnings: list[str]
     report_path: str
@@ -82,6 +85,7 @@ class MultiFactorResult:
             "coverage": self.coverage,
             "confidence": self.confidence,
             "stability": self.stability,
+            "collinearity": self.collinearity,
             "scores": [asdict(score) for score in self.scores],
             "warnings": self.warnings,
         }
@@ -156,6 +160,12 @@ class MultiFactorModel:
             }
             confidence_by_factor[factor] = round(coverage[factor] * stability_score, 6)
 
+        # P0: Factor collinearity analysis
+        collinearity_warnings, factor_correlations = self._analyze_collinearity(
+            normalized_by_factor, factor_families, factors, symbols
+        )
+        warnings.extend(collinearity_warnings)
+
         scores: list[MultiFactorSymbolScore] = []
         for symbol in symbols:
             factor_contributions = {}
@@ -226,6 +236,11 @@ class MultiFactorModel:
                 "overall_confidence": overall_confidence,
             },
             stability=stability_by_factor,
+            collinearity={
+                "factor_correlations": factor_correlations,
+                "warnings": collinearity_warnings,
+                "methodology": "Pearson correlation across symbol-normalized factor values; |r| > 0.7 flagged",
+            },
             scores=scores,
             warnings=warnings,
             report_path="",
@@ -296,6 +311,55 @@ class MultiFactorModel:
         if "momentum" in category or "momentum" in factor_type or category == "risk":
             return "PRICE"
         return "PRICE"
+
+
+    @staticmethod
+    def _analyze_collinearity(
+        normalized_by_factor, factor_families, factors, symbols,
+    ):
+        warnings_list = []
+        correlations = {}
+        # Transpose symbol->factor to factor->symbol
+        factor_by_symbol: dict[str, dict[str, float]] = {}
+        for factor in factors:
+            factor_by_symbol[factor] = {}
+            for sym in symbols:
+                sym_data = normalized_by_factor.get(sym, {})
+                factor_by_symbol[factor][sym] = sym_data.get(factor)
+        factor_list = [f for f in factors if f in factor_by_symbol]
+        if len(factor_list) < 2:
+            return warnings_list, correlations
+        for i, f1 in enumerate(factor_list):
+            correlations[f1] = {}
+            vals1 = [factor_by_symbol[f1].get(s) for s in symbols]
+            for j, f2 in enumerate(factor_list):
+                if i >= j:
+                    continue
+                vals2 = [factor_by_symbol[f2].get(s) for s in symbols]
+                paired = [(v1, v2) for v1, v2 in zip(vals1, vals2) if v1 is not None and v2 is not None]
+                if len(paired) < 5:
+                    correlations[f1][f2] = 0.0
+                    continue
+                a = np.array([p[0] for p in paired])
+                b = np.array([p[1] for p in paired])
+                if np.std(a) < 1e-12 or np.std(b) < 1e-12:
+                    correlations[f1][f2] = 0.0
+                    continue
+                r = float(np.corrcoef(a, b)[0, 1])
+                correlations[f1][f2] = round(r, 6)
+                family1 = factor_families.get(f1, "UNKNOWN")
+                family2 = factor_families.get(f2, "UNKNOWN")
+                if family1 == family2 and abs(r) > 0.70:
+                    warnings_list.append(
+                        f"COLLINEARITY: {f1} and {f2} (both {family1}) "
+                        f"correlated at r={r:.3f}"
+                    )
+                elif abs(r) > 0.85:
+                    warnings_list.append(
+                        f"COLLINEARITY: {f1} ({family1}) and {f2} ({family2}) "
+                        f"highly correlated at r={r:.3f}"
+                    )
+        return warnings_list, correlations
 
     @staticmethod
     def _coverage(raw_factor_values: Mapping[str, Mapping[str, float | None]], factor: str, symbols: list[str]) -> float:

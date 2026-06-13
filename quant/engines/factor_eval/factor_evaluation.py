@@ -6,6 +6,7 @@ import time
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from quant.config import DEFAULT_SYMBOLS
@@ -29,6 +30,44 @@ from quant.storage.sqlite_store import SQLitePriceStore
 
 
 FACTOR_REGISTRY = FactorRegistry()
+SUPPORTED_FACTORS = set(FACTOR_REGISTRY.factor_names())
+DEFAULT_DECAY_DAYS = [1, 5, 10, 20, 60]
+
+
+def _estimate_half_life(decay: dict) -> float | None:
+    '''Estimate signal half-life from IC decay curve using exponential fit.
+    Expects decay dict format: {"20d": {"ic": 0.05, "rank_ic": 0.06, ...}}'''
+    horizons = []
+    ic_values = []
+    for label, entry in decay.items():
+        # Parse horizon from label like "20d" or "60d"
+        if not isinstance(label, str) or not label.endswith("d"):
+            continue
+        try:
+            horizon = int(label[:-1])
+        except (ValueError, TypeError):
+            continue
+        ic = entry.get("ic")  # Use standard IC (not rank IC)
+        if ic is not None and abs(float(ic)) > 1e-9:
+            ic_abs = abs(float(ic))
+            horizons.append(float(horizon))
+            ic_values.append(ic_abs)
+
+    if len(horizons) < 3:
+        return None
+
+    try:
+        h_arr = np.array(horizons)
+        y_arr = np.log(np.array(ic_values))
+        slope, intercept = np.polyfit(h_arr, y_arr, 1)
+        lambda_est = -slope
+        if lambda_est <= 1e-12:
+            return None
+        half_life = float(np.log(2) / lambda_est)
+        return round(half_life, 1)
+    except Exception:
+        return None
+
 SUPPORTED_FACTORS = set(FACTOR_REGISTRY.factor_names())
 DEFAULT_DECAY_DAYS = [1, 5, 10, 20, 60]
 
@@ -63,6 +102,7 @@ class FactorEvaluationResult:
     quintiles: dict[str, float | None]
     spread_return: float | None
     decay: dict[str, dict[str, float | int | None]]
+    half_life_days: float | None
     observations: list[FactorObservation]
     excluded_symbols: list[str]
     exclusion_reasons: dict[str, str]
@@ -220,6 +260,7 @@ class FactorEvaluation:
                 pipeline_config=normalized_pipeline_config,
                 factor_cache=cache if use_cache else None,
             )
+        half_life_days = _estimate_half_life(decay)
         performance_metadata = self._performance_metadata(
             cache=cache,
             cache_before=cache_before,
@@ -250,6 +291,7 @@ class FactorEvaluation:
             quintiles=quintiles,
             spread_return=spread_return,
             decay=decay,
+            half_life_days=half_life_days,
             observations=observations,
             excluded_symbols=excluded_symbols,
             exclusion_reasons=exclusion_reasons,

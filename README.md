@@ -6,7 +6,7 @@ This project is research infrastructure only. It is not investment advice, does 
 
 ## Current Version
 
-`v0.41.0-factor-eval-cache`
+`v0.42.0-quant-methodology`
 
 This release adds an opt-in Factor Eval Cache / Bulk Factor Matrix layer and safe parallel factor-batch research validation for existing factor evaluation and bounded research-validation workflows.
 

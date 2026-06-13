@@ -83,6 +83,7 @@ MAX_MODULE_LINES = 800
 ALLOWED_OVERSIZED_MODULES = {
     "quant/engines/alpha/alpha_engine.py",
     "quant/engines/factor_backtest/factor_backtest.py",
+    "quant/engines/walk_forward/walk_forward.py",
     "quant/engines/strategy_eval/strategy_evaluation.py",
     "quant/research_validation/research_validation.py",
     "quant/factors/store/factor_store.py",

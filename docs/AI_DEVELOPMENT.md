@@ -4,7 +4,7 @@ This document is the long-lived context entry point for AI assistants working on
 
 ## Current Version
 
-`v0.41.0-factor-eval-cache`
+`v0.42.0-quant-methodology`
 
 The project currently includes:
 

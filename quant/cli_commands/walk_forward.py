@@ -27,6 +27,10 @@ def register_parser(subparsers) -> None:
     walk_forward.add_argument("--pipeline", default=None, help="Optional factor pipeline config JSON.")
     walk_forward.add_argument("--max-folds", type=int, default=5, help="Limit folds for CLI runtime; use 0 for all folds.")
     walk_forward.add_argument("--save-factor-history", action="store_true", help="Persist walk-forward factor history.")
+    walk_forward.add_argument("--parallel", action="store_true", help="Execute folds in parallel using process pool.")
+    walk_forward.add_argument("--workers", type=int, default=None, help="Number of parallel workers (default: min(folds, 4)).")
+    walk_forward.add_argument("--purge-days", type=int, default=0, help="Purge train observations whose forward labels extend into test.")
+    walk_forward.add_argument("--embargo-days", type=int, default=0, help="Add embargo gap between train end and test start.")
 
 
 def handle(args, context) -> int:
@@ -43,6 +47,10 @@ def handle(args, context) -> int:
         alpha_config=load_alpha_config(Path(args.alpha_config)) if args.strategy == "alpha" else None,
         pipeline_config=load_factor_pipeline_config(Path(args.pipeline)) if args.pipeline else None,
         max_folds=None if args.max_folds == 0 else args.max_folds,
+        parallel=args.parallel,
+        workers=args.workers,
+        purge_days=args.purge_days,
+        embargo_days=args.embargo_days,
     )
     print("Walk Forward Summary")
     print(f"strategy: {result.strategy}")

@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Mapping
 
+import numpy as np
 import pandas as pd
 
 from quant.config import DEFAULT_SYMBOLS
@@ -88,7 +89,7 @@ class OptimizerEngine:
         targets_path: str | Path | None = None,
     ) -> OptimizerResult:
         normalized_mode = mode.strip().lower()
-        if normalized_mode not in {"equal_weight", "risk_adjusted", "constrained"}:
+        if normalized_mode not in {"equal_weight", "risk_adjusted", "constrained", "min_variance", "risk_parity"}:
             raise ValueError("mode must be one of: equal_weight, risk_adjusted, constrained")
 
         merged_constraints = self._normalize_constraints(constraints or {})
@@ -110,6 +111,24 @@ class OptimizerEngine:
                 warnings,
             )
             rationale = ["Weighted symbols inversely to recent volatility from stored prices."]
+        elif normalized_mode in ("min_variance", "risk_parity"):
+            end_date = merged_constraints.get("covariance_end_date", str(pd.Timestamp.now().date()))
+            lookback = int(merged_constraints.get("covariance_lookback_days", 252))
+            cov, cov_symbols = self._build_covariance_matrix(
+                available_symbols, end_date=end_date, lookback_days=lookback
+            )
+            if len(cov_symbols) < 2:
+                warnings.append("COVARIANCE_FALLBACK: fewer than 2 symbols with price history; using equal weight")
+                raw_weights = self._equal_weights(available_symbols, merged_constraints["min_cash_weight"])
+                rationale = ["Fell back to equal weight (insufficient data for covariance)."]
+            else:
+                if normalized_mode == "min_variance":
+                    w = self._min_variance_weights(cov)
+                    rationale = [f"Minimum variance weights from {lookback}d covariance matrix ({len(cov_symbols)} symbols)."]
+                else:
+                    w = self._risk_parity_weights(cov)
+                    rationale = [f"Risk parity weights from {lookback}d covariance matrix ({len(cov_symbols)} symbols)."]
+                raw_weights = {s: float(w[i]) for i, s in enumerate(cov_symbols)}
         else:
             raw_weights = self._equal_weights(available_symbols, merged_constraints["min_cash_weight"])
             rationale = ["Generated constrained equal weights, then applied position and sector caps."]
@@ -134,6 +153,84 @@ class OptimizerEngine:
         )
         report_path = self._write_report(result)
         return replace(result, report_path=str(report_path))
+
+    def _build_covariance_matrix(
+        self,
+        symbols: list[str],
+        end_date: str,
+        lookback_days: int = 252,
+    ) -> tuple:
+        import pandas as _pd
+        end_ts = _pd.to_datetime(end_date)
+        start_ts = end_ts - _pd.Timedelta(days=lookback_days * 3)
+
+        returns_dict = {}
+        valid_symbols = []
+        for symbol in symbols:
+            history = self.price_store.get_price_history(str(symbol), start=str(start_ts.date()), end=str(end_ts.date()))
+            if history.empty:
+                continue
+            history = history.sort_values("date")
+            history["close"] = _pd.to_numeric(history["close"], errors="coerce")
+            history = history.dropna(subset=["close"])
+            if len(history) < lookback_days // 3:
+                continue
+            rets = history["close"].pct_change().dropna().tail(lookback_days)
+            if len(rets) < lookback_days // 3:
+                continue
+            returns_dict[symbol] = rets.values
+            valid_symbols.append(symbol)
+
+        if len(valid_symbols) < 2:
+            n = max(len(valid_symbols), 1)
+            return np.eye(n), valid_symbols
+
+        aligned = _pd.DataFrame(returns_dict).dropna()
+        if len(aligned) < 20:
+            aligned = _pd.DataFrame(returns_dict)
+
+        cov = aligned.cov().values
+        diag = np.diag(np.diag(cov))
+        cov = 0.6 * cov + 0.4 * diag
+        return cov, valid_symbols
+
+    @staticmethod
+    def _min_variance_weights(cov: np.ndarray) -> np.ndarray:
+        n = cov.shape[0]
+        if n == 0:
+            return np.array([])
+        if n == 1:
+            return np.array([1.0])
+        try:
+            inv = np.linalg.pinv(cov)
+            ones = np.ones((n, 1))
+            w = (inv @ ones).flatten()
+            w = np.clip(w, 0, None)
+            total = w.sum()
+            return w / total if total > 1e-12 else np.full(n, 1.0 / n)
+        except Exception:
+            return np.full(n, 1.0 / n)
+
+    @staticmethod
+    def _risk_parity_weights(cov: np.ndarray, max_iter: int = 50) -> np.ndarray:
+        n = cov.shape[0]
+        if n == 0:
+            return np.array([])
+        if n == 1:
+            return np.array([1.0])
+        w = np.full(n, 1.0 / n)
+        for _ in range(max_iter):
+            rc = w * (cov @ w)
+            target = rc.mean()
+            if target < 1e-12:
+                break
+            w = w * target / np.maximum(rc, 1e-12)
+            w = np.clip(w, 0, None)
+            total = w.sum()
+            if total < 1e-12:
+                return np.full(n, 1.0 / n)
+            w = w / total
+        return w
 
     def _current_allocation(self) -> dict[str, float]:
         allocation = self.rebalance_engine.allocation()
