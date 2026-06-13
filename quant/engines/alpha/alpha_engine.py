@@ -131,8 +131,9 @@ class AlphaEngine:
         multi_factor_summary: dict | None = None
 
         row_factor_names = self._row_factor_names(normalized_config, pipeline_config)
+        price_histories = self._price_histories(normalized_config["universe"], end=normalized_config["as_of_date"])
         factor_rows = [
-            self._factor_row(symbol, normalized_config, warnings, row_factor_names)
+            self._factor_row(symbol, normalized_config, warnings, row_factor_names, history=self._history_for_symbol(price_histories, symbol))
             for symbol in normalized_config["universe"]
         ]
         composite_score_by_symbol: dict[str, float] | None = None
@@ -209,7 +210,8 @@ class AlphaEngine:
         as_of_date = self._result_as_of_date(selected_rows)
         data_start_date = self._min_date(row.data_start_date for row in selected_rows)
         data_end_date = self._max_date(row.data_end_date for row in selected_rows)
-        suggested_execution_date = self._suggested_execution_date(selected_rows, as_of_date)
+        execution_histories = self._price_histories([row.symbol for row in selected_rows], start=as_of_date) if as_of_date else {}
+        suggested_execution_date = self._suggested_execution_date(selected_rows, as_of_date, histories=execution_histories)
         target_output = self._write_targets(target_weights, output_targets) if output_targets else None
 
         result = AlphaResult(
@@ -241,8 +243,10 @@ class AlphaEngine:
         config: dict,
         warnings: list[str],
         factor_names: list[str] | None = None,
+        history: pd.DataFrame | None = None,
     ) -> AlphaFactorRow:
-        history = self.price_store.get_price_history(symbol, end=config["as_of_date"])
+        if history is None:
+            history = self.price_store.get_price_history(symbol, end=config["as_of_date"])
         if history.empty:
             return self._excluded_row(symbol, "no price data", warnings)
 
@@ -753,19 +757,44 @@ class AlphaEngine:
         self,
         selected_rows: list[AlphaFactorRow],
         as_of_date: str | None,
+        histories: dict[str, pd.DataFrame] | None = None,
     ) -> str | None:
         if as_of_date is None:
             return None
 
         candidates = []
         for row in selected_rows:
-            history = self.price_store.get_price_history(row.symbol, start=as_of_date)
+            history = None
+            if histories is not None:
+                history = self._history_for_symbol(histories, row.symbol)
+            if history is None:
+                history = self.price_store.get_price_history(row.symbol, start=as_of_date)
             if history.empty:
                 continue
             future = history[history["date"] > as_of_date]
             if not future.empty:
                 candidates.append(str(future.iloc[0]["date"]))
         return min(candidates) if candidates else None
+
+    def _price_histories(
+        self,
+        symbols: list[str],
+        start: str | None = None,
+        end: str | None = None,
+    ) -> dict[str, pd.DataFrame]:
+        if hasattr(self.price_store, "get_price_history_many"):
+            return self.price_store.get_price_history_many(symbols, start=start, end=end)
+        return {
+            symbol: self.price_store.get_price_history(symbol, start=start, end=end)
+            for symbol in symbols
+        }
+
+    @staticmethod
+    def _history_for_symbol(histories: dict[str, pd.DataFrame], symbol: str) -> pd.DataFrame | None:
+        history = histories.get(symbol)
+        if history is not None:
+            return history
+        return histories.get(symbol.upper())
 
     @staticmethod
     def _normalize_symbols(symbols: list[str]) -> list[str]:

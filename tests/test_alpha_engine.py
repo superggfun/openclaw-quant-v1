@@ -53,6 +53,69 @@ def make_engine(db_path: Path, report_dir: Path) -> AlphaEngine:
     return AlphaEngine(SQLitePriceStore(db_path), report_dir=report_dir)
 
 
+class BulkOnlyAlphaPriceStore:
+    def __init__(self, db_path: Path, symbols: list[str], days: int = 90) -> None:
+        self.db_path = db_path
+        self.bulk_calls: list[tuple[tuple[str, ...], str | None, str | None]] = []
+        start = date(2024, 1, 1)
+        self.histories = {}
+        for symbol_index, symbol in enumerate(symbols):
+            self.histories[symbol.upper()] = pd.DataFrame(
+                [
+                    {
+                        "symbol": symbol.upper(),
+                        "date": (start + timedelta(days=offset)).isoformat(),
+                        "open": 100 + symbol_index * 5 + offset,
+                        "high": 100 + symbol_index * 5 + offset,
+                        "low": 100 + symbol_index * 5 + offset,
+                        "close": 100 + symbol_index * 5 + offset,
+                        "adj_close": 100 + symbol_index * 5 + offset,
+                        "volume": 1000,
+                    }
+                    for offset in range(days)
+                ]
+            )
+
+    def get_price_history_many(self, symbols: list[str], start: str | None = None, end: str | None = None):
+        self.bulk_calls.append((tuple(symbol.upper() for symbol in symbols), start, end))
+        output = {}
+        for symbol in symbols:
+            history = self.histories[symbol.upper()].copy()
+            if start is not None:
+                history = history[history["date"] >= start]
+            if end is not None:
+                history = history[history["date"] <= end]
+            output[symbol.upper()] = history.reset_index(drop=True)
+        return output
+
+    def get_price_history(self, *args, **kwargs):
+        raise AssertionError("expected bulk price history path")
+
+
+def test_alpha_generate_uses_bulk_price_history(tmp_path: Path) -> None:
+    store = BulkOnlyAlphaPriceStore(tmp_path / "quant.db", ["SPY", "QQQ", "NVDA"])
+    engine = AlphaEngine(store, report_dir=tmp_path / "reports")
+
+    result = engine.generate(
+        {
+            "universe": ["SPY", "QQQ", "NVDA"],
+            "as_of_date": "2024-03-15",
+            "lookback_short": 20,
+            "lookback_long": 60,
+            "top_n": 2,
+            "weighting_mode": "equal_weight",
+            "min_cash_weight": 0.1,
+            "max_position_weight": 0.5,
+        },
+        write_report=False,
+    )
+
+    assert result.as_of_date == "2024-03-15"
+    assert result.suggested_execution_date == "2024-03-16"
+    assert store.bulk_calls[0] == (("SPY", "QQQ", "NVDA"), None, "2024-03-15")
+    assert store.bulk_calls[1][1:] == ("2024-03-15", None)
+
+
 def test_alpha_generates_factor_values_and_ranks(tmp_path: Path) -> None:
     db_path = tmp_path / "quant.db"
     seed_price_series(db_path, ["SPY", "QQQ", "NVDA"])

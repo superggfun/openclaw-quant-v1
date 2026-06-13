@@ -582,8 +582,13 @@ class TradingSimulator:
 
     def _load_price_frame(self, symbols: list[str], start: str, end: str, price_column: str) -> pd.DataFrame:
         frames = []
+        histories = self._price_histories(symbols, start, end)
         for symbol in symbols:
-            history = self.price_store.get_price_history(symbol, start=start, end=end)
+            history = histories.get(symbol)
+            if history is None:
+                history = histories.get(symbol.upper())
+            if history is None:
+                continue
             if history.empty or price_column not in history.columns:
                 continue
             series = pd.Series(
@@ -595,6 +600,14 @@ class TradingSimulator:
         if not frames:
             return pd.DataFrame()
         return pd.concat(frames, axis=1, join="outer").sort_index().ffill().dropna(how="all")
+
+    def _price_histories(self, symbols: list[str], start: str, end: str) -> dict[str, pd.DataFrame]:
+        if hasattr(self.price_store, "get_price_history_many"):
+            return self.price_store.get_price_history_many(symbols, start=start, end=end)
+        return {
+            symbol: self.price_store.get_price_history(symbol, start=start, end=end)
+            for symbol in symbols
+        }
 
     @staticmethod
     def _rebalance_dates(dates: list[pd.Timestamp], frequency: str) -> set[pd.Timestamp]:

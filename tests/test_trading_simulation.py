@@ -69,6 +69,56 @@ def multiply_prices_after(db_path: Path, after_date: str, multiplier: float) -> 
         store.upsert_prices(pd.concat(rows, ignore_index=True))
 
 
+class BulkOnlyTradingPriceStore:
+    def __init__(self, db_path: Path) -> None:
+        self.db_path = db_path
+        self.bulk_calls = 0
+
+    def get_price_history_many(self, symbols: list[str], start: str | None = None, end: str | None = None):
+        self.bulk_calls += 1
+        return {
+            symbol.upper(): pd.DataFrame(
+                [
+                    {
+                        "symbol": symbol.upper(),
+                        "date": "2024-01-02",
+                        "open": 99.0,
+                        "high": 101.0,
+                        "low": 98.0,
+                        "close": 100.0,
+                        "adj_close": 100.0,
+                        "volume": 1000,
+                    },
+                    {
+                        "symbol": symbol.upper(),
+                        "date": "2024-01-03",
+                        "open": 100.0,
+                        "high": 102.0,
+                        "low": 99.0,
+                        "close": 101.0,
+                        "adj_close": 101.0,
+                        "volume": 1000,
+                    },
+                ]
+            )
+            for symbol in symbols
+        }
+
+    def get_price_history(self, *args, **kwargs):
+        raise AssertionError("expected bulk price history path")
+
+
+def test_trading_simulator_load_price_frame_uses_bulk_history(tmp_path: Path) -> None:
+    store = BulkOnlyTradingPriceStore(tmp_path / "quant.db")
+    simulator = TradingSimulator(store, report_dir=tmp_path / "reports")
+
+    frame = simulator._load_price_frame(["SPY", "QQQ"], "2024-01-02", "2024-01-03", "close")
+
+    assert list(frame.columns) == ["SPY", "QQQ"]
+    assert frame.loc[pd.Timestamp("2024-01-03"), "SPY"] == 101.0
+    assert store.bulk_calls == 1
+
+
 def test_account_initialization() -> None:
     account = PortfolioAccount(100000)
 
