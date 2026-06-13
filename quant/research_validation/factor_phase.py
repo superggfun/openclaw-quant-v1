@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from quant.factor_acceleration import FactorBatchTask
+from quant.factor_acceleration import FactorBatchTask, run_factor_batch_tasks
 from quant.research_validation.config import DEFAULT_FORWARD_DAYS, DEFAULT_HOLDING_PERIOD
 from quant.research_validation.models import ResearchValidationPhaseState, ValidationStep
 from quant.research_validation.phase_common import budget_exhausted, record_skip
@@ -208,7 +208,7 @@ def _run_parallel_factor_phase(
             )
 
         parallel_compute_started = time.monotonic()
-        runner._run_factor_batch_tasks(parallel_tasks, worker_count, timeout_seconds=parallel_budget, on_result=handle_parallel_result)
+        run_factor_batch_tasks(parallel_tasks, worker_count, timeout_seconds=parallel_budget, on_result=handle_parallel_result)
         state.parallel_compute_seconds = time.monotonic() - parallel_compute_started
     except Exception as exc:
         state.factor_eval_serial = True

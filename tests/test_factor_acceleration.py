@@ -375,7 +375,7 @@ def test_parallel_research_validation_falls_back_to_serial(tmp_path: Path, monke
     def fail_parallel(*args, **kwargs):
         raise RuntimeError("forced parallel failure")
 
-    monkeypatch.setattr("quant.research_validation.research_validation.run_factor_batch_tasks", fail_parallel)
+    monkeypatch.setattr("quant.research_validation.factor_phase.run_factor_batch_tasks", fail_parallel)
     report = ResearchValidationRunner(context, report_dir=tmp_path / "reports").run(
         mode="quick",
         max_factors=1,

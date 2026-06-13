@@ -11,7 +11,7 @@ from typing import Any, Callable
 from uuid import uuid4
 
 from quant.cli_commands.common import load_alpha_config
-from quant.factor_acceleration import FactorBatchTask, run_factor_batch_tasks
+from quant.factor_acceleration import FactorBatchTask
 from quant.factor_cache import FactorEvalCache
 from quant.engines.factor_backtest.factor_backtest import FactorBacktest
 from quant.engines.factor_eval.factor_evaluation import FactorEvaluation
@@ -167,10 +167,6 @@ class ResearchValidationRunner:
         )
         context.run_dir.mkdir(parents=True, exist_ok=True)
         return context
-
-    @staticmethod
-    def _run_factor_batch_tasks(*args, **kwargs):
-        return run_factor_batch_tasks(*args, **kwargs)
 
     def run(
         self,
