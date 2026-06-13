@@ -34,6 +34,7 @@ from quant.research_validation.models import ValidationStep
 from quant.research_validation.ranking import coverage as ranking_coverage
 from quant.research_validation.ranking import factor_rankings, num as ranking_num, strategy_rankings
 from quant.research_validation.recommendations import recommendations as research_recommendations
+from quant.research_validation.report_input import ResearchValidationReportInput
 from quant.research_validation.report_writer import (
     ResearchValidationReportWriter,
     agent_summary,
@@ -606,7 +607,68 @@ class ResearchValidationRunner:
         }
         regime_sample_counts = self.context.regime_history_store.counts()
         factor_evidence_summary = self._factor_evidence_summary(factor_eval_results, factor_backtest_results)
-        report = build_research_validation_report(locals())
+        report = build_research_validation_report(
+            ResearchValidationReportInput(
+                scope=scope,
+                symbol_diagnostics=symbol_diagnostics,
+                warning_counter=warning_counter,
+                run_id=run_id,
+                run_dir=run_dir,
+                mode=mode,
+                start=start,
+                end=end,
+                effective_start=effective_start,
+                effective_end=effective_end,
+                max_factors=max_factors,
+                max_strategies=max_strategies,
+                folds=folds,
+                timeout=timeout,
+                effective_batch_size=effective_batch_size,
+                max_symbols=max_symbols,
+                family=family,
+                resume=resume,
+                skip_existing=skip_existing,
+                use_cache=use_cache,
+                cache_stats=cache_stats,
+                bulk_matrix=bulk_matrix,
+                parallel=parallel,
+                worker_count=worker_count,
+                parallel_target=parallel_target,
+                write_substep_reports=write_substep_reports,
+                write_batch_artifacts=write_batch_artifacts,
+                write_intermediate_reports=write_intermediate_reports,
+                write_charts=charts,
+                write_debug_logs=write_debug_logs,
+                universe=universe,
+                factor_store_before=factor_store_before,
+                factor_store_after=factor_store_after,
+                factor_store_growth=factor_store_growth,
+                cache_summary_data=cache_summary_data,
+                performance_metadata=performance_metadata,
+                regime_sample_counts=regime_sample_counts,
+                batches=batches,
+                completed_batches=completed_batches,
+                skipped_batches=skipped_batches,
+                runtime=runtime,
+                partial=partial,
+                steps=steps,
+                skipped_steps=skipped_steps,
+                slow_steps=slow_steps,
+                factor_rankings=factor_rankings,
+                strategy_rankings=strategy_rankings,
+                current_regime=current_regime,
+                best_current_regime_factor=best_current_regime_factor,
+                factor_evidence_summary=factor_evidence_summary,
+                factor_eval_results=factor_eval_results,
+                factor_backtest_results=factor_backtest_results,
+                walk_forward_results=walk_forward_results,
+                strategy_results=strategy_results,
+                gate_results=gate_results,
+                factor_rank=factor_rank,
+                regime_rank=regime_rank,
+                recommendations=recommendations,
+            )
+        )
         report_write_started = time.monotonic()
         report, chart_write_seconds = self._write_outputs(report, charts_enabled=charts, chart_dir=chart_dir)
         report_write_seconds = time.monotonic() - report_write_started

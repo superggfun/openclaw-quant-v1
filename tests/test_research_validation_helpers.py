@@ -4,9 +4,85 @@ import json
 from collections import Counter
 from pathlib import Path
 
+import pytest
+
+from quant.research_validation.models import ValidationStep
 from quant.research_validation.ranking import factor_rankings, strategy_rankings
 from quant.research_validation.recommendations import recommendations
-from quant.research_validation.report_writer import ResearchValidationReportWriter, agent_summary
+from quant.research_validation.report_input import ResearchValidationReportInput
+from quant.research_validation.report_writer import ResearchValidationReportWriter, agent_summary, build_research_validation_report
+
+
+def _minimal_report_input_kwargs(tmp_path: Path) -> dict:
+    return {
+        "scope": {
+            "trading_day_count": 2,
+            "symbol_count": 1,
+            "factor_count": 1,
+            "estimated_observation_count": 2,
+        },
+        "symbol_diagnostics": {
+            "requested_symbol_count": 1,
+            "selected_symbol_count": 1,
+            "skipped_symbol_count": 0,
+        },
+        "warning_counter": Counter(),
+        "run_id": "rv-test",
+        "run_dir": tmp_path / "runs" / "rv-test",
+        "mode": "quick",
+        "start": "2024-01-01",
+        "end": "2024-01-03",
+        "effective_start": "2024-01-01",
+        "effective_end": "2024-01-03",
+        "max_factors": 1,
+        "max_strategies": 1,
+        "folds": 1,
+        "timeout": 30.0,
+        "effective_batch_size": 1,
+        "max_symbols": 1,
+        "family": "price",
+        "resume": False,
+        "skip_existing": False,
+        "use_cache": False,
+        "cache_stats": False,
+        "bulk_matrix": False,
+        "parallel": False,
+        "worker_count": 1,
+        "parallel_target": "factor_batch",
+        "write_substep_reports": False,
+        "write_batch_artifacts": False,
+        "write_intermediate_reports": False,
+        "write_charts": False,
+        "write_debug_logs": False,
+        "universe": ["SPY"],
+        "factor_store_before": {"factor_history": 0},
+        "factor_store_after": {"factor_history": 1},
+        "factor_store_growth": {"factor_history": 1},
+        "cache_summary_data": {"cache_enabled": False},
+        "performance_metadata": {"sqlite_writes": "main_process_only"},
+        "regime_sample_counts": {},
+        "batches": [["SPY"]],
+        "completed_batches": [],
+        "skipped_batches": [],
+        "runtime": 1.2345678,
+        "partial": False,
+        "steps": [ValidationStep("factor_eval", "factor", "momentum_20d", "PASS", 0.1)],
+        "skipped_steps": [],
+        "slow_steps": [],
+        "factor_rankings": [{"factor": "momentum_20d", "evidence_score": 0.5}],
+        "strategy_rankings": [{"strategy": "demo", "total_return": 0.01}],
+        "current_regime": "BULL",
+        "best_current_regime_factor": None,
+        "factor_evidence_summary": {"usable_factor_count": 1},
+        "factor_eval_results": [],
+        "factor_backtest_results": [],
+        "walk_forward_results": [],
+        "strategy_results": [],
+        "gate_results": [],
+        "factor_rank": {},
+        "regime_rank": {},
+        "recommendations": [],
+    }
 
 
 def test_factor_rankings_include_raw_metrics_and_grade() -> None:
@@ -42,6 +118,22 @@ def test_strategy_rankings_and_recommendations_are_report_helpers() -> None:
 
     assert strategies[0]["strategy"] == "demo"
     assert any("coverage" in item for item in output)
+
+
+def test_research_validation_report_uses_explicit_input_boundary(tmp_path: Path) -> None:
+    kwargs = _minimal_report_input_kwargs(tmp_path)
+
+    report = build_research_validation_report(ResearchValidationReportInput(**kwargs))
+
+    assert report["run_id"] == "rv-test"
+    assert report["parameters"]["universe"] == ["SPY"]
+    assert report["completed_steps"][0]["name"] == "factor_eval"
+    assert report["top_10_factors"] == kwargs["factor_rankings"]
+    assert report["status"] == "PASS"
+
+    kwargs["unused_local"] = "this used to leak through locals()"
+    with pytest.raises(TypeError):
+        ResearchValidationReportInput(**kwargs)
 
 
 def test_report_writer_manifest_and_agent_summary(tmp_path: Path) -> None:
