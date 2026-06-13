@@ -188,7 +188,7 @@ class AlphaEngine:
             return self._excluded_row(symbol, "no price data", warnings)
 
         history = history.sort_values("date")
-        closes = pd.to_numeric(history["close"], errors="coerce").dropna()
+        closes = pd.to_numeric(history.set_index("date")["close"], errors="coerce").dropna()
         if len(closes) <= config["lookback_long"]:
             return self._excluded_row(
                 symbol,
@@ -199,9 +199,11 @@ class AlphaEngine:
         momentum_20d = self._momentum(closes, config["lookback_short"])
         momentum_60d = self._momentum(closes, config["lookback_long"])
         volatility_20d = self._volatility(closes, config["lookback_short"])
-        risk_adjusted_momentum = (
-            momentum_20d / volatility_20d if volatility_20d and volatility_20d > 0 else None
-        )
+        if volatility_20d is None:
+            return self._excluded_row(symbol, "volatility_20d is unavailable", warnings)
+        if volatility_20d <= 0:
+            return self._excluded_row(symbol, "volatility_20d is zero", warnings)
+        risk_adjusted_momentum = momentum_20d / volatility_20d
 
         factor_values: dict[str, float | None] = {
             "momentum_20d": momentum_20d,
@@ -215,12 +217,12 @@ class AlphaEngine:
                 name = definition.name
                 if name in factor_values:
                     continue
-                factor_fn = self.factor_registry.factor_function(name)
-                if factor_fn is None:
-                    factor_values[name] = None
-                    continue
                 try:
-                    value = factor_fn(name, closes)
+                    value = self.factor_registry.factor_value(
+                        closes, name,
+                        symbol=symbol,
+                        as_of_date=config["as_of_date"],
+                    )
                     factor_values[name] = value
                 except Exception:
                     factor_values[name] = None

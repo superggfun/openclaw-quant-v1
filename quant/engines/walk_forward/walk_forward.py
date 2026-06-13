@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -16,9 +16,13 @@ from quant.core.collections import dedupe_by
 from quant.core.symbols import normalize_symbols
 from quant.reports.report_io import generate_report_path, write_json_report
 from quant.storage.sqlite_store import SQLitePriceStore
+from quant.data.fundamental.fundamental_store import FundamentalStore
 from quant.engines.walk_forward.models import WalkForwardFoldTask, WalkForwardFold, WalkForwardResult
 from quant.engines.walk_forward.fold_runner import run_fold_worker, factor_stability_worker
 from quant.engines.walk_forward.rolling_validation import RollingValidation
+from quant.factors.price.factor_registry import FactorRegistry
+from quant.engines.backtest.backtest_engine import PortfolioBacktestEngine
+from quant.engines.factor_backtest.factor_backtest import FactorBacktest
 
 DEFAULT_STABILITY_FACTORS = [
     "momentum_20d",
@@ -453,6 +457,8 @@ class WalkForwardEngine:
                 "initial_cash": initial_cash,
                 "rebalance_frequency": rebalance_frequency,
                 "max_folds": max_folds,
+                "purge_days": purge_days,
+                "embargo_days": embargo_days,
             },
             folds=folds,
             summary=summary,

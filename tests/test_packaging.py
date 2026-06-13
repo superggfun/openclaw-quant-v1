@@ -12,7 +12,7 @@ def test_pyproject_metadata_exists() -> None:
     data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
 
     assert data["project"]["name"] == "openclaw-quant"
-    assert data["project"]["version"] == "0.41.0"
+    assert data["project"]["version"] == "0.42.0"
     assert data["project"]["requires-python"] == ">=3.11"
     assert "pandas>=2.2" in data["project"]["dependencies"]
     assert "core" in data["project"]["optional-dependencies"]
