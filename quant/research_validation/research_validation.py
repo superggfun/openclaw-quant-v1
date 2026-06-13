@@ -3,19 +3,14 @@
 from __future__ import annotations
 
 import time
-from bisect import bisect_right
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 from uuid import uuid4
 
-from quant.cli_commands.common import load_alpha_config
 from quant.factor_acceleration import FactorBatchTask
 from quant.factor_cache import FactorEvalCache
-from quant.engines.factor_backtest.factor_backtest import FactorBacktest
-from quant.engines.factor_eval.factor_evaluation import FactorEvaluation
-from quant.factors.store.factor_analytics import FactorAnalytics
 from quant.factors.store.factor_store import FactorStore
 from quant.factors.store.factor_registry_store import FactorRegistryStore
 from quant.factors.price.factor_registry import FactorRegistry
@@ -24,8 +19,6 @@ from quant.engines.regime.regime_history import RegimeHistoryStore
 from quant.strategy_dsl.strategy_registry import StrategyRegistry
 from quant.engines.walk_forward.walk_forward import DEFAULT_STABILITY_FACTORS
 from quant.research_validation.config import (
-    DEFAULT_FORWARD_DAYS,
-    DEFAULT_HOLDING_PERIOD,
     QUICK_DEFAULT_START,
     ResearchValidationConfig,
 )
@@ -36,22 +29,46 @@ from quant.research_validation.models import (
     ValidationStep,
 )
 from quant.research_validation.factor_phase import run_factor_validation_phase
-from quant.research_validation.ranking import coverage as ranking_coverage
 from quant.research_validation.regime_phase import run_regime_phase
-from quant.research_validation.ranking import factor_rankings, num as ranking_num, strategy_rankings
+from quant.research_validation.ranking import factor_rankings, strategy_rankings
 from quant.research_validation.recommendations import recommendations as research_recommendations
 from quant.research_validation.report_input import ResearchValidationReportInput
 from quant.research_validation.report_writer import (
     ResearchValidationReportWriter,
     agent_summary,
     build_research_validation_report,
-    directory_files,
     markdown_summary,
 )
-from quant.reports.report_io import generate_report_path, write_json_report
 from quant.research_validation.run_options import normalize_run_options
 from quant.research_validation.scope import ResearchValidationScopePlanner
+from quant.research_validation.factor_runner import (
+    batch_id,
+    cache_summary,
+    compact_factor_backtest_result,
+    compact_factor_eval_result,
+    finalize_factor_backtest_result,
+    finalize_factor_eval_result,
+    run_factor_backtest,
+    run_factor_eval,
+    write_batch_artifact,
+)
+from quant.research_validation.regime_runner import (
+    factor_regime_rows_from_backtest,
+    factor_regime_rows_from_evaluation,
+    regime_for_date,
+    run_regime_detection,
+)
 from quant.research_validation.strategy_phase import run_strategy_phase
+from quant.research_validation.utility import (
+    coverage_pct,
+    directory_files as dir_files,
+    factor_evidence_summary,
+    factor_store_counts,
+    has_existing_factor_values,
+    report_coverage,
+    safe_num,
+    warning_codes,
+)
 from quant.research_validation.walk_forward_phase import run_walk_forward_phase
 
 
@@ -586,36 +603,13 @@ class ResearchValidationRunner:
         write_report: bool = False,
         report_dir: str | Path | None = None,
     ) -> dict[str, Any]:
-        engine = self.context.factor_evaluation
-        if report_dir is not None:
-            engine = FactorEvaluation(self.context.price_store, self.context.fundamental_store, report_dir=report_dir)
-        result = engine.evaluate(
-            factor=factor,
-            start=start,
-            end=end,
-            forward_days=DEFAULT_FORWARD_DAYS,
-            universe=universe,
-            use_cache=self.factor_eval_cache is not None,
-            factor_cache=self.factor_eval_cache,
-            cache_stats=self.factor_eval_cache is not None,
-            bulk_matrix=bulk_matrix,
-            write_report=write_report,
-        )
-        return self._finalize_factor_eval_result(result)
+        return run_factor_eval(self, factor, universe, start, end, bulk_matrix, write_report, report_dir)
 
     def _finalize_factor_eval_result(self, result) -> dict[str, Any]:
-        saved = self.context.factor_store.save_factor_evaluation(result)
-        try:
-            regime_saved = self.context.regime_analytics.save_factor_evaluation_by_regime(result)
-        except Exception as exc:
-            regime_saved = {"error": str(exc)}
-        return self._compact_factor_eval_result(result) | {"saved_factor_history": saved, "saved_regime_history": regime_saved}
+        return finalize_factor_eval_result(self, result)
 
     def _cache_summary(self, use_cache: bool, cache_stats: bool) -> dict[str, Any]:
-        if not (use_cache or cache_stats):
-            return {"cache_enabled": False}
-        snapshot = self.factor_eval_cache.snapshot() if self.factor_eval_cache is not None else {}
-        return {"cache_enabled": use_cache, **snapshot}
+        return cache_summary(self, use_cache, cache_stats)
 
     def _run_factor_backtest(
         self,
@@ -629,19 +623,7 @@ class ResearchValidationRunner:
         report_dir: str | Path | None = None,
         artifact_dir: str | Path | None = None,
     ) -> dict[str, Any]:
-        engine = self.context.factor_backtest_engine
-        if report_dir is not None:
-            engine = FactorBacktest(self.context.price_store, self.context.fundamental_store, report_dir=report_dir)
-        result = engine.run(
-            factor=factor,
-            start=start,
-            end=end,
-            holding_period=DEFAULT_HOLDING_PERIOD,
-            universe=universe,
-            bulk_matrix=bulk_matrix,
-            write_report=write_report,
-        )
-        return self._finalize_factor_backtest_result(result, write_batch_artifact=write_batch_artifact, artifact_dir=artifact_dir)
+        return run_factor_backtest(self, factor, universe, start, end, bulk_matrix, write_report, write_batch_artifact, report_dir, artifact_dir)
 
     def _finalize_factor_backtest_result(
         self,
@@ -649,43 +631,10 @@ class ResearchValidationRunner:
         write_batch_artifact: bool = False,
         artifact_dir: str | Path | None = None,
     ) -> dict[str, Any]:
-        saved = self.context.factor_store.save_factor_backtest(result)
-        try:
-            regime_saved = self.context.regime_analytics.save_factor_backtest_by_regime(result)
-        except Exception as exc:
-            regime_saved = {"error": str(exc)}
-        artifact_path = ""
-        if write_batch_artifact:
-            artifact_path = self._write_batch_artifact("factor_backtest", None, result.to_report(), Path(artifact_dir) if artifact_dir else self.report_dir / "research_validation_batches")
-        return self._compact_factor_backtest_result(result, artifact_path=artifact_path) | {"saved_factor_history": saved, "saved_regime_history": regime_saved}
+        return finalize_factor_backtest_result(self, result, write_batch_artifact, artifact_dir)
 
     def _compact_factor_eval_result(self, result, task: FactorBatchTask | None = None) -> dict[str, Any]:
-        coverage = self._coverage_pct(result.factor_coverage)
-        output = {
-            "factor": result.factor,
-            "factor_name": result.factor,
-            "batch_id": self._batch_id(task),
-            "batch_index": task.batch_index if task else None,
-            "batch_symbols": list(task.symbols) if task else list(result.universe),
-            "universe_size": len(task.symbols) if task else len(result.universe),
-            "observation_count": len(result.observations),
-            "ic_mean": result.ic_mean,
-            "rank_ic_mean": result.rank_ic_mean,
-            "icir": result.icir,
-            "ic_count": result.ic_count,
-            "rank_ic_count": result.rank_ic_count,
-            "coverage": coverage,
-            "warnings": list(result.warnings or []),
-            "report_path": result.report_path,
-            "artifact_path": result.report_path or None,
-        }
-        if result.performance_metadata:
-            output["performance_metadata"] = {
-                key: result.performance_metadata.get(key)
-                for key in ("bulk_matrix_enabled", "matrix_rows", "bulk_read_seconds", "matrix_build_seconds", "eval_seconds")
-                if key in result.performance_metadata
-            }
-        return output
+        return compact_factor_eval_result(self, result, task)
 
     def _compact_factor_backtest_result(
         self,
@@ -693,110 +642,27 @@ class ResearchValidationRunner:
         task: FactorBatchTask | None = None,
         artifact_path: str | None = None,
     ) -> dict[str, Any]:
-        coverage = self._coverage_pct(result.factor_coverage)
-        sharpe = result.long_short_sharpe if result.long_short_sharpe is not None else result.sharpe
-        return {
-            "factor": result.factor,
-            "factor_name": result.factor,
-            "batch_id": self._batch_id(task),
-            "batch_index": task.batch_index if task else None,
-            "batch_symbols": list(task.symbols) if task else None,
-            "universe_size": len(task.symbols) if task else None,
-            "observation_count": result.observations,
-            "long_short_return": result.long_short_return,
-            "sharpe": sharpe,
-            "long_short_sharpe": result.long_short_sharpe,
-            "max_drawdown": result.max_drawdown,
-            "turnover": result.turnover,
-            "ic_mean": result.ic_mean,
-            "rank_ic_mean": result.rank_ic_mean,
-            "icir": result.icir,
-            "coverage": coverage,
-            "warnings": list(result.warnings or []),
-            "report_path": result.report_path,
-            "artifact_path": artifact_path or result.report_path or None,
-        }
+        return compact_factor_backtest_result(self, result, task, artifact_path)
 
     def _write_batch_artifact(self, kind: str, task: FactorBatchTask | None, report: dict[str, Any], artifact_dir: Path) -> str:
-        artifact_dir.mkdir(parents=True, exist_ok=True)
-        factor = (task.factor if task else report.get("factor") or kind).replace("/", "_")
-        batch = f"batch_{task.batch_index:04d}_of_{task.batch_count:04d}" if task else f"batch_{uuid4().hex[:8]}"
-        path = generate_report_path(artifact_dir, f"{kind}_{factor}_{batch}", unique=True)
-        write_json_report(path, report, sort_keys=True)
-        return str(path)
+        return write_batch_artifact(kind, task, report, artifact_dir)
 
     @staticmethod
     def _batch_id(task: FactorBatchTask | None) -> str | None:
-        if task is None:
-            return None
-        return f"{task.factor}:{task.batch_index}/{task.batch_count}"
+        return batch_id(task)
 
     @staticmethod
     def _coverage_pct(coverage: dict | None) -> float | None:
-        if not coverage:
-            return None
-        return coverage.get("coverage_percentage")
+        return coverage_pct(coverage)
 
     def _factor_regime_rows_from_evaluation(self, result) -> list[dict]:
-        observations = []
-        for obs in result.observations:
-            regime = self._regime_for_date(obs.signal_date)
-            if not regime:
-                continue
-            observations.append(
-                {
-                    "regime": regime,
-                    "factor_value": obs.factor_value,
-                    "future_return": obs.future_return,
-                }
-            )
-        return self.context.regime_analytics._factor_rows(
-            result.factor,
-            observations,
-            value_key="factor_value",
-            return_key="future_return",
-        )
+        return factor_regime_rows_from_evaluation(self, result)
 
     def _factor_regime_rows_from_backtest(self, result) -> list[dict]:
-        observations = []
-        for period in result.periods:
-            regime = self._regime_for_date(period.signal_date)
-            if not regime:
-                continue
-            observations.append({"regime": regime, "spread_return": period.long_short_return})
-        rows = []
-        for regime, items in self.context.regime_analytics._group(observations).items():
-            returns = [self.context.regime_analytics._num(item.get("spread_return")) for item in items]
-            clean = [value for value in returns if value is not None]
-            if not clean:
-                continue
-            mean = sum(clean) / len(clean)
-            std = self.context.regime_analytics._std(clean)
-            rows.append(
-                {
-                    "factor_name": result.factor,
-                    "regime": regime,
-                    "ic": mean,
-                    "rank_ic": None,
-                    "icir": mean / std if std and std > 0 else None,
-                    "coverage": len(clean) / max(len(result.periods), 1),
-                    "stability": FactorAnalytics.consistency_score(clean),
-                    "samples": len(clean),
-                    "metric_note": "factor_backtest spread-return proxy stored in ic field for regime diagnostics",
-                }
-            )
-        return rows
+        return factor_regime_rows_from_backtest(self, result)
 
     def _regime_for_date(self, date: str) -> str | None:
-        if self._regime_dates is None or self._regime_values is None:
-            with self.context.regime_history_store.connect() as connection:
-                rows = connection.execute("SELECT date, regime FROM regime_history ORDER BY date").fetchall()
-            self._regime_dates = [row["date"] for row in rows]
-            self._regime_values = [row["regime"] for row in rows]
-        index = bisect_right(self._regime_dates, date) - 1
-        if index < 0:
-            return None
-        return self._regime_values[index]
+        return regime_for_date(self, date)
 
     def _run_walk_forward_factor(
         self,
@@ -818,11 +684,7 @@ class ResearchValidationRunner:
         return result.to_report() | {"report_path": result.report_path, "saved_factor_history": saved}
 
     def _run_regime_detection(self, report_dir: str | Path, write_report: bool) -> dict[str, Any]:
-        if write_report:
-            history_store = RegimeHistoryStore(self.context.db_path, report_dir=report_dir)
-            factor_store = FactorStore(self.context.db_path, report_dir=report_dir)
-            return RegimeAnalytics(self.context.regime_detector, history_store, factor_store).detect_and_save(write_report=True)
-        return self.context.regime_analytics.detect_and_save(write_report=False)
+        return run_regime_detection(self, report_dir, write_report)
 
     def _run_strategy(
         self,
@@ -899,7 +761,7 @@ class ResearchValidationRunner:
 
     @staticmethod
     def _directory_files(path: Path) -> set[str]:
-        return directory_files(path)
+        return dir_files(path)
 
     def _timed_step(
         self,
@@ -962,61 +824,14 @@ class ResearchValidationRunner:
         return self.scope_planner.fundamental_coverage(symbols)
 
     def _has_existing_factor_values(self, factor: str, symbols: list[str]) -> bool:
-        if not symbols:
-            return False
-        placeholders = ",".join("?" for _ in symbols)
-        query = f"""
-            SELECT COUNT(DISTINCT symbol) AS symbol_count
-            FROM factor_values
-            WHERE factor_name = ? AND symbol IN ({placeholders})
-        """
-        try:
-            with self.context.factor_store.connect() as connection:
-                row = connection.execute(query, [factor, *symbols]).fetchone()
-            return int(row["symbol_count"] if hasattr(row, "keys") else row[0]) >= len(symbols)
-        except Exception:
-            return False
+        return has_existing_factor_values(self, factor, symbols)
 
     def _factor_store_counts(self) -> dict[str, int]:
-        tables = [
-            "factor_values",
-            "factor_evaluation_history",
-            "factor_backtest_history",
-            "factor_walk_forward_history",
-            "factor_stability_history",
-        ]
-        counts: dict[str, int] = {}
-        with self.context.factor_store.connect() as connection:
-            for table in tables:
-                try:
-                    row = connection.execute(f"SELECT COUNT(*) AS count FROM {table}").fetchone()
-                    counts[table] = int(row["count"])
-                except Exception:
-                    counts[table] = 0
-        return counts
+        return factor_store_counts(self)
 
     @staticmethod
     def _factor_evidence_summary(evals: list[dict[str, Any]], backtests: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        rows: dict[str, dict[str, Any]] = {}
-        for result in evals:
-            factor = result.get("factor")
-            if not factor:
-                continue
-            row = rows.setdefault(factor, {"factor": factor, "eval_batches": 0, "backtest_batches": 0, "observations": 0})
-            row["eval_batches"] += 1
-            row["observations"] += int(result.get("observation_count") or len(result.get("observations") or []))
-            row["latest_ic"] = result.get("ic_mean")
-            row["latest_rank_ic"] = result.get("rank_ic_mean")
-            row["latest_icir"] = result.get("icir")
-        for result in backtests:
-            factor = result.get("factor")
-            if not factor:
-                continue
-            row = rows.setdefault(factor, {"factor": factor, "eval_batches": 0, "backtest_batches": 0, "observations": 0})
-            row["backtest_batches"] += 1
-            row["latest_long_short_return"] = result.get("long_short_return")
-            row["latest_sharpe"] = result.get("long_short_sharpe") if result.get("long_short_sharpe") is not None else result.get("sharpe")
-        return sorted(rows.values(), key=lambda row: row["factor"])
+        return factor_evidence_summary(evals, backtests)
 
     def _select_strategies(self, mode: str, max_strategies: int | None) -> list[str]:
         return self.scope_planner.select_strategies(mode, max_strategies)
@@ -1080,18 +895,12 @@ class ResearchValidationRunner:
 
     @staticmethod
     def _warning_codes(warnings: list[Any]) -> list[str]:
-        output = []
-        for warning in warnings:
-            if isinstance(warning, dict):
-                output.append(str(warning.get("code") or "WARN_UNKNOWN"))
-            else:
-                output.append(str(warning).split(":", 1)[0])
-        return [code for code in output if code]
+        return warning_codes(warnings)
 
     @staticmethod
     def _coverage(report: dict[str, Any]) -> float | None:
-        return ranking_coverage(report)
+        return report_coverage(report)
 
     @staticmethod
     def _num(value: Any) -> float | None:
-        return ranking_num(value)
+        return safe_num(value)
