@@ -377,10 +377,13 @@ class FactorBacktest:
         excluded_symbols = []
         exclusion_reasons = {}
         warnings = []
+        histories = self._price_histories(symbols)
 
         for symbol in symbols:
-            history = self.price_store.get_price_history(symbol)
-            if history.empty:
+            history = histories.get(symbol)
+            if history is None:
+                history = histories.get(symbol.upper())
+            if history is None or history.empty:
                 self._exclude(symbol, "no price data", excluded_symbols, exclusion_reasons, warnings)
                 continue
             history = history.sort_values("date").reset_index(drop=True)
@@ -397,6 +400,11 @@ class FactorBacktest:
 
         observations.sort(key=lambda row: (row.signal_date, row.symbol))
         return observations, excluded_symbols, exclusion_reasons, warnings
+
+    def _price_histories(self, symbols: list[str]) -> dict[str, pd.DataFrame]:
+        if hasattr(self.price_store, "get_price_history_many"):
+            return self.price_store.get_price_history_many(symbols)
+        return {symbol: self.price_store.get_price_history(symbol) for symbol in symbols}
 
     def _symbol_observations(
         self,

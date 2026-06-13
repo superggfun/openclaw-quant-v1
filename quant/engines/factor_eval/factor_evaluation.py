@@ -421,10 +421,13 @@ class FactorEvaluation:
         excluded_symbols = []
         exclusion_reasons = {}
         warnings = []
+        histories = self._price_histories(symbols)
 
         for symbol in symbols:
-            history = self.price_store.get_price_history(symbol)
-            if history.empty:
+            history = histories.get(symbol)
+            if history is None:
+                history = histories.get(symbol.upper())
+            if history is None or history.empty:
                 excluded_symbols.append(symbol)
                 exclusion_reasons[symbol] = "no price data"
                 warnings.append(f"excluded {symbol}: no price data")
@@ -456,6 +459,11 @@ class FactorEvaluation:
 
         observations.sort(key=lambda row: (row.signal_date, row.symbol, row.forward_days))
         return observations, excluded_symbols, exclusion_reasons, warnings
+
+    def _price_histories(self, symbols: list[str]) -> dict[str, pd.DataFrame]:
+        if hasattr(self.price_store, "get_price_history_many"):
+            return self.price_store.get_price_history_many(symbols)
+        return {symbol: self.price_store.get_price_history(symbol) for symbol in symbols}
 
     def _symbol_observations(
         self,

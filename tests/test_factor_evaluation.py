@@ -66,10 +66,61 @@ class LatestDatesOnlyStore:
         raise AssertionError("expected bulk latest_dates path")
 
 
+class BulkHistoryOnlyStore:
+    def __init__(self, db_path: Path, days: int = 45) -> None:
+        self.db_path = db_path
+        self.days = days
+        self.bulk_calls = 0
+
+    def get_price_history_many(self, symbols: list[str], start: str | None = None, end: str | None = None):
+        self.bulk_calls += 1
+        histories = {}
+        start_date = date(2024, 1, 1)
+        for symbol_index, symbol in enumerate(symbols):
+            histories[symbol.upper()] = pd.DataFrame(
+                [
+                    {
+                        "symbol": symbol.upper(),
+                        "date": (start_date + timedelta(days=offset)).isoformat(),
+                        "open": 100 + symbol_index + offset,
+                        "high": 100 + symbol_index + offset,
+                        "low": 100 + symbol_index + offset,
+                        "close": 100 + symbol_index + offset,
+                        "adj_close": 100 + symbol_index + offset,
+                        "volume": 1000,
+                    }
+                    for offset in range(self.days)
+                ]
+            )
+        return histories
+
+    def get_price_history(self, *args, **kwargs):
+        raise AssertionError("expected bulk price history path")
+
+
 def test_data_newest_date_uses_bulk_latest_dates(tmp_path: Path) -> None:
     engine = FactorEvaluation(LatestDatesOnlyStore(tmp_path / "unused.db"), report_dir=tmp_path / "reports")
 
     assert engine._data_newest_date(["aaa", "BBB"]) == "2024-01-02"
+
+
+def test_observations_use_bulk_price_history(tmp_path: Path) -> None:
+    store = BulkHistoryOnlyStore(tmp_path / "unused.db")
+    engine = FactorEvaluation(store, report_dir=tmp_path / "reports")
+
+    observations, excluded, reasons, warnings = engine._observations(
+        "momentum_20d",
+        ["aaa", "BBB"],
+        start="2024-01-25",
+        end="2024-01-28",
+        forward_days=5,
+    )
+
+    assert observations
+    assert excluded == []
+    assert reasons == {}
+    assert warnings == []
+    assert store.bulk_calls == 1
 
 
 def test_ic_calculation(tmp_path: Path) -> None:
