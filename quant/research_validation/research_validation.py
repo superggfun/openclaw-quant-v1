@@ -30,7 +30,7 @@ from quant.research_validation.config import (
     QUICK_DEFAULT_START,
     ResearchValidationConfig,
 )
-from quant.research_validation.models import ValidationStep
+from quant.research_validation.models import ResearchValidationRunContext, ResearchValidationRunOptions, ValidationStep
 from quant.research_validation.ranking import coverage as ranking_coverage
 from quant.research_validation.ranking import factor_rankings, num as ranking_num, strategy_rankings
 from quant.research_validation.recommendations import recommendations as research_recommendations
@@ -43,6 +43,7 @@ from quant.research_validation.report_writer import (
     markdown_summary,
 )
 from quant.reports.report_io import generate_report_path, write_json_report
+from quant.research_validation.run_options import normalize_run_options
 from quant.research_validation.scope import ResearchValidationScopePlanner
 
 
@@ -89,6 +90,76 @@ class ResearchValidationRunner:
             workers=workers,
         )
 
+    def _normalize_options(
+        self,
+        mode: str,
+        start: str | None,
+        end: str | None,
+        max_factors: int | None,
+        max_strategies: int | None,
+        max_folds: int | None,
+        timeout_seconds: float | None,
+        batch_size: int | None,
+        max_symbols: int | None,
+        factor_family: str,
+        resume: bool,
+        skip_existing: bool,
+        use_cache: bool,
+        cache_stats: bool,
+        bulk_matrix: bool,
+        parallel: bool,
+        workers: int | None,
+        parallel_target: str,
+        charts: bool,
+        write_substep_reports: bool,
+        write_batch_artifacts: bool,
+        write_intermediate_reports: bool,
+        write_debug_logs: bool,
+        artifact_dir: str | Path | None,
+    ) -> ResearchValidationRunOptions:
+        return normalize_run_options(
+            config=self.config,
+            scope_planner=self.scope_planner,
+            mode=mode,
+            start=start,
+            end=end,
+            max_factors=max_factors,
+            max_strategies=max_strategies,
+            max_folds=max_folds,
+            timeout_seconds=timeout_seconds,
+            batch_size=batch_size,
+            max_symbols=max_symbols,
+            factor_family=factor_family,
+            resume=resume,
+            skip_existing=skip_existing,
+            use_cache=use_cache,
+            cache_stats=cache_stats,
+            bulk_matrix=bulk_matrix,
+            parallel=parallel,
+            workers=workers,
+            parallel_target=parallel_target,
+            charts=charts,
+            write_substep_reports=write_substep_reports,
+            write_batch_artifacts=write_batch_artifacts,
+            write_intermediate_reports=write_intermediate_reports,
+            write_debug_logs=write_debug_logs,
+            artifact_dir=artifact_dir,
+        )
+
+    def _initialize_run_context(self, artifact_dir: str | Path | None) -> ResearchValidationRunContext:
+        run_id = f"rv-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid4().hex[:8]}"
+        run_dir = self._run_dir(run_id, artifact_dir)
+        context = ResearchValidationRunContext(
+            run_id=run_id,
+            run_dir=run_dir,
+            substep_dir=run_dir / "substeps",
+            batch_artifact_dir=run_dir / "artifacts",
+            chart_dir=run_dir / "charts",
+            log_dir=run_dir / "logs",
+        )
+        context.run_dir.mkdir(parents=True, exist_ok=True)
+        return context
+
     def run(
         self,
         mode: str = "quick",
@@ -116,19 +187,57 @@ class ResearchValidationRunner:
         write_debug_logs: bool = False,
         artifact_dir: str | Path | None = None,
     ) -> dict[str, Any]:
-        mode = mode.strip().lower()
-        if mode not in {"quick", "full"}:
-            raise ValueError("mode must be quick or full")
-        family = factor_family.strip().lower()
-        if family not in {"price", "fundamental", "all"}:
-            raise ValueError("factor_family must be price, fundamental, or all")
-        default_timeout = self.config.quick_default_timeout_seconds if mode == "quick" else self.config.full_default_timeout_seconds
-        timeout = float(timeout_seconds if timeout_seconds is not None else default_timeout)
+        options = self._normalize_options(
+            mode=mode,
+            start=start,
+            end=end,
+            max_factors=max_factors,
+            max_strategies=max_strategies,
+            max_folds=max_folds,
+            timeout_seconds=timeout_seconds,
+            batch_size=batch_size,
+            max_symbols=max_symbols,
+            factor_family=factor_family,
+            resume=resume,
+            skip_existing=skip_existing,
+            use_cache=use_cache,
+            cache_stats=cache_stats,
+            bulk_matrix=bulk_matrix,
+            parallel=parallel,
+            workers=workers,
+            parallel_target=parallel_target,
+            charts=charts,
+            write_substep_reports=write_substep_reports,
+            write_batch_artifacts=write_batch_artifacts,
+            write_intermediate_reports=write_intermediate_reports,
+            write_debug_logs=write_debug_logs,
+            artifact_dir=artifact_dir,
+        )
+        mode = options.mode
+        start = options.start
+        end = options.end
+        max_factors = options.max_factors
+        max_strategies = options.max_strategies
+        max_folds = options.max_folds
+        timeout = options.timeout_seconds
+        batch_size = options.batch_size
+        max_symbols = options.max_symbols
+        family = options.factor_family
+        resume = options.resume
+        skip_existing = options.skip_existing
+        use_cache = options.use_cache
+        cache_stats = options.cache_stats
+        bulk_matrix = options.bulk_matrix
+        parallel = options.parallel
+        worker_count = options.worker_count
+        parallel_target = options.parallel_target
+        charts = options.charts
+        write_substep_reports = options.write_substep_reports
+        write_batch_artifacts = options.write_batch_artifacts
+        write_intermediate_reports = options.write_intermediate_reports
+        write_debug_logs = options.write_debug_logs
+        artifact_dir = options.artifact_dir
         self.factor_eval_cache = FactorEvalCache() if use_cache else None
-        worker_count = self.scope_planner.worker_count(parallel=parallel, workers=workers)
-        parallel_target = parallel_target.strip().lower()
-        if parallel_target != "factor_batch":
-            raise ValueError("parallel_target must be factor_batch")
         scope = self.preview(
             mode=mode,
             start=start,
@@ -150,19 +259,17 @@ class ResearchValidationRunner:
         batches = scope["batches"]
         effective_start = scope["effective_start_date"]
         effective_end = scope["effective_end_date"]
-        folds = max_folds if max_folds is not None else (1 if mode == "quick" else 5)
+        folds = options.folds
         reserve_seconds = self.config.quick_reserve_seconds if mode == "quick" else 0.0
         started = time.monotonic()
-        run_id = f"rv-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid4().hex[:8]}"
-        run_dir = self._run_dir(run_id, artifact_dir)
-        substep_dir = run_dir / "substeps"
-        batch_artifact_dir = run_dir / "artifacts"
-        chart_dir = run_dir / "charts"
-        log_dir = run_dir / "logs"
-        run_dir.mkdir(parents=True, exist_ok=True)
+        run_context = self._initialize_run_context(artifact_dir)
+        run_id = run_context.run_id
+        run_dir = run_context.run_dir
+        substep_dir = run_context.substep_dir
+        batch_artifact_dir = run_context.batch_artifact_dir
+        chart_dir = run_context.chart_dir
         substep_report_paths: list[str] = []
         artifact_paths: list[str] = []
-        chart_paths: list[str] = []
         log_paths: list[str] = []
         steps: list[ValidationStep] = []
         skipped_steps: list[dict[str, Any]] = []
@@ -565,20 +672,15 @@ class ResearchValidationRunner:
         warning_counter.update(self._warning_codes(factor_rank.get("warnings") or []))
         warning_counter.update(self._warning_codes(regime_rank.get("warnings") or []))
 
-        runtime = time.monotonic() - started
-        slow_threshold = max(2.0, timeout / 20.0)
-        slow_steps = [
-            step.to_dict() | {"reason": "SLOW_STEP"}
-            for step in sorted(steps, key=lambda item: item.runtime_seconds, reverse=True)
-            if step.runtime_seconds >= slow_threshold
-        ][:10]
-        for _ in slow_steps:
-            warning_counter.update(["SLOW_STEP"])
-        if detailed_artifact_count or factor_eval_results or factor_backtest_results:
-            warning_counter.update(["REPORT_COMPACTED"])
-        partial = any(step.status in {"FAIL", "TIMEOUT", "SKIPPED"} for step in steps) or runtime >= timeout
-        if partial:
-            warning_counter.update(["PARTIAL_RESULTS"])
+        runtime, slow_steps, partial = self._summarize_run_status(
+            steps=steps,
+            started=started,
+            timeout=timeout,
+            warning_counter=warning_counter,
+            detailed_artifact_count=detailed_artifact_count,
+            factor_eval_results=factor_eval_results,
+            factor_backtest_results=factor_backtest_results,
+        )
 
         factor_rankings = self._factor_rankings(factors, factor_eval_results, factor_backtest_results, walk_forward_results, factor_rank)
         strategy_rankings = self._strategy_rankings(strategy_results)
@@ -586,25 +688,21 @@ class ResearchValidationRunner:
         best_current_regime_factor = self._best_current_regime_factor(current_regime, regime_rank)
         recommendations = self._recommendations(warning_counter, strategy_rankings)
         cache_summary_data = self._cache_summary(use_cache, cache_stats)
-        performance_metadata = {
-            "bulk_matrix_enabled": bulk_matrix,
-            "parallel_enabled": parallel and not factor_eval_serial and not factor_backtest_serial,
-            "workers": worker_count,
-            "factor_batches": len(completed_batches),
-            "parallel_compute_seconds": round(parallel_compute_seconds, 6),
-            "parallel_finalize_seconds": round(parallel_finalize_seconds, 6),
-            "factor_store_write_seconds": round(factor_store_write_seconds, 6),
-            "report_compaction_seconds": round(report_compaction_seconds, 6),
-            "report_write_seconds": None,
-            "chart_write_seconds": None,
-            "aggregate_report_size_bytes": None,
-            "detailed_artifact_count": detailed_artifact_count,
-            "factor_store_batch_write_summary": batch_write_summary,
-            "cache_hits": cache_summary_data.get("matrix_hits") or 0,
-            "cache_misses": cache_summary_data.get("matrix_misses") or 0,
-            "speedup_vs_baseline": None,
-            "sqlite_writes": "main_process_only",
-        }
+        performance_metadata = self._performance_metadata(
+            bulk_matrix=bulk_matrix,
+            parallel=parallel,
+            factor_eval_serial=factor_eval_serial,
+            factor_backtest_serial=factor_backtest_serial,
+            worker_count=worker_count,
+            completed_batches=completed_batches,
+            parallel_compute_seconds=parallel_compute_seconds,
+            parallel_finalize_seconds=parallel_finalize_seconds,
+            factor_store_write_seconds=factor_store_write_seconds,
+            report_compaction_seconds=report_compaction_seconds,
+            detailed_artifact_count=detailed_artifact_count,
+            batch_write_summary=batch_write_summary,
+            cache_summary_data=cache_summary_data,
+        )
         regime_sample_counts = self.context.regime_history_store.counts()
         factor_evidence_summary = self._factor_evidence_summary(factor_eval_results, factor_backtest_results)
         report = build_research_validation_report(
@@ -669,8 +767,99 @@ class ResearchValidationRunner:
                 recommendations=recommendations,
             )
         )
+        return self._write_final_outputs(
+            report,
+            started=started,
+            charts_enabled=charts,
+            chart_dir=chart_dir,
+            run_dir=run_dir,
+            run_id=run_id,
+            mode=mode,
+            substep_report_paths=substep_report_paths,
+            artifact_paths=artifact_paths,
+            log_paths=log_paths,
+        )
+
+    def _summarize_run_status(
+        self,
+        *,
+        steps: list[ValidationStep],
+        started: float,
+        timeout: float,
+        warning_counter: Counter[str],
+        detailed_artifact_count: int,
+        factor_eval_results: list[dict[str, Any]],
+        factor_backtest_results: list[dict[str, Any]],
+    ) -> tuple[float, list[dict[str, Any]], bool]:
+        runtime = time.monotonic() - started
+        slow_threshold = max(2.0, timeout / 20.0)
+        slow_steps = [
+            step.to_dict() | {"reason": "SLOW_STEP"}
+            for step in sorted(steps, key=lambda item: item.runtime_seconds, reverse=True)
+            if step.runtime_seconds >= slow_threshold
+        ][:10]
+        for _ in slow_steps:
+            warning_counter.update(["SLOW_STEP"])
+        if detailed_artifact_count or factor_eval_results or factor_backtest_results:
+            warning_counter.update(["REPORT_COMPACTED"])
+        partial = any(step.status in {"FAIL", "TIMEOUT", "SKIPPED"} for step in steps) or runtime >= timeout
+        if partial:
+            warning_counter.update(["PARTIAL_RESULTS"])
+        return runtime, slow_steps, partial
+
+    @staticmethod
+    def _performance_metadata(
+        *,
+        bulk_matrix: bool,
+        parallel: bool,
+        factor_eval_serial: bool,
+        factor_backtest_serial: bool,
+        worker_count: int,
+        completed_batches: list[dict[str, Any]],
+        parallel_compute_seconds: float,
+        parallel_finalize_seconds: float,
+        factor_store_write_seconds: float,
+        report_compaction_seconds: float,
+        detailed_artifact_count: int,
+        batch_write_summary: dict[str, Any],
+        cache_summary_data: dict[str, Any],
+    ) -> dict[str, Any]:
+        return {
+            "bulk_matrix_enabled": bulk_matrix,
+            "parallel_enabled": parallel and not factor_eval_serial and not factor_backtest_serial,
+            "workers": worker_count,
+            "factor_batches": len(completed_batches),
+            "parallel_compute_seconds": round(parallel_compute_seconds, 6),
+            "parallel_finalize_seconds": round(parallel_finalize_seconds, 6),
+            "factor_store_write_seconds": round(factor_store_write_seconds, 6),
+            "report_compaction_seconds": round(report_compaction_seconds, 6),
+            "report_write_seconds": None,
+            "chart_write_seconds": None,
+            "aggregate_report_size_bytes": None,
+            "detailed_artifact_count": detailed_artifact_count,
+            "factor_store_batch_write_summary": batch_write_summary,
+            "cache_hits": cache_summary_data.get("matrix_hits") or 0,
+            "cache_misses": cache_summary_data.get("matrix_misses") or 0,
+            "speedup_vs_baseline": None,
+            "sqlite_writes": "main_process_only",
+        }
+
+    def _write_final_outputs(
+        self,
+        report: dict[str, Any],
+        *,
+        started: float,
+        charts_enabled: bool,
+        chart_dir: Path,
+        run_dir: Path,
+        run_id: str,
+        mode: str,
+        substep_report_paths: list[str],
+        artifact_paths: list[str],
+        log_paths: list[str],
+    ) -> dict[str, Any]:
         report_write_started = time.monotonic()
-        report, chart_write_seconds = self._write_outputs(report, charts_enabled=charts, chart_dir=chart_dir)
+        report, chart_write_seconds = self._write_outputs(report, charts_enabled=charts_enabled, chart_dir=chart_dir)
         report_write_seconds = time.monotonic() - report_write_started
         report["performance_metadata"]["report_write_seconds"] = round(report_write_seconds, 6)
         report["performance_metadata"]["chart_write_seconds"] = round(chart_write_seconds, 6)
