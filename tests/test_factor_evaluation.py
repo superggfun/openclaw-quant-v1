@@ -55,6 +55,23 @@ def make_engine(db_path: Path, report_dir: Path) -> FactorEvaluation:
     return FactorEvaluation(SQLitePriceStore(db_path), report_dir=report_dir)
 
 
+class LatestDatesOnlyStore:
+    def __init__(self, db_path: Path) -> None:
+        self.db_path = db_path
+
+    def latest_dates(self, symbols: list[str]) -> dict[str, str | None]:
+        return {symbol.upper(): f"2024-01-0{index + 1}" for index, symbol in enumerate(symbols)}
+
+    def latest_date(self, symbol: str) -> str | None:
+        raise AssertionError("expected bulk latest_dates path")
+
+
+def test_data_newest_date_uses_bulk_latest_dates(tmp_path: Path) -> None:
+    engine = FactorEvaluation(LatestDatesOnlyStore(tmp_path / "unused.db"), report_dir=tmp_path / "reports")
+
+    assert engine._data_newest_date(["aaa", "BBB"]) == "2024-01-02"
+
+
 def test_ic_calculation(tmp_path: Path) -> None:
     db_path = tmp_path / "quant.db"
     seed_factor_prices(db_path, ["AAA", "BBB", "CCC", "DDD", "EEE"])

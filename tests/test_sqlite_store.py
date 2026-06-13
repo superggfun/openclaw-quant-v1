@@ -45,3 +45,39 @@ def test_upsert_updates_existing_row(tmp_path: Path) -> None:
     assert len(rows) == 1
     assert rows[0]["close"] == 105.0
 
+
+def test_latest_dates_batches_symbol_max_dates(tmp_path: Path) -> None:
+    store = SQLitePriceStore(tmp_path / "quant.db")
+    store.upsert_prices(
+        pd.DataFrame(
+            [
+                *sample_prices(close=101.0).to_dict("records"),
+                {
+                    "symbol": "SPY",
+                    "date": "2024-01-03",
+                    "open": 100.0,
+                    "high": 102.0,
+                    "low": 99.0,
+                    "close": 106.0,
+                    "adj_close": 106.0,
+                    "volume": 123456,
+                },
+                {
+                    "symbol": "QQQ",
+                    "date": "2024-01-01",
+                    "open": 100.0,
+                    "high": 102.0,
+                    "low": 99.0,
+                    "close": 99.0,
+                    "adj_close": 99.0,
+                    "volume": 123456,
+                },
+            ]
+        )
+    )
+
+    assert store.latest_dates(["spy", "QQQ", "MISSING", "SPY"]) == {
+        "SPY": "2024-01-03",
+        "QQQ": "2024-01-01",
+        "MISSING": None,
+    }

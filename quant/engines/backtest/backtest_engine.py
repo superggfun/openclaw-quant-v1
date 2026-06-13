@@ -331,9 +331,12 @@ class PortfolioBacktestEngine:
 
     def _load_price_frame(self, symbols: list[str], start: str, end: str) -> pd.DataFrame:
         frames = []
+        histories = self._price_histories(symbols, start, end)
         for symbol in symbols:
-            history = self.price_store.get_price_history(symbol, start=start, end=end)
-            if history.empty:
+            history = histories.get(symbol)
+            if history is None:
+                history = histories.get(symbol.upper())
+            if history is None or history.empty:
                 continue
             frame = history[["date", "close"]].copy()
             frame["date"] = pd.to_datetime(frame["date"])
@@ -351,8 +354,13 @@ class PortfolioBacktestEngine:
 
     def _load_price_lookup(self, symbols: list[str], start: str, end: str) -> dict[str, dict[str, dict[str, float]]]:
         lookup: dict[str, dict[str, dict[str, float]]] = {}
+        histories = self._price_histories(symbols, start, end)
         for symbol in symbols:
-            history = self.price_store.get_price_history(symbol, start=start, end=end)
+            history = histories.get(symbol)
+            if history is None:
+                history = histories.get(symbol.upper())
+            if history is None:
+                continue
             for row in history.to_dict("records"):
                 date_text = str(row["date"])
                 lookup.setdefault(date_text, {})[symbol] = {
@@ -360,6 +368,14 @@ class PortfolioBacktestEngine:
                     "close": float(row["close"]),
                 }
         return lookup
+
+    def _price_histories(self, symbols: list[str], start: str, end: str) -> dict[str, pd.DataFrame]:
+        if hasattr(self.price_store, "get_price_history_many"):
+            return self.price_store.get_price_history_many(symbols, start=start, end=end)
+        return {
+            symbol: self.price_store.get_price_history(symbol, start=start, end=end)
+            for symbol in symbols
+        }
 
     @staticmethod
     def _equity_point(

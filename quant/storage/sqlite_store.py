@@ -194,3 +194,28 @@ class SQLitePriceStore:
                 (symbol.upper(),),
             ).fetchone()
         return row["latest_date"] if row and row["latest_date"] else None
+
+    def latest_dates(self, symbols: list[str]) -> dict[str, str | None]:
+        normalized = []
+        seen = set()
+        for symbol in symbols:
+            ticker = str(symbol).upper().strip()
+            if ticker and ticker not in seen:
+                normalized.append(ticker)
+                seen.add(ticker)
+        if not normalized:
+            return {}
+
+        placeholders = ",".join("?" for _ in normalized)
+        with self.connect() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT symbol, MAX(date) AS latest_date
+                FROM prices
+                WHERE symbol IN ({placeholders})
+                GROUP BY symbol
+                """,
+                normalized,
+            ).fetchall()
+        latest_by_symbol = {row["symbol"]: row["latest_date"] for row in rows}
+        return {symbol: latest_by_symbol.get(symbol) for symbol in normalized}

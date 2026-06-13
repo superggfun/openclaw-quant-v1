@@ -42,6 +42,59 @@ def alpha_config(symbols: list[str]) -> dict:
     }
 
 
+class BulkOnlyPriceStore:
+    def __init__(self, db_path: Path) -> None:
+        self.db_path = db_path
+        self.bulk_calls = 0
+
+    def get_price_history_many(self, symbols: list[str], start: str | None = None, end: str | None = None):
+        self.bulk_calls += 1
+        rows = {}
+        for index, symbol in enumerate(symbols):
+            rows[symbol.upper()] = pd.DataFrame(
+                [
+                    {
+                        "symbol": symbol.upper(),
+                        "date": "2024-01-01",
+                        "open": 100.0 + index,
+                        "high": 100.0 + index,
+                        "low": 100.0 + index,
+                        "close": 100.0 + index,
+                        "adj_close": 100.0 + index,
+                        "volume": 1000,
+                    },
+                    {
+                        "symbol": symbol.upper(),
+                        "date": "2024-01-02",
+                        "open": 101.0 + index,
+                        "high": 101.0 + index,
+                        "low": 101.0 + index,
+                        "close": 101.0 + index,
+                        "adj_close": 101.0 + index,
+                        "volume": 1000,
+                    },
+                ]
+            )
+        return rows
+
+    def get_price_history(self, *args, **kwargs):
+        raise AssertionError("expected bulk price history path")
+
+
+def test_portfolio_backtest_loaders_use_bulk_price_history(tmp_path: Path) -> None:
+    store = BulkOnlyPriceStore(tmp_path / "quant.db")
+    engine = PortfolioBacktestEngine(store, report_dir=tmp_path / "reports")
+
+    frame = engine._load_price_frame(["SPY", "QQQ"], "2024-01-01", "2024-01-02")
+    lookup = engine._load_price_lookup(["SPY", "QQQ"], "2024-01-01", "2024-01-02")
+
+    assert list(frame.columns) == ["SPY", "QQQ"]
+    assert frame.loc[pd.Timestamp("2024-01-02"), "QQQ"] == 102.0
+    assert lookup["2024-01-01"]["SPY"]["open"] == 100.0
+    assert lookup["2024-01-02"]["QQQ"]["close"] == 102.0
+    assert store.bulk_calls == 2
+
+
 def test_portfolio_backtest_runs_to_completion(tmp_path: Path) -> None:
     db_path = tmp_path / "quant.db"
     seed_price_series(db_path, ["SPY", "QQQ"])

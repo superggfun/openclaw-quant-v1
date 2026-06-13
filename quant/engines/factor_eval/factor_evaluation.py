@@ -354,7 +354,10 @@ class FactorEvaluation:
         )
 
     def _data_newest_date(self, symbols: list[str]) -> str | None:
-        latest_dates = [self.price_store.latest_date(symbol) for symbol in symbols]
+        if hasattr(self.price_store, "latest_dates"):
+            latest_dates = list(self.price_store.latest_dates(symbols).values())
+        else:
+            latest_dates = [self.price_store.latest_date(symbol) for symbol in symbols]
         latest_dates = [date for date in latest_dates if date]
         return max(latest_dates) if latest_dates else None
 
