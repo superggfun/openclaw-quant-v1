@@ -1,8 +1,7 @@
-"""Bounded research validation sprint orchestration."""
+﻿"""Bounded research validation sprint orchestration."""
 
 from __future__ import annotations
 
-import json
 import time
 from bisect import bisect_right
 from collections import Counter
@@ -36,7 +35,9 @@ from quant.research_validation.models import (
     ResearchValidationRunOptions,
     ValidationStep,
 )
+from quant.research_validation.factor_phase import run_factor_validation_phase
 from quant.research_validation.ranking import coverage as ranking_coverage
+from quant.research_validation.regime_phase import run_regime_phase
 from quant.research_validation.ranking import factor_rankings, num as ranking_num, strategy_rankings
 from quant.research_validation.recommendations import recommendations as research_recommendations
 from quant.research_validation.report_input import ResearchValidationReportInput
@@ -50,6 +51,8 @@ from quant.research_validation.report_writer import (
 from quant.reports.report_io import generate_report_path, write_json_report
 from quant.research_validation.run_options import normalize_run_options
 from quant.research_validation.scope import ResearchValidationScopePlanner
+from quant.research_validation.strategy_phase import run_strategy_phase
+from quant.research_validation.walk_forward_phase import run_walk_forward_phase
 
 
 class ResearchValidationRunner:
@@ -165,6 +168,10 @@ class ResearchValidationRunner:
         context.run_dir.mkdir(parents=True, exist_ok=True)
         return context
 
+    @staticmethod
+    def _run_factor_batch_tasks(*args, **kwargs):
+        return run_factor_batch_tasks(*args, **kwargs)
+
     def run(
         self,
         mode: str = "quick",
@@ -277,7 +284,8 @@ class ResearchValidationRunner:
         factor_store_before = self._factor_store_counts()
 
         FactorRegistryStore(self.context.factor_store).sync()
-        self._run_factor_validation_phase(
+        run_factor_validation_phase(
+            self,
             state=phase_state,
             factors=factors,
             batches=batches,
@@ -296,7 +304,8 @@ class ResearchValidationRunner:
             substep_dir=substep_dir,
             batch_artifact_dir=batch_artifact_dir,
         )
-        regime_detection = self._run_regime_phase(
+        regime_detection = run_regime_phase(
+            self,
             state=phase_state,
             started=started,
             reserve_seconds=reserve_seconds,
@@ -304,7 +313,8 @@ class ResearchValidationRunner:
             substep_dir=substep_dir,
             write_substep_reports=write_substep_reports,
         )
-        self._run_strategy_phase(
+        run_strategy_phase(
+            self,
             state=phase_state,
             strategies=strategies,
             started=started,
@@ -316,7 +326,8 @@ class ResearchValidationRunner:
             write_substep_reports=write_substep_reports,
             write_intermediate_reports=write_intermediate_reports,
         )
-        self._run_walk_forward_phase(
+        run_walk_forward_phase(
+            self,
             state=phase_state,
             factors=factors,
             folds=folds,
@@ -454,561 +465,6 @@ class ResearchValidationRunner:
             artifact_paths=phase_state.artifact_paths,
             log_paths=phase_state.log_paths,
         )
-
-    @staticmethod
-    def _budget_exhausted(started: float, reserve_seconds: float, timeout: float) -> bool:
-        return time.monotonic() - started + reserve_seconds >= timeout
-
-    @staticmethod
-    def _record_skip(state: ResearchValidationPhaseState, name: str, category: str, target: str, reason: str) -> None:
-        step = ValidationStep(name, category, target, "TIMEOUT" if reason == "TIMEOUT" else "SKIPPED", 0.0, warnings=[reason])
-        state.steps.append(step)
-        state.skipped_steps.append(step.to_dict() | {"reason": reason})
-        state.warning_counter.update([reason])
-
-    def _run_factor_validation_phase(
-        self,
-        *,
-        state: ResearchValidationPhaseState,
-        factors: list[str],
-        batches: list[list[str]],
-        started: float,
-        reserve_seconds: float,
-        timeout: float,
-        parallel: bool,
-        worker_count: int,
-        skip_existing: bool,
-        resume: bool,
-        bulk_matrix: bool,
-        effective_start: str | None,
-        effective_end: str | None,
-        write_substep_reports: bool,
-        write_batch_artifacts: bool,
-        substep_dir: Path,
-        batch_artifact_dir: Path,
-    ) -> None:
-        pending_factor_evals = []
-        pending_factor_backtests = []
-        pending_regime_items: list[tuple[str, list[dict], str | None]] = []
-
-        if parallel:
-            self._run_parallel_factor_phase(
-                state=state,
-                factors=factors,
-                batches=batches,
-                started=started,
-                reserve_seconds=reserve_seconds,
-                timeout=timeout,
-                worker_count=worker_count,
-                skip_existing=skip_existing,
-                resume=resume,
-                bulk_matrix=bulk_matrix,
-                effective_start=effective_start,
-                effective_end=effective_end,
-                write_substep_reports=write_substep_reports,
-                write_batch_artifacts=write_batch_artifacts,
-                substep_dir=substep_dir,
-                batch_artifact_dir=batch_artifact_dir,
-                pending_factor_evals=pending_factor_evals,
-                pending_factor_backtests=pending_factor_backtests,
-                pending_regime_items=pending_regime_items,
-            )
-
-        if pending_factor_evals or pending_factor_backtests or pending_regime_items:
-            write_started = time.monotonic()
-            eval_saved = self.context.factor_store.save_factor_evaluations(pending_factor_evals)
-            backtest_saved = self.context.factor_store.save_factor_backtests(pending_factor_backtests)
-            regime_saved = self.context.factor_store.save_factor_regime_history_many(pending_regime_items)
-            state.factor_store_write_seconds = time.monotonic() - write_started
-            state.batch_write_summary = {
-                "factor_evaluations": len(eval_saved),
-                "factor_backtests": len(backtest_saved),
-                "regime_items": len(pending_regime_items),
-                "regime_rows": regime_saved.get("saved_regime_rows", 0),
-                "sqlite_write_mode": "batched_main_process",
-            }
-
-        self._run_serial_factor_eval_phase(
-            state=state,
-            factors=factors,
-            batches=batches,
-            started=started,
-            reserve_seconds=reserve_seconds,
-            timeout=timeout,
-            skip_existing=skip_existing,
-            resume=resume,
-            bulk_matrix=bulk_matrix,
-            effective_start=effective_start,
-            effective_end=effective_end,
-            write_substep_reports=write_substep_reports,
-            substep_dir=substep_dir,
-        )
-        self._run_serial_factor_backtest_phase(
-            state=state,
-            factors=factors,
-            batches=batches,
-            started=started,
-            reserve_seconds=reserve_seconds,
-            timeout=timeout,
-            bulk_matrix=bulk_matrix,
-            effective_start=effective_start,
-            effective_end=effective_end,
-            write_substep_reports=write_substep_reports,
-            write_batch_artifacts=write_batch_artifacts,
-            substep_dir=substep_dir,
-            batch_artifact_dir=batch_artifact_dir,
-        )
-
-    def _run_parallel_factor_phase(
-        self,
-        *,
-        state: ResearchValidationPhaseState,
-        factors: list[str],
-        batches: list[list[str]],
-        started: float,
-        reserve_seconds: float,
-        timeout: float,
-        worker_count: int,
-        skip_existing: bool,
-        resume: bool,
-        bulk_matrix: bool,
-        effective_start: str | None,
-        effective_end: str | None,
-        write_substep_reports: bool,
-        write_batch_artifacts: bool,
-        substep_dir: Path,
-        batch_artifact_dir: Path,
-        pending_factor_evals: list,
-        pending_factor_backtests: list,
-        pending_regime_items: list[tuple[str, list[dict], str | None]],
-    ) -> None:
-        parallel_tasks: list[FactorBatchTask] = []
-        for factor in factors:
-            for batch_index, batch in enumerate(batches, start=1):
-                target = f"{factor} batch {batch_index}/{len(batches)}"
-                if self._budget_exhausted(started, reserve_seconds, timeout):
-                    self._record_skip(state, "factor_eval", "factor", target, "TIMEOUT")
-                    continue
-                if (skip_existing or resume) and self._has_existing_factor_values(factor, batch):
-                    state.skipped_batches.append(
-                        {
-                            "step": "factor_eval",
-                            "factor": factor,
-                            "batch_index": batch_index,
-                            "symbols": batch,
-                            "reason": "SKIP_EXISTING",
-                        }
-                    )
-                    self._record_skip(state, "factor_eval", "factor", target, "SKIP_EXISTING")
-                    continue
-                parallel_tasks.append(
-                    FactorBatchTask(
-                        kind="factor_eval",
-                        factor=factor,
-                        batch_index=batch_index,
-                        batch_count=len(batches),
-                        symbols=batch,
-                        db_path=str(self.context.db_path),
-                        report_dir=str(substep_dir if write_substep_reports else self.report_dir),
-                        bulk_matrix=bulk_matrix,
-                        start=effective_start,
-                        end=effective_end,
-                        forward_days=DEFAULT_FORWARD_DAYS,
-                        holding_period=DEFAULT_HOLDING_PERIOD,
-                        write_report=write_substep_reports,
-                    )
-                )
-        for factor in factors:
-            for batch_index, batch in enumerate(batches, start=1):
-                if self._budget_exhausted(started, reserve_seconds, timeout):
-                    self._record_skip(state, "factor_backtest", "factor", f"{factor} batch {batch_index}/{len(batches)}", "TIMEOUT")
-                    continue
-                parallel_tasks.append(
-                    FactorBatchTask(
-                        kind="factor_backtest",
-                        factor=factor,
-                        batch_index=batch_index,
-                        batch_count=len(batches),
-                        symbols=batch,
-                        db_path=str(self.context.db_path),
-                        report_dir=str(substep_dir if write_substep_reports else self.report_dir),
-                        bulk_matrix=bulk_matrix,
-                        start=effective_start,
-                        end=effective_end,
-                        forward_days=DEFAULT_FORWARD_DAYS,
-                        holding_period=DEFAULT_HOLDING_PERIOD,
-                        write_report=write_substep_reports,
-                    )
-                )
-        try:
-            parallel_budget = max(timeout - (time.monotonic() - started) - reserve_seconds, 0.0)
-            state.factor_eval_serial = False
-            state.factor_backtest_serial = False
-
-            def handle_parallel_result(item) -> None:
-                self._handle_parallel_factor_result(
-                    state=state,
-                    item=item,
-                    write_batch_artifacts=write_batch_artifacts,
-                    batch_artifact_dir=batch_artifact_dir,
-                    pending_factor_evals=pending_factor_evals,
-                    pending_factor_backtests=pending_factor_backtests,
-                    pending_regime_items=pending_regime_items,
-                )
-
-            parallel_compute_started = time.monotonic()
-            run_factor_batch_tasks(parallel_tasks, worker_count, timeout_seconds=parallel_budget, on_result=handle_parallel_result)
-            state.parallel_compute_seconds = time.monotonic() - parallel_compute_started
-        except Exception as exc:
-            state.factor_eval_serial = True
-            state.factor_backtest_serial = True
-            pending_factor_evals.clear()
-            pending_factor_backtests.clear()
-            pending_regime_items.clear()
-            state.warning_counter.update(["PARALLEL_FALLBACK_SERIAL"])
-            state.steps.append(
-                ValidationStep(
-                    "parallel_factor_batch",
-                    "factor",
-                    "factor_batch",
-                    "WARNING",
-                    0.0,
-                    warnings=["PARALLEL_FALLBACK_SERIAL"],
-                    error=str(exc),
-                    details={"workers": worker_count},
-                )
-            )
-
-    def _handle_parallel_factor_result(
-        self,
-        *,
-        state: ResearchValidationPhaseState,
-        item,
-        write_batch_artifacts: bool,
-        batch_artifact_dir: Path,
-        pending_factor_evals: list,
-        pending_factor_backtests: list,
-        pending_regime_items: list[tuple[str, list[dict], str | None]],
-    ) -> None:
-        result = item.result
-        step = ValidationStep(
-            item.task.kind,
-            "factor",
-            item.task.target,
-            item.status,
-            item.runtime_seconds,
-            getattr(result, "report_path", None) if result is not None else None,
-            item.warnings,
-            item.error,
-            details={
-                "factor": item.task.factor,
-                "batch_index": item.task.batch_index,
-                "symbols_evaluated": item.task.symbols,
-                "parallel": True,
-            },
-        )
-        state.steps.append(step)
-        state.warning_counter.update(self._warning_codes(step.warnings or []))
-        if result is None:
-            return
-        if item.task.kind == "factor_eval":
-            finalize_started = time.monotonic()
-            compact_started = time.monotonic()
-            report_result = self._compact_factor_eval_result(result, item.task)
-            if result.report_path:
-                state.substep_report_paths.append(result.report_path)
-            state.report_compaction_seconds += time.monotonic() - compact_started
-            pending_factor_evals.append(result)
-            pending_regime_items.append((result.factor, self._factor_regime_rows_from_evaluation(result), result.report_path))
-            state.parallel_finalize_seconds += time.monotonic() - finalize_started
-            state.factor_eval_results.append(report_result)
-            state.completed_batches.append(
-                {
-                    "step": "factor_eval",
-                    "factor": item.task.factor,
-                    "batch_index": item.task.batch_index,
-                    "symbols_evaluated": item.task.symbols,
-                    "observations": int(report_result.get("observation_count") or len(report_result.get("observations") or [])),
-                    "runtime_seconds": step.runtime_seconds,
-                    "status": step.status,
-                    "report_path": step.report_path,
-                    "parallel": True,
-                }
-            )
-        elif item.task.kind == "factor_backtest":
-            finalize_started = time.monotonic()
-            compact_started = time.monotonic()
-            artifact_path = ""
-            if write_batch_artifacts:
-                artifact_path = self._write_batch_artifact("factor_backtest", item.task, result.to_report(), batch_artifact_dir)
-                state.artifact_paths.append(artifact_path)
-                state.detailed_artifact_count += 1
-            if result.report_path:
-                state.substep_report_paths.append(result.report_path)
-            report_result = self._compact_factor_backtest_result(result, item.task, artifact_path)
-            state.report_compaction_seconds += time.monotonic() - compact_started
-            pending_factor_backtests.append(result)
-            pending_regime_items.append((result.factor, self._factor_regime_rows_from_backtest(result), result.report_path))
-            state.parallel_finalize_seconds += time.monotonic() - finalize_started
-            state.factor_backtest_results.append(report_result)
-            state.completed_batches.append(
-                {
-                    "step": "factor_backtest",
-                    "factor": item.task.factor,
-                    "batch_index": item.task.batch_index,
-                    "symbols_evaluated": item.task.symbols,
-                    "observations": report_result.get("observation_count"),
-                    "runtime_seconds": step.runtime_seconds,
-                    "status": step.status,
-                    "report_path": step.report_path,
-                    "parallel": True,
-                }
-            )
-
-    def _run_serial_factor_eval_phase(
-        self,
-        *,
-        state: ResearchValidationPhaseState,
-        factors: list[str],
-        batches: list[list[str]],
-        started: float,
-        reserve_seconds: float,
-        timeout: float,
-        skip_existing: bool,
-        resume: bool,
-        bulk_matrix: bool,
-        effective_start: str | None,
-        effective_end: str | None,
-        write_substep_reports: bool,
-        substep_dir: Path,
-    ) -> None:
-        for factor in ([] if not state.factor_eval_serial else factors):
-            for batch_index, batch in enumerate(batches, start=1):
-                target = f"{factor} batch {batch_index}/{len(batches)}"
-                if self._budget_exhausted(started, reserve_seconds, timeout):
-                    self._record_skip(state, "factor_eval", "factor", target, "TIMEOUT")
-                    continue
-                if (skip_existing or resume) and self._has_existing_factor_values(factor, batch):
-                    state.skipped_batches.append(
-                        {
-                            "step": "factor_eval",
-                            "factor": factor,
-                            "batch_index": batch_index,
-                            "symbols": batch,
-                            "reason": "SKIP_EXISTING",
-                        }
-                    )
-                    self._record_skip(state, "factor_eval", "factor", target, "SKIP_EXISTING")
-                    continue
-                step, result = self._timed_step(
-                    "factor_eval",
-                    "factor",
-                    target,
-                    lambda f=factor, symbols=batch: self._run_factor_eval(
-                        f,
-                        symbols,
-                        start=effective_start,
-                        end=effective_end,
-                        bulk_matrix=bulk_matrix,
-                        write_report=write_substep_reports,
-                        report_dir=substep_dir,
-                    ),
-                    details={"factor": factor, "batch_index": batch_index, "symbols_evaluated": batch},
-                )
-                state.steps.append(step)
-                state.warning_counter.update(self._warning_codes(step.warnings))
-                if result:
-                    if result.get("report_path"):
-                        state.substep_report_paths.append(result["report_path"])
-                    result["batch_index"] = batch_index
-                    result["batch_symbols"] = batch
-                    state.factor_eval_results.append(result)
-                    state.completed_batches.append(
-                        {
-                            "step": "factor_eval",
-                            "factor": factor,
-                            "batch_index": batch_index,
-                            "symbols_evaluated": batch,
-                            "observations": int(result.get("observation_count") or len(result.get("observations") or [])),
-                            "runtime_seconds": step.runtime_seconds,
-                            "status": step.status,
-                            "report_path": step.report_path,
-                        }
-                    )
-
-    def _run_serial_factor_backtest_phase(
-        self,
-        *,
-        state: ResearchValidationPhaseState,
-        factors: list[str],
-        batches: list[list[str]],
-        started: float,
-        reserve_seconds: float,
-        timeout: float,
-        bulk_matrix: bool,
-        effective_start: str | None,
-        effective_end: str | None,
-        write_substep_reports: bool,
-        write_batch_artifacts: bool,
-        substep_dir: Path,
-        batch_artifact_dir: Path,
-    ) -> None:
-        for factor in ([] if not state.factor_backtest_serial else factors):
-            for batch_index, batch in enumerate(batches, start=1):
-                target = f"{factor} batch {batch_index}/{len(batches)}"
-                if self._budget_exhausted(started, reserve_seconds, timeout):
-                    self._record_skip(state, "factor_backtest", "factor", target, "TIMEOUT")
-                    continue
-                step, result = self._timed_step(
-                    "factor_backtest",
-                    "factor",
-                    target,
-                    lambda f=factor, symbols=batch: self._run_factor_backtest(
-                        f,
-                        symbols,
-                        start=effective_start,
-                        end=effective_end,
-                        bulk_matrix=bulk_matrix,
-                        write_report=write_substep_reports,
-                        write_batch_artifact=write_batch_artifacts,
-                        report_dir=substep_dir,
-                        artifact_dir=batch_artifact_dir,
-                    ),
-                    details={"factor": factor, "batch_index": batch_index, "symbols_evaluated": batch},
-                )
-                state.steps.append(step)
-                state.warning_counter.update(self._warning_codes(step.warnings))
-                if result:
-                    if result.get("report_path"):
-                        state.substep_report_paths.append(result["report_path"])
-                    if result.get("artifact_path"):
-                        state.artifact_paths.append(result["artifact_path"])
-                    result["batch_index"] = batch_index
-                    result["batch_symbols"] = batch
-                    state.factor_backtest_results.append(result)
-                state.completed_batches.append(
-                    {
-                        "step": "factor_backtest",
-                            "factor": factor,
-                            "batch_index": batch_index,
-                            "symbols_evaluated": batch,
-                            "observations": result.get("observation_count"),
-                            "runtime_seconds": step.runtime_seconds,
-                            "status": step.status,
-                            "report_path": step.report_path,
-                        }
-                    )
-
-    def _run_regime_phase(
-        self,
-        *,
-        state: ResearchValidationPhaseState,
-        started: float,
-        reserve_seconds: float,
-        timeout: float,
-        substep_dir: Path,
-        write_substep_reports: bool,
-    ) -> dict[str, Any]:
-        if self._budget_exhausted(started, reserve_seconds, timeout):
-            self._record_skip(state, "detect_regime", "regime", "SPY", "TIMEOUT")
-            return {}
-        step, result = self._timed_step(
-            "detect_regime",
-            "regime",
-            "SPY",
-            lambda: self._run_regime_detection(report_dir=substep_dir, write_report=write_substep_reports),
-        )
-        state.steps.append(step)
-        state.warning_counter.update(self._warning_codes(step.warnings))
-        regime_detection = result or {}
-        if regime_detection.get("report_path"):
-            state.substep_report_paths.append(regime_detection["report_path"])
-        return regime_detection
-
-    def _run_strategy_phase(
-        self,
-        *,
-        state: ResearchValidationPhaseState,
-        strategies: list[str],
-        started: float,
-        reserve_seconds: float,
-        timeout: float,
-        effective_start: str | None,
-        effective_end: str | None,
-        substep_dir: Path,
-        write_substep_reports: bool,
-        write_intermediate_reports: bool,
-    ) -> None:
-        for strategy in strategies:
-            if self._budget_exhausted(started, reserve_seconds, timeout):
-                self._record_skip(state, "strategy_run_with_gates", "strategy", strategy, "TIMEOUT")
-                continue
-            step, result = self._timed_step(
-                "strategy_run_with_gates",
-                "strategy",
-                strategy,
-                lambda s=strategy: self._run_strategy(
-                    s,
-                    effective_start,
-                    effective_end,
-                    report_dir=substep_dir,
-                    write_report=write_substep_reports,
-                    write_intermediate_reports=write_intermediate_reports,
-                ),
-            )
-            state.steps.append(step)
-            state.warning_counter.update(self._warning_codes(step.warnings))
-            if result:
-                state.strategy_results.append(result)
-                state.substep_report_paths.extend([path for path in result.get("generated_reports", []) if path])
-                gate_path = ((result.get("artifacts") or {}).get("strategy_gate_report_path"))
-                if gate_path:
-                    try:
-                        gate_report = json.loads(Path(gate_path).read_text(encoding="utf-8"))
-                        state.gate_results.append(gate_report)
-                        state.warning_counter.update(self._warning_codes(gate_report.get("warnings") or []))
-                    except (FileNotFoundError, json.JSONDecodeError):
-                        state.warning_counter.update(["WARN_GATE_REPORT_UNREADABLE"])
-
-    def _run_walk_forward_phase(
-        self,
-        *,
-        state: ResearchValidationPhaseState,
-        factors: list[str],
-        folds: int,
-        universe: list[str],
-        started: float,
-        reserve_seconds: float,
-        timeout: float,
-        effective_start: str | None,
-        effective_end: str | None,
-        substep_dir: Path,
-        write_substep_reports: bool,
-    ) -> None:
-        for factor in self._major_factors(factors):
-            if self._budget_exhausted(started, reserve_seconds, timeout):
-                self._record_skip(state, "walk_forward", "factor", factor, "TIMEOUT")
-                continue
-            step, result = self._timed_step(
-                "walk_forward",
-                "factor",
-                factor,
-                lambda f=factor: self._run_walk_forward_factor(
-                    f,
-                    folds,
-                    universe,
-                    effective_start,
-                    effective_end,
-                    report_dir=substep_dir,
-                    write_report=write_substep_reports,
-                ),
-            )
-            state.steps.append(step)
-            state.warning_counter.update(self._warning_codes(step.warnings))
-            if result:
-                if result.get("report_path"):
-                    state.substep_report_paths.append(result["report_path"])
-                state.walk_forward_results.append(result)
 
     def _summarize_run_status(
         self,
