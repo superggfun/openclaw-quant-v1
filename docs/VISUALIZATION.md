@@ -20,7 +20,7 @@ python -m quant.cli visualize-report --report reports/trade_sim_YYYYMMDD_HHMMSS.
 
 ## Supported Reports
 
-Report type is auto-detected from schema keys:
+Report type is auto-detected from schema keys. Visualization specs are auto-discovered from modules under `quant/reports/visualization/extractors/`; new report visualizations should add a local `REPORT_SPECS` entry in the relevant extractor module or a new extractor module, not edit a central registry.
 
 - `trade_sim`
 - `backtest`
@@ -60,8 +60,11 @@ Each chart is written as:
 Each report also gets:
 
 - `*_summary.html`
+- `*_visual_summary.json`
 
 `reports/charts/` is ignored by git because charts are generated artifacts.
+
+Research-validation charts follow the run artifact layout in `docs/REPORT_ARCHITECTURE.md`: quick mode disables charts by default, and `--write-charts` / `--charts` writes them under `reports/runs/<run_id>/charts/`. The standalone `visualize-report` command remains backward-compatible and writes to the output directory supplied by the caller.
 
 ## Dashboard
 
@@ -72,6 +75,8 @@ The summary dashboard includes:
 - warnings
 - interpretation notes
 - chart images
+
+The visual summary JSON is the machine-readable companion for Agent Export and LLM consumers. It records generated and skipped chart ids, dashboard metrics, warnings, decision-relevant chart ids, and display-only chart ids without embedding image bytes.
 
 Multi-factor reports generate charts for family contribution, factor contribution, confidence, and stability ranking.
 

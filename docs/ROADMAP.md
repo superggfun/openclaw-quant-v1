@@ -1,5 +1,16 @@
 # Roadmap
 
+## v0.41.0-factor-eval-cache
+
+- Adds `quant/factor_cache` with an opt-in in-memory factor matrix cache.
+- Adds `quant/factor_acceleration` for v0.41 semantic-preserving bulk matrices and safe parallel research-validation factor batches.
+- Adds the report architecture split between compact summaries, structured table artifacts, and detailed run artifacts.
+- Adds `factor-eval --use-cache --cache-stats --bulk-matrix`.
+- Adds `research-validation --use-cache --cache-stats`.
+- Adds optional cache/performance metadata to factor-eval and research-validation reports.
+- Preserves factor_eval metrics, factor_backtest semantics, walk-forward semantics, research-validation semantics, no-lookahead behavior, and report fields.
+- Does not add new factors, multiprocessing, numba, parquet, vectorized rewrites, strategy logic, warning suppression, or tuning.
+
 ## v0.40.0-performance-baseline-profiling
 
 - Adds measurement-only `performance-profile`, `performance-summary`, and `performance-report`.
@@ -43,9 +54,9 @@
 
 ## v0.34.0-architecture-layout
 
-- Adds a layered package layout under `quant/core`, `quant/data`, `quant/factors`, `quant/engines`, `quant/services`, `quant/reports`, `quant/interfaces`, and `quant/adapters`.
-- Keeps legacy import paths working through compatibility shims for at least one release.
-- Adds reserved MCP/API/OpenClaw/LangChain/QuantStats/PyFolio namespaces without implementing those integrations.
+- Adds a layered package layout under `quant/core`, `quant/data`, `quant/factors`, `quant/engines`, `quant/services`, `quant/reports`, and `quant/interfaces`.
+- Establishes layered import paths as the canonical package layout.
+- Avoids precreating API/OpenClaw/LangChain/QuantStats/PyFolio packages until those integrations have real implementation and tests.
 - Structural refactor only: no new factors, data providers, trading logic, report schema changes, CLI behavior changes, or no-lookahead semantic changes.
 
 ## v0.32.0-regime-detection

@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 from typing import Iterable
 
 from quant.config import DEFAULT_START_DATE, DEFAULT_SYMBOLS
-from quant.data_providers import DataProvider, YFinanceProvider
+from quant.data.providers import DataProvider, YFinanceProvider
 from quant.storage.sqlite_store import SQLitePriceStore
 
 

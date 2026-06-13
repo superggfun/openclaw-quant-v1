@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from quant.agent_export.agent_exporter import AgentExporter
+from quant.reports.agent_export.agent_exporter import AgentExporter
 from quant.cli import COMMAND_HANDLERS, build_parser, main
 from quant.cli_commands.common import create_context
 from quant.performance import PerformanceProfiler, RuntimeTracker
 from quant.storage.sqlite_store import SQLitePriceStore
-from quant.visualization.report_visualizer import ReportVisualizer
+from quant.reports.visualization.report_visualizer import ReportVisualizer
 
 
 def seed_prices(db_path: Path) -> None:

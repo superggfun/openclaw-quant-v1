@@ -24,6 +24,16 @@ python -m quant.cli strategy-run --strategy momentum_fundamental --with-gates
 - `trading_simulation`: checks drawdown, turnover, cost drag, and offline trade simulation evidence.
 - `complexity`: checks factor count and parameter count.
 
+Gate specs are auto-discovered from `quant/engines/strategy_gates/gates/`.
+
+To add a gate:
+
+1. Add a `GateSpec` to a module under `quant/engines/strategy_gates/gates/`.
+2. Implement the matching handler on `StrategyGateRunner`; handlers receive a `GateRunInput`.
+3. Add tests for ordering, status behavior, evidence fields, and report output.
+
+Do not edit `GateRegistry` or the `StrategyGateRunner.run()` gate list for ordinary gate additions. The runner executes discovered specs by `order`.
+
 ## Status Semantics
 
 - `PASS`: evidence meets configured thresholds.

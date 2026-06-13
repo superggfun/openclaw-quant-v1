@@ -1,12 +1,15 @@
-"""Layered data-quality and universe package."""
+"""Data-quality, symbol metadata, and universe helpers."""
 
-from quant.utils.module_alias import alias_modules
+from quant.data.layer.data_quality import DataQualityAnalyzer, DataQualityReport, DataRefreshManager
+from quant.data.layer.symbol_metadata import DEFAULT_SYMBOL_METADATA, SymbolMetadata, SymbolMetadataStore
+from quant.data.layer.universe_manager import UniverseManager
 
-_ALIASES = {
-    "data_quality": "quant.data_layer.data_quality",
-    "symbol_metadata": "quant.data_layer.symbol_metadata",
-    "universe_manager": "quant.data_layer.universe_manager",
-}
-
-alias_modules(__name__, _ALIASES)
-
+__all__ = [
+    "DEFAULT_SYMBOL_METADATA",
+    "DataQualityAnalyzer",
+    "DataQualityReport",
+    "DataRefreshManager",
+    "SymbolMetadata",
+    "SymbolMetadataStore",
+    "UniverseManager",
+]

@@ -7,6 +7,8 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+from quant.storage.sqlite_connection import connect_sqlite
+
 
 class SchedulerHistoryStore:
     """Persist scheduler run summaries without storing generated reports in git."""
@@ -17,9 +19,7 @@ class SchedulerHistoryStore:
         self._ensure_schema()
 
     def connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.db_path)
-        connection.row_factory = sqlite3.Row
-        return connection
+        return connect_sqlite(self.db_path)
 
     def save(self, report: dict[str, Any]) -> None:
         summary = report.get("daily_research_summary") or {}

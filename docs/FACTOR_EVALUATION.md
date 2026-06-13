@@ -65,6 +65,7 @@ python -m quant.cli factor-eval --factor momentum_20d
 python -m quant.cli factor-eval --factor momentum_20d --pipeline examples/factor_pipeline_config.json
 python -m quant.cli factor-eval --factor momentum_20d --save-factor-history
 python -m quant.cli factor-eval --factor momentum_20d --save-regime-history
+python -m quant.cli factor-eval --factor momentum_20d --use-cache --cache-stats
 python -m quant.cli factor-eval --factor risk_adjusted_momentum
 python -m quant.cli factor-eval --factor momentum_60d --start 2024-01-01 --end 2024-12-31 --forward-days 20
 ```
@@ -82,6 +83,10 @@ The CLI prints:
 With `--save-factor-history`, the command also persists factor values, IC, Rank IC, ICIR, coverage, missing percentage, warnings, and version metadata into the Factor Store. Persistence is optional and does not change the generated factor evaluation report.
 
 With `--save-regime-history`, the command groups no-lookahead factor observations by the persisted market regime active on each `signal_date` and stores regime-level diagnostics. This does not change factor values or future-return labels.
+
+With `--use-cache`, the command uses the v0.41 opt-in in-memory factor matrix cache. The cache builds rows through the same no-lookahead observation path as uncached factor evaluation. It can avoid repeated factor value and future-return row construction inside one process, especially for repeated evaluations and bounded research-validation batches. It is disabled by default.
+
+With `--cache-stats`, the command prints matrix hit/miss counts, factor value hit/miss counts, future return hit/miss counts, memory estimate, row count, and evaluation seconds. With `--bulk-matrix`, the command consumes the matrix path without retaining cache state.
 
 ## Reports
 
@@ -116,6 +121,8 @@ Top-level keys include:
 - `exclusion_reasons`
 - `warnings`
 
+When cache or bulk matrix mode is used, reports may also include optional `performance_metadata`, `cache_enabled`, `cache_hits`, `cache_misses`, `matrix_rows`, `matrix_build_seconds`, `eval_seconds`, and `speedup_estimate`. These fields are diagnostics only and do not replace the existing metric fields.
+
 Each observation records `signal_date`, `future_date`, `symbol`, `factor_value`, `future_return`, and `forward_days`.
 
 When `--pipeline` is supplied, `factor_value` contains the cleaned same-date cross-sectional value used for IC, Rank IC, quintiles, and decay. Raw factor preprocessing details are documented in `docs/FACTOR_PIPELINE.md`.
@@ -131,6 +138,16 @@ Single-symbol evaluations can produce factor observations and quintile data, but
 Factor Evaluation measures predictive quality with IC, Rank IC, quintiles, and decay. It does not explain portfolio returns or risk.
 
 Use `python -m quant.cli factor-backtest --factor <factor>` to create a factor spread return stream, then use `python -m quant.cli strategy-eval --factor-backtest-report <report>` for v0.14 performance attribution and robustness diagnostics.
+
+## Factor Cache
+
+See `docs/FACTOR_CACHE.md` for cache key design, invalidation fields, no-lookahead rules, and parity expectations. Cached and uncached outputs must preserve IC, Rank IC, ICIR, quintiles, spread return, decay, observations, excluded symbols, and warnings.
+
+## v0.41 Bulk Matrix
+
+`factor-eval --bulk-matrix` enables the optional bulk observation matrix path. It reads symbol histories in bulk, builds signal-date factor values once, and derives future returns for requested horizons without changing IC, Rank IC, quintile, spread-return, decay, warning, or no-lookahead semantics.
+
+When `--cache-stats` is also supplied, reports may include optional performance metadata such as `bulk_matrix_enabled`, `bulk_read_seconds`, `matrix_build_seconds`, and `eval_seconds`. Default factor evaluation remains serial unless the caller explicitly requests the bulk matrix path.
 
 ## v0.19 Factor Registry
 

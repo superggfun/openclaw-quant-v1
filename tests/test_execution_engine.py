@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from quant.execution.execution_engine import ExecutionEngine
+from quant.engines.execution.execution_engine import ExecutionEngine
 from quant.storage.portfolio_store import SQLitePortfolioStore
 from quant.storage.sqlite_store import SQLitePriceStore
 

@@ -68,9 +68,9 @@ The release adds:
 
 ## Package Layout
 
-`v0.34.0` is phase 1 of the layered namespace refactor. It adds layered package namespaces while keeping legacy import paths available. The editable install includes both old compatibility packages and new preferred packages because `pyproject.toml` discovers packages under `quant*`.
+`v0.34.0` introduced the layered namespace refactor. Data, engine, and report implementations now live under their layered package namespaces.
 
-Preferred new paths:
+Canonical paths:
 
 - `quant.core.*`
 - `quant.data.*`
@@ -78,13 +78,11 @@ Preferred new paths:
 - `quant.engines.*`
 - `quant.reports.*`
 - `quant.interfaces.*`
-- `quant.adapters.*`
-
-The `quant.interfaces.api` and `quant.adapters.*` namespaces are packaging placeholders only. They do not add API, OpenClaw, LangChain, QuantStats, or PyFolio integrations.
+Do not add placeholder packages for future integrations. Add API, OpenClaw, LangChain, QuantStats, or PyFolio packages only when they include real implementation and tests.
 
 `quant.interfaces.mcp_server` is implemented in v0.35 as a local MCP-compatible research interface. It does not add a network daemon, broker API, or live trading integration.
 
-Most implementation modules remain in their original locations in this phase. Future physical moves should be gradual and must preserve compatibility shims until a planned removal release.
+Legacy compatibility packages are not part of the canonical package layout.
 
 ## Boundaries
 

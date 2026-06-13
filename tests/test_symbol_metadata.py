@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from quant.data_layer.symbol_metadata import SymbolMetadata, SymbolMetadataStore
+from quant.data.layer.symbol_metadata import SymbolMetadata, SymbolMetadataStore
 from quant.config import DEFAULT_SYMBOLS
 
 

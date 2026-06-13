@@ -6,7 +6,8 @@ import sys
 from pathlib import Path
 
 from quant.cli_commands.common import format_optional_number, format_optional_pct, load_factor_pipeline_config
-from quant.factor_eval.factor_evaluation import SUPPORTED_FACTORS
+from quant.factor_cache import FactorEvalCache
+from quant.engines.factor_eval.factor_evaluation import SUPPORTED_FACTORS
 
 
 def register_parser(subparsers) -> None:
@@ -16,6 +17,9 @@ def register_parser(subparsers) -> None:
     factor_eval.add_argument("--end", default=None, help="Inclusive signal end date YYYY-MM-DD.")
     factor_eval.add_argument("--forward-days", type=int, default=20)
     factor_eval.add_argument("--pipeline", default=None, help="Optional factor pipeline config JSON.")
+    factor_eval.add_argument("--use-cache", action="store_true", help="Use the opt-in in-memory factor matrix cache.")
+    factor_eval.add_argument("--cache-stats", action="store_true", help="Print factor matrix cache diagnostics.")
+    factor_eval.add_argument("--bulk-matrix", action="store_true", help="Build and consume a bulk factor matrix without enabling cache reuse.")
     factor_eval.add_argument("--save-factor-history", action="store_true", help="Persist factor values and evaluation history.")
     factor_eval.add_argument("--save-regime-history", action="store_true", help="Persist factor diagnostics by current regime history.")
 
@@ -27,6 +31,10 @@ def handle(args, context) -> int:
         end=args.end,
         forward_days=args.forward_days,
         pipeline_config=load_factor_pipeline_config(Path(args.pipeline)) if args.pipeline else None,
+        use_cache=args.use_cache,
+        factor_cache=FactorEvalCache() if args.use_cache else None,
+        bulk_matrix=args.bulk_matrix,
+        cache_stats=args.cache_stats,
     )
     print("Factor Evaluation Summary")
     print(f"factor: {result.factor}")
@@ -52,6 +60,19 @@ def handle(args, context) -> int:
         print(f"missing_percentage: {format_optional_pct(result.factor_coverage.get('missing_percentage'))}")
         print(f"metrics_used: {','.join(result.factor_coverage.get('fundamental_metrics_used') or [])}")
         print(f"no_lookahead_filter: {result.factor_coverage.get('no_lookahead_filter')}")
+    if args.cache_stats and result.performance_metadata:
+        stats = result.performance_metadata.get("cache_stats") or {}
+        print("cache_stats:")
+        print(f"cache_enabled: {str(result.performance_metadata.get('cache_enabled')).lower()}")
+        print(f"matrix_hits: {stats.get('matrix_hits', 0)}")
+        print(f"matrix_misses: {stats.get('matrix_misses', 0)}")
+        print(f"factor_value_hits: {stats.get('factor_value_hits', 0)}")
+        print(f"factor_value_misses: {stats.get('factor_value_misses', 0)}")
+        print(f"future_return_hits: {stats.get('future_return_hits', 0)}")
+        print(f"future_return_misses: {stats.get('future_return_misses', 0)}")
+        print(f"cache_memory_estimate: {stats.get('cache_memory_estimate', 0)}")
+        print(f"matrix_rows: {result.performance_metadata.get('matrix_rows')}")
+        print(f"eval_seconds: {format_optional_number(result.performance_metadata.get('eval_seconds'))}")
     print("decay:")
     for horizon, metrics in result.decay.items():
         print(

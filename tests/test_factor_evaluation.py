@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from quant.factor_eval.factor_evaluation import FactorEvaluation
+from quant.engines.factor_eval.factor_evaluation import FactorEvaluation
 from quant.storage.sqlite_store import SQLitePriceStore
 
 

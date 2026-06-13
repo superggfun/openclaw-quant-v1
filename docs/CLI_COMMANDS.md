@@ -200,11 +200,13 @@ The factor pipeline command reads stored prices up to `--as-of-date` when provid
 python -m quant.cli factor-eval --factor momentum_20d
 python -m quant.cli factor-eval --factor momentum_20d --pipeline examples/factor_pipeline_config.json
 python -m quant.cli factor-eval --factor momentum_20d --save-factor-history
+python -m quant.cli factor-eval --factor momentum_20d --use-cache --cache-stats
+python -m quant.cli factor-eval --factor momentum_20d --bulk-matrix --cache-stats
 python -m quant.cli factor-eval --factor risk_adjusted_momentum
 python -m quant.cli factor-eval --factor volatility_20d --start 2024-01-01 --end 2024-12-31 --forward-days 20
 ```
 
-The factor evaluation command reads stored prices, calculates factor values using signal-date-and-earlier data, then compares them with future returns. It prints IC, Rank IC, ICIR, quintile returns, spread, and decay metrics, and writes `reports/factor_eval_*.json`. Use `--save-factor-history` to persist factor definitions, factor values, IC, Rank IC, ICIR, coverage, and warning metadata into the Factor Store.
+The factor evaluation command reads stored prices, calculates factor values using signal-date-and-earlier data, then compares them with future returns. It prints IC, Rank IC, ICIR, quintile returns, spread, and decay metrics, and writes `reports/factor_eval_*.json`. Use `--save-factor-history` to persist factor definitions, factor values, IC, Rank IC, ICIR, coverage, and warning metadata into the Factor Store. Use `--use-cache --cache-stats` to enable the v0.41 opt-in in-memory factor matrix cache and print hit/miss diagnostics. The cache is disabled by default and must preserve uncached metrics.
 
 ## Long-Short Factor Backtest
 
@@ -253,12 +255,14 @@ python -m quant.cli research-status
 python -m quant.cli research-history
 python -m quant.cli research-report
 python -m quant.cli research-validation --mode quick
+python -m quant.cli research-validation --mode quick --max-symbols 20 --max-factors 3 --use-cache --cache-stats
+python -m quant.cli research-validation --mode quick --max-symbols 20 --max-factors 3 --bulk-matrix --parallel --workers 4 --cache-stats
 python -m quant.cli research-validation --mode full --max-folds 5 --timeout-seconds 3600
 ```
 
 `research-run` automates an offline research workflow and writes `reports/research_run_*.json`. The default `examples/research_scheduler_config.json` is lightweight daily/smoke mode, not full-universe validation. Full research remains available by config: larger universe, multiple factors, data refresh enabled, visualization/export enabled, and longer trade simulation windows. Use `--skip-data-refresh`, `--skip-trade-sim`, `--skip-visualization`, or `--skip-agent-export` for even shorter smoke runs.
 
-`research-validation` runs the v0.39 evidence and coverage sprint. Quick mode is bounded and intended for local smoke/research runs. Full mode can be long-running and should be scheduled deliberately.
+`research-validation` runs the v0.39 evidence and coverage sprint. Quick mode is bounded and intended for local smoke/research runs. Full mode can be long-running and should be scheduled deliberately. v0.41 adds opt-in `--use-cache`, `--bulk-matrix`, `--parallel`, `--workers`, and `--cache-stats` flags. Parallel workers compute independent factor batches only; SQLite writes stay in the main process.
 
 ## Performance Profiling
 

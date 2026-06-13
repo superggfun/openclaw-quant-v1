@@ -53,6 +53,8 @@ MCP tools are deterministic wrappers around existing engines and services.
 - visualization paths are returned as paths, not image bytes
 - generated artifacts remain local
 
+MCP report tools return compact report summaries and metadata. Large artifacts are represented by paths, row counts, and artifact type metadata; MCP responses must not return raw large files, binary chart payloads, factor observation matrices, daily holdings, or millions of JSON rows. See `docs/REPORT_ARCHITECTURE.md`.
+
 ## CLI
 
 ```bash
@@ -72,6 +74,18 @@ python -m quant.cli mcp-smoke
 - `REPORTS`: Agent Export and report summaries
 - `VISUALIZATION`: generated chart/dashboard metadata
 - `SECURITY`: forbidden trading/broker actions that return `NOT_SUPPORTED`
+
+## Tool Auto-Registration
+
+MCP tools are auto-discovered from `quant.interfaces.mcp_server.tools`.
+
+To add a tool:
+
+1. Add an `MCPToolSpec` to the matching module under `quant/interfaces/mcp_server/tools/`, or add a new module in that package.
+2. Implement the matching `handler_name` method in the appropriate module under `quant/interfaces/mcp_server/runners/`.
+3. Add focused tests for the new tool behavior and capability level.
+
+Do not edit `create_default_mcp_registry()` for ordinary tool additions. The registry discovers every module exposing `MCP_TOOL_SPECS`, validates duplicate names, binds each spec to the `MCPToolRunner` facade, and registers the resulting tool.
 
 ## JSON Safety
 

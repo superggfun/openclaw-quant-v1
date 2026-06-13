@@ -1,2 +1,0 @@
-"""Future OpenClaw integration boundary."""
-

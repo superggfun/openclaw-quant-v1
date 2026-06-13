@@ -1,13 +1,6 @@
 """Visualization layered namespace."""
 
-from quant.visualization import *  # noqa: F401,F403
-from quant.utils.module_alias import alias_modules
+from quant.reports.visualization.chart_builder import ChartArtifact, ChartBuilder
+from quant.reports.visualization.report_visualizer import ReportVisualizer
 
-alias_modules(
-    __name__,
-    {
-        "chart_builder": "quant.visualization.chart_builder",
-        "report_visualizer": "quant.visualization.report_visualizer",
-    },
-)
-
+__all__ = ["ChartArtifact", "ChartBuilder", "ReportVisualizer"]

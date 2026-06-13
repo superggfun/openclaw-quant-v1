@@ -5,16 +5,16 @@ from pathlib import Path
 
 import pandas as pd
 
-from quant.agent_export.agent_exporter import AgentExporter
-from quant.factor_eval.factor_evaluation import FactorEvaluation
-from quant.factor_store.factor_store import FactorStore
-from quant.regime_detection.market_regime import MarketRegime
-from quant.regime_detection.regime_analytics import RegimeAnalytics
-from quant.regime_detection.regime_classification import classify_regime
-from quant.regime_detection.regime_detector import RegimeDetector
-from quant.regime_detection.regime_history import RegimeHistoryStore
+from quant.reports.agent_export.agent_exporter import AgentExporter
+from quant.engines.factor_eval.factor_evaluation import FactorEvaluation
+from quant.factors.store.factor_store import FactorStore
+from quant.engines.regime.market_regime import MarketRegime
+from quant.engines.regime.regime_analytics import RegimeAnalytics
+from quant.engines.regime.regime_classification import classify_regime
+from quant.engines.regime.regime_detector import RegimeDetector
+from quant.engines.regime.regime_history import RegimeHistoryStore
 from quant.storage.sqlite_store import SQLitePriceStore
-from quant.visualization.report_visualizer import ReportVisualizer
+from quant.reports.visualization.report_visualizer import ReportVisualizer
 
 
 def seed_regime_prices(db_path: Path) -> None:

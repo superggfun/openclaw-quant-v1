@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from quant.backtest.backtest_engine import PortfolioBacktestEngine
+from quant.engines.backtest.backtest_engine import PortfolioBacktestEngine
 from quant.storage.sqlite_store import SQLitePriceStore
 
 

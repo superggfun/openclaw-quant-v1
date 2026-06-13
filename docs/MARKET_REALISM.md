@@ -20,10 +20,10 @@ The layer is deterministic and uses only stored daily OHLCV history.
 
 ## Components
 
-- `quant/market_realism/liquidity_model.py`: estimates ADV, average daily notional, and rolling volatility from stored daily bars.
-- `quant/market_realism/slippage_model.py`: estimates fixed, bps, volume-scaled, or volatility-scaled slippage.
-- `quant/market_realism/execution_constraints.py`: applies marketability, liquidity, and position-size constraints.
-- `quant/market_realism/marketability.py`: stores marketability diagnostics.
+- `quant/engines/execution/liquidity_model.py`: estimates ADV, average daily notional, and rolling volatility from stored daily bars.
+- `quant/engines/execution/slippage_model.py`: estimates fixed, bps, volume-scaled, or volatility-scaled slippage.
+- `quant/engines/execution/execution_constraints.py`: applies marketability, liquidity, and position-size constraints.
+- `quant/engines/execution/marketability.py`: stores marketability diagnostics.
 
 ## Slippage Models
 

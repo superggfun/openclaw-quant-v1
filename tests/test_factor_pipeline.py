@@ -4,9 +4,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from quant.alpha.alpha_engine import AlphaEngine
-from quant.factor_eval.factor_evaluation import FactorEvaluation
-from quant.factor_pipeline.factor_pipeline import FactorPipeline
+from quant.engines.alpha.alpha_engine import AlphaEngine
+from quant.engines.factor_eval.factor_evaluation import FactorEvaluation
+from quant.engines.factor_pipeline.factor_pipeline import FactorPipeline
 from quant.storage.sqlite_store import SQLitePriceStore
 
 

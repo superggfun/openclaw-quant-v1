@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from quant.agent_export.agent_exporter import AgentExporter
+from quant.reports.agent_export.agent_exporter import AgentExporter
 from quant.cli import COMMAND_HANDLERS, build_parser, main
 from quant.cli_commands.common import create_context
 from quant.interfaces.mcp_server import MCPRequest
@@ -13,8 +13,10 @@ from quant.interfaces.mcp_server.capabilities import OFFLINE_SIMULATION, READ_ON
 from quant.interfaces.mcp_server.tool_registry import create_default_mcp_registry
 from quant.storage.sqlite_store import SQLitePriceStore
 from quant.strategy_dsl.strategy_registry import StrategyRegistry
-from quant.strategy_gates.gate_runner import StrategyGateRunner
-from quant.visualization.report_visualizer import ReportVisualizer
+from quant.engines.strategy_gates.gate_discovery import discover_gate_specs
+from quant.engines.strategy_gates.gate_registry import GateRegistry
+from quant.engines.strategy_gates.gate_runner import StrategyGateRunner
+from quant.reports.visualization.report_visualizer import ReportVisualizer
 
 
 def _strategy_yaml(extra: str = "") -> str:
@@ -100,6 +102,22 @@ def test_strategy_gate_runner_reports_warnings_for_missing_evidence(tmp_path: Pa
     assert Path(report["report_path"]).exists()
 
 
+def test_strategy_gates_are_auto_discovered() -> None:
+    registry = GateRegistry()
+    discovered_names = [spec.name for spec in discover_gate_specs()]
+
+    assert registry.names() == discovered_names
+    assert discovered_names == [
+        "schema_validation",
+        "data_quality",
+        "factor_history",
+        "walk_forward",
+        "regime_coverage",
+        "trading_simulation",
+        "complexity",
+    ]
+
+
 def test_strategy_gate_rejects_invalid_dsl_and_lookahead_override(tmp_path: Path) -> None:
     strategy_dir = _write_strategy(tmp_path, _strategy_yaml("validation:\n  allow_lookahead: true\n"))
     context = create_context(tmp_path / "quant.db")
@@ -176,4 +194,3 @@ def test_strategy_gate_mcp_tools_have_expected_capabilities(tmp_path: Path) -> N
     assert response.status == "OK"
     assert response.result["metadata"]["report_type"] == "strategy_gate"
     assert latest.status == "OK"
-

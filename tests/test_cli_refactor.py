@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import pkgutil
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
-from quant.cli import COMMAND_HANDLERS, build_parser, main
+import quant.cli_commands as cli_commands_package
+from quant.cli import COMMAND_HANDLERS, COMMAND_MODULES, SKIPPED_COMMAND_MODULES, build_parser, main
+from quant.cli_commands.common import create_context
 from quant.storage.sqlite_store import SQLitePriceStore
 
 
@@ -113,6 +116,17 @@ def test_each_command_is_registered() -> None:
     assert set(COMMAND_HANDLERS) == EXPECTED_COMMANDS
 
 
+def test_command_modules_are_auto_discovered() -> None:
+    expected_modules = sorted(
+        module_info.name
+        for module_info in pkgutil.iter_modules(cli_commands_package.__path__)
+        if not module_info.ispkg and module_info.name not in SKIPPED_COMMAND_MODULES
+    )
+    actual_modules = sorted(module.__name__.rsplit(".", 1)[-1] for module in COMMAND_MODULES)
+
+    assert actual_modules == expected_modules
+
+
 def test_db_path_still_works(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     db_path = tmp_path / "custom.db"
 
@@ -122,6 +136,18 @@ def test_db_path_still_works(tmp_path: Path, capsys: pytest.CaptureFixture[str])
     assert exit_code == 0
     assert "SPY" in output
     assert db_path.exists()
+
+
+def test_cli_context_initializes_engines_lazily(tmp_path: Path) -> None:
+    context = create_context(tmp_path / "quant.db")
+
+    assert set(context.__dict__) == {"db_path"}
+
+    alpha_engine = context.alpha_engine
+
+    assert context.alpha_engine is alpha_engine
+    assert "alpha_engine" in context.__dict__
+    assert "risk_engine" not in context.__dict__
 
 
 def test_representative_cli_smoke_commands(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

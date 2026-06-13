@@ -11,6 +11,8 @@ from quant.research_validation import ResearchValidationRunner
 def register_parser(subparsers: argparse._SubParsersAction) -> None:
     parser = subparsers.add_parser("research-validation", help="Run bounded research validation sprint workflow.")
     parser.add_argument("--mode", choices=["quick", "full"], default="quick")
+    parser.add_argument("--start", default=None, help="Signal-date window start, YYYY-MM-DD. Quick defaults to 2024-01-01.")
+    parser.add_argument("--end", default=None, help="Signal-date window end, YYYY-MM-DD. Quick defaults to latest available price date.")
     parser.add_argument("--max-factors", type=int, default=None)
     parser.add_argument("--max-strategies", type=int, default=None)
     parser.add_argument("--max-folds", type=int, default=None)
@@ -20,11 +22,56 @@ def register_parser(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument("--factor-family", choices=["price", "fundamental", "all"], default="all")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--skip-existing", action="store_true")
+    parser.add_argument("--use-cache", action="store_true", help="Use the opt-in in-memory factor matrix cache for factor-eval steps.")
+    parser.add_argument("--bulk-matrix", action="store_true", help="Use semantic-preserving bulk factor observation matrices.")
+    parser.add_argument("--parallel", action="store_true", help="Parallelize independent factor batch computations.")
+    parser.add_argument("--workers", type=int, default=None, help="Worker process count for --parallel.")
+    parser.add_argument("--parallel-target", choices=["factor_batch"], default="factor_batch")
+    parser.add_argument("--cache-stats", action="store_true", help="Include factor matrix cache diagnostics in the report and CLI output.")
+    parser.add_argument("--write-substep-reports", action="store_true", help="Write sub-step reports under the run-specific substeps directory.")
+    parser.add_argument("--write-batch-artifacts", action="store_true", help="Write detailed batch artifacts under the run-specific artifacts directory.")
+    parser.add_argument("--write-intermediate-reports", action="store_true", help="Allow nested alpha/multi-factor/portfolio/trade-sim intermediate reports under the run-specific substeps directory.")
+    parser.add_argument("--write-charts", "--charts", dest="write_charts", action="store_true", help="Generate research-validation charts under the run-specific charts directory.")
+    parser.add_argument("--write-debug-logs", action="store_true", help="Reserve run-specific logs directory for debug/HPC logs. Disabled by default.")
+    parser.add_argument("--artifact-dir", default=None, help="Run artifact directory. Defaults to reports/runs/<run_id>.")
 
 
 def handle(args: argparse.Namespace, context: CLIContext) -> int:
-    report = ResearchValidationRunner(context).run(
+    runner = ResearchValidationRunner(context)
+    preview = runner.preview(
         mode=args.mode,
+        start=args.start,
+        end=args.end,
+        max_factors=args.max_factors,
+        max_strategies=args.max_strategies,
+        max_folds=args.max_folds,
+        batch_size=args.batch_size,
+        max_symbols=args.max_symbols,
+        factor_family=args.factor_family,
+        parallel=args.parallel,
+        workers=args.workers,
+    )
+    print("Research Validation Plan")
+    print(f"mode: {args.mode}")
+    print(f"symbols: {preview['symbol_count']}")
+    print(f"factors: {preview['factor_count']} ({', '.join(preview['factors'][:10])})")
+    print(f"date_range: {preview['effective_start_date']} to {preview['effective_end_date']}")
+    print(f"frequency: {preview['frequency']}")
+    print(f"trading_days: {preview['trading_day_count']}")
+    print(f"forward_days: {preview['forward_days']}")
+    print(f"holding_period: {preview['holding_period']}")
+    print(f"batch_size: {preview['batch_size']}")
+    print(f"batch_count: {preview['batch_count']}")
+    print(f"workers: {preview['workers']}")
+    print(f"expected_task_count: {preview['expected_task_count']}")
+    print(f"charts_enabled: {str(bool(args.write_charts)).lower()}")
+    print(f"write_substep_reports: {str(bool(args.write_substep_reports)).lower()}")
+    print(f"write_batch_artifacts: {str(bool(args.write_batch_artifacts)).lower()}")
+    print(f"write_intermediate_reports: {str(bool(args.write_intermediate_reports)).lower()}")
+    report = runner.run(
+        mode=args.mode,
+        start=args.start,
+        end=args.end,
         max_factors=args.max_factors,
         max_strategies=args.max_strategies,
         max_folds=args.max_folds,
@@ -34,12 +81,31 @@ def handle(args: argparse.Namespace, context: CLIContext) -> int:
         factor_family=args.factor_family,
         resume=args.resume,
         skip_existing=args.skip_existing,
+        use_cache=args.use_cache,
+        bulk_matrix=args.bulk_matrix,
+        parallel=args.parallel,
+        workers=args.workers,
+        parallel_target=args.parallel_target,
+        cache_stats=args.cache_stats,
+        charts=args.write_charts,
+        write_substep_reports=args.write_substep_reports,
+        write_batch_artifacts=args.write_batch_artifacts,
+        write_intermediate_reports=args.write_intermediate_reports,
+        write_debug_logs=args.write_debug_logs,
+        artifact_dir=args.artifact_dir,
     )
     print("Research Validation Summary")
     print(f"mode: {report['mode']}")
     print(f"status: {report['status']}")
     print(f"partial_results: {str(bool(report['partial_results'])).lower()}")
     print(f"runtime_seconds: {format_optional_number(report['runtime_seconds'])}")
+    print(f"date_range: {report.get('effective_start_date')} to {report.get('effective_end_date')}")
+    print(f"frequency: {report.get('frequency')}")
+    print(f"trading_days: {report.get('trading_day_count')}")
+    print(f"charts_enabled: {str(bool(report.get('charts_enabled'))).lower()}")
+    print(f"chart_count: {report.get('chart_count')}")
+    print(f"run_artifact_dir: {report.get('run_artifact_dir')}")
+    print(f"manifest: {report.get('manifest_path')}")
     print(f"completed_steps: {len(report['completed_steps'])}")
     print(f"skipped_steps: {len(report['skipped_steps'])}")
     print(f"timed_out_steps: {len(report['timed_out_steps'])}")
@@ -72,6 +138,23 @@ def handle(args: argparse.Namespace, context: CLIContext) -> int:
             f"{row['factor']}: eval_batches={row.get('eval_batches')} "
             f"backtest_batches={row.get('backtest_batches')} observations={row.get('observations')}"
         )
+    if args.cache_stats:
+        cache_summary = report.get("cache_summary") or {}
+        print("cache_summary:")
+        print(f"cache_enabled: {str(cache_summary.get('cache_enabled')).lower()}")
+        print(f"matrix_hits: {cache_summary.get('matrix_hits', 0)}")
+        print(f"matrix_misses: {cache_summary.get('matrix_misses', 0)}")
+        print(f"factor_value_hits: {cache_summary.get('factor_value_hits', 0)}")
+        print(f"factor_value_misses: {cache_summary.get('factor_value_misses', 0)}")
+        print(f"cache_memory_estimate: {cache_summary.get('cache_memory_estimate', 0)}")
+    metadata = report.get("performance_metadata") or {}
+    if args.cache_stats or args.bulk_matrix or args.parallel:
+        print("performance_metadata:")
+        print(f"bulk_matrix_enabled: {str(metadata.get('bulk_matrix_enabled')).lower()}")
+        print(f"parallel_enabled: {str(metadata.get('parallel_enabled')).lower()}")
+        print(f"workers: {metadata.get('workers')}")
+        print(f"factor_batches: {metadata.get('factor_batches')}")
+        print(f"chart_write_seconds: {format_optional_number(metadata.get('chart_write_seconds'))}")
     print("recommendations:")
     for item in report.get("recommendations", []):
         print(f"- {item}")

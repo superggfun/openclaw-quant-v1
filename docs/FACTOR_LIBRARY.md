@@ -16,6 +16,8 @@ python -m quant.cli alpha
 
 ## Factors
 
+Factor definitions are auto-discovered from `FACTOR_SPECS` declarations in modules under `quant/factors/price/` and `quant/factors/fundamental/`. New factors should declare their metadata next to their compute function instead of editing a central registry.
+
 | Factor | Category | Higher Is Better | Inputs | Description |
 | --- | --- | --- | --- | --- |
 | `momentum_20d` | momentum | yes | close | 20-day close-to-close momentum. |

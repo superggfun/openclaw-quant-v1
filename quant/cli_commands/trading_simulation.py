@@ -13,8 +13,8 @@ from quant.cli_commands.common import (
     load_cost_config,
     load_market_realism_config,
 )
-from quant.portfolio_construction.portfolio_construction import SUPPORTED_METHODS
-from quant.trading_simulation.trading_simulator import SUPPORTED_REBALANCE_FREQUENCIES
+from quant.engines.portfolio.portfolio_construction import SUPPORTED_METHODS
+from quant.engines.trading_simulation.trading_simulator import SUPPORTED_REBALANCE_FREQUENCIES
 
 
 def register_parser(subparsers: argparse._SubParsersAction) -> None:

@@ -19,6 +19,7 @@ def handle(args: argparse.Namespace, context) -> int:
     print(f"source_report: {result.source_report}")
     print(f"output_dir: {result.output_dir}")
     print(f"dashboard: {result.dashboard_path}")
+    print(f"visual_summary: {result.visual_summary_path}")
     print("charts:")
     for chart in result.charts:
         print(f"- {chart['chart_id']}: {chart['png_path']} | {chart['svg_path']}")

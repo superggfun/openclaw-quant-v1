@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import math
 from dataclasses import asdict, dataclass
-from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 
+from quant.reports.report_io import generate_report_path, write_json_report
 from quant.storage.sqlite_store import SQLitePriceStore
 
 
@@ -238,9 +237,7 @@ class BacktestService:
         return (wins / len(closed_trade_pnls)) * 100.0
 
     def _write_report(self, symbol: str, result: BacktestResult) -> Path:
-        self.report_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        path = self.report_dir / f"backtest_{symbol}_{timestamp}.json"
-        path.write_text(json.dumps(result.to_report(), indent=2), encoding="utf-8")
-        return path
-
+        return write_json_report(
+            generate_report_path(self.report_dir, f"backtest_{symbol}"),
+            result.to_report(),
+        )

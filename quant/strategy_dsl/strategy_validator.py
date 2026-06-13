@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from quant.config import DEFAULT_SYMBOLS
-from quant.factors.factor_registry import FactorRegistry
-from quant.portfolio_construction.portfolio_construction import SUPPORTED_METHODS
+from quant.factors.price.factor_registry import FactorRegistry
+from quant.engines.portfolio.portfolio_construction import SUPPORTED_METHODS
 from quant.strategy_dsl.strategy_definition import StrategyDefinition
 
 

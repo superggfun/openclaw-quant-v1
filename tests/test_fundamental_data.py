@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from quant.agent_export.agent_exporter import AgentExporter
+from quant.reports.agent_export.agent_exporter import AgentExporter
 from quant.cli import main
-from quant.fundamental_data.fundamental_service import FundamentalService
-from quant.fundamental_data.fundamental_store import FundamentalStore
+from quant.data.fundamental.fundamental_service import FundamentalService
+from quant.data.fundamental.fundamental_store import FundamentalStore
 
 
 def write_csv(tmp_path: Path, name: str, rows: list[dict]) -> Path:

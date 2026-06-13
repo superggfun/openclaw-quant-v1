@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from quant.cli_commands.common import format_optional_number, format_optional_pct, load_factor_pipeline_config
-from quant.factor_eval.factor_evaluation import SUPPORTED_FACTORS
+from quant.engines.factor_eval.factor_evaluation import SUPPORTED_FACTORS
 
 
 def register_parser(subparsers) -> None:

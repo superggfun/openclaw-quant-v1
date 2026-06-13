@@ -37,6 +37,16 @@ Price refresh, `update-prices`, coverage, and readiness workflows resolve provid
 - `alpha_vantage`: placeholder, not installed.
 - `polygon`: placeholder, not installed.
 
+Provider specs are auto-discovered from `quant/data/providers/`.
+
+To add a provider:
+
+1. Implement a `DataProvider` subclass in `quant/data/providers/`.
+2. Expose `PROVIDER_SPECS = (ProviderSpec("provider_name", ProviderClass),)` from that module.
+3. Add health-check, normalization, CLI/provider-registry, and optional-dependency tests.
+
+Do not edit `ProviderRegistry` for ordinary provider additions. The registry discovers provider specs, instantiates providers, and preserves `yfinance` as the default unless configuration changes it.
+
 ## CSV Provider
 
 The CSV provider supports either one combined file or symbol files:

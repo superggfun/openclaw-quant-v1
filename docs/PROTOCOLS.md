@@ -38,7 +38,7 @@ Supported recommendation actions:
 
 ## Validation
 
-`quant/core_protocols/protocol_validation.py` provides lightweight checks:
+`quant/core/protocols/protocol_validation.py` provides lightweight checks:
 
 - cash must not be negative
 - shares must not be negative

@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quant.agent_export.agent_exporter import AgentExporter
+from quant.reports.agent_export.agent_exporter import AgentExporter
+from quant.reports.agent_export.registry import EXPORT_SPECS, discover_export_modules, discover_export_specs
 
 
 def write_report(tmp_path: Path, payload: dict) -> Path:
@@ -24,6 +25,15 @@ def test_report_detection() -> None:
     assert exporter.detect_report_type({"items": [], "cash_after_rebalance": 100}) == "rebalance"
     assert exporter.detect_report_type({"executed_trades": [], "unfilled_trades": [], "execution_costs": {}}) == "execution"
     assert exporter.detect_report_type({"metrics": {}, "equity_curve": []}) == "backtest"
+
+
+def test_agent_export_specs_are_auto_discovered() -> None:
+    modules = discover_export_modules()
+    discovered = discover_export_specs(modules)
+
+    assert discovered == EXPORT_SPECS
+    assert "factor_eval" in {spec.report_type for spec in discovered}
+    assert any(spec.report_type == "factor_eval" and spec.export.__module__.endswith(".factors") for spec in discovered)
 
 
 def test_alpha_export(tmp_path: Path) -> None:

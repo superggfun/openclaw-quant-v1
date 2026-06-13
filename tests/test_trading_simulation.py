@@ -6,10 +6,10 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from quant.agent_export.agent_exporter import AgentExporter
+from quant.reports.agent_export.agent_exporter import AgentExporter
 from quant.storage.sqlite_store import SQLitePriceStore
-from quant.trading_simulation.portfolio_account import PortfolioAccount
-from quant.trading_simulation.trading_simulator import TradingSimulator
+from quant.engines.trading_simulation.portfolio_account import PortfolioAccount
+from quant.engines.trading_simulation.trading_simulator import TradingSimulator
 
 
 def seed_trading_prices(db_path: Path) -> None:

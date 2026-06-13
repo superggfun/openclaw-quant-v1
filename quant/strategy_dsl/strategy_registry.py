@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 from quant.config import DEFAULT_SYMBOLS
+from quant.reports.report_io import generate_report_path, write_json_report
 from quant.strategy_dsl.strategy_definition import StrategyDefinition
 from quant.strategy_dsl.strategy_loader import StrategyLoader
 from quant.strategy_dsl.strategy_metadata import StrategyMetadataStore
@@ -90,6 +90,9 @@ class StrategyRegistry:
         rebalance_frequency: str = "monthly",
         with_gates: bool = False,
         gate_config_path: str | Path = "examples/strategy_gate_config.json",
+        write_report: bool = True,
+        write_intermediate_reports: bool = True,
+        write_gate_report: bool = True,
     ) -> dict[str, Any]:
         definition, path = self.load_strategy(strategy, file)
         validation = self.validator.validate(definition)
@@ -109,27 +112,33 @@ class StrategyRegistry:
             cost_config=cost_config,
             market_realism_config=market_realism_config,
             symbols=alpha_config["universe"],
+            write_report=write_intermediate_reports,
+            write_intermediate_reports=write_intermediate_reports,
         )
+        defer_strategy_report = bool(write_report and with_gates)
         report = self._strategy_run_report(
             definition=definition,
             source_path=path,
             validation=validation.to_report(),
             trading_report=result.to_report(),
+            write_report=write_report and not defer_strategy_report,
         )
         if with_gates:
-            from quant.strategy_gates.gate_runner import StrategyGateRunner
+            from quant.engines.strategy_gates.gate_runner import StrategyGateRunner
 
             gate_report = StrategyGateRunner(self.context, strategy_dir=self.loader.strategy_dir, report_dir=self.report_dir).run(
                 strategy=strategy,
                 file=file,
                 config_path=gate_config_path,
                 strategy_run_report=report,
+                write_report=write_gate_report,
             )
             artifacts = dict(report.get("artifacts") or {})
             artifacts["strategy_gate_report_path"] = gate_report.get("report_path")
             report["artifacts"] = artifacts
             generated = list(report.get("generated_reports") or [])
-            generated.append(gate_report.get("report_path"))
+            if gate_report.get("report_path"):
+                generated.append(gate_report.get("report_path"))
             report["generated_reports"] = _dedupe(generated)
             report["gate_summary"] = {
                 "overall_status": gate_report.get("overall_status"),
@@ -137,7 +146,8 @@ class StrategyRegistry:
                 "rejection_reasons": gate_report.get("rejection_reasons") or [],
             }
             report["warnings"] = _dedupe(list(report.get("warnings") or []) + list(gate_report.get("warnings") or []))
-            Path(report["report_path"]).write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+        if defer_strategy_report:
+            report = self._with_report_path(report, "strategy_run")
         self.metadata_store.save_run(report)
         return report
 
@@ -147,6 +157,7 @@ class StrategyRegistry:
         source_path: Path,
         validation: dict[str, Any],
         trading_report: dict[str, Any],
+        write_report: bool = True,
     ) -> dict[str, Any]:
         generated_at = datetime.now().isoformat(timespec="seconds")
         warnings = list(validation.get("warnings") or []) + list(trading_report.get("warnings") or [])
@@ -196,6 +207,8 @@ class StrategyRegistry:
                 "This is not live trading, broker execution, or investment advice.",
             ],
         }
+        if not write_report:
+            return report | {"report_path": ""}
         return self._with_report_path(report, "strategy_run")
 
     def _alpha_config(self, definition: StrategyDefinition) -> dict[str, Any]:
@@ -229,14 +242,13 @@ class StrategyRegistry:
         return cost, market
 
     def _with_report_path(self, report: dict[str, Any], prefix: str) -> dict[str, Any]:
-        self.report_dir.mkdir(parents=True, exist_ok=True)
-        path = self.report_dir / f"{prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        path = generate_report_path(self.report_dir, prefix)
         output = report | {"report_path": str(path)}
         if prefix == "strategy_run":
             generated = list(output.get("generated_reports") or [])
             generated.append(str(path))
             output["generated_reports"] = _dedupe(generated)
-        path.write_text(json.dumps(output, indent=2, sort_keys=True), encoding="utf-8")
+        write_json_report(path, output, sort_keys=True)
         return output
 
 

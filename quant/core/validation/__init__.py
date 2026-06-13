@@ -1,6 +1,5 @@
 """Layered validation package."""
 
-from quant.utils.module_alias import alias_modules
+from quant.core.protocols.protocol_validation import validate_fill_references_order
 
-alias_modules(__name__, {"protocol_validation": "quant.core_protocols.protocol_validation"})
-
+__all__ = ["validate_fill_references_order"]

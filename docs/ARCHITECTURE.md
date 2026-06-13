@@ -16,11 +16,11 @@ SQLite / External APIs
 
 ## Layered Package Layout
 
-`v0.34.0` is phase 1 of the layered namespace refactor. It introduces a clearer package layout before API, OpenClaw, LangChain, QuantStats, or PyFolio adapters are implemented.
+`v0.34.0` introduced the layered namespace refactor before API, OpenClaw, LangChain, QuantStats, or PyFolio integrations are implemented.
 
-The new paths are structural boundaries only. They do not change CLI behavior, report schemas, factor calculations, backtest behavior, trading simulation semantics, or no-lookahead guarantees. Existing public import paths remain supported through lightweight compatibility shims for at least one release.
+The layered paths are the canonical implementation locations. They do not change CLI behavior, report schemas, factor calculations, backtest behavior, trading simulation semantics, or no-lookahead guarantees.
 
-Most implementation files remain in their legacy locations in this phase. Future physical migration can happen gradually once callers have moved to the layered namespaces.
+Implementation files for data, engines, and reports live under the layered namespaces directly.
 
 ```text
 quant/
@@ -30,71 +30,68 @@ quant/
   engines/       alpha, backtest, factor research, portfolio, risk, execution
   services/      application orchestration services
   reports/       agent export and visualization
-  interfaces/    CLI plus reserved MCP/API boundaries
-  adapters/      reserved external framework boundaries
+  interfaces/    MCP and future external boundaries
   scheduler/     daily offline research automation
   utils/         small shared implementation helpers
 ```
 
-Compatibility examples:
+Import examples:
 
 ```python
 from quant.core.protocols.account import AccountState
-from quant.core_protocols.account import AccountState as LegacyAccountState
-
-assert AccountState is LegacyAccountState
+from quant.engines.alpha.alpha_engine import AlphaEngine
+from quant.reports.agent_export.agent_exporter import AgentExporter
 ```
 
-The reserved `quant.interfaces.api`, `quant.adapters.openclaw`, `quant.adapters.langchain`, `quant.adapters.quantstats`, and `quant.adapters.pyfolio` packages are placeholders only. They intentionally do not implement external integrations in v0.34.
+Unimplemented extension namespaces are not precreated. Add API, OpenClaw, LangChain, QuantStats, or PyFolio packages only with real implementation and tests.
 
 `v0.35.0` fills `quant.interfaces.mcp_server` with a local MCP-compatible research tool layer. It is not a network daemon, not a broker API, and not a trading interface.
 
 ## Components
 
 - `quant.cli`: Main CLI entry point. It builds the top-level parser, creates shared context, and dispatches to command modules.
-- `quant.cli_commands`: Dedicated parser registration and command handlers for data, data layer, scheduler, agent export, visualization, portfolio, rebalance, risk, optimizer, portfolio construction, alpha, factor, strategy evaluation, trading simulation, cost, execution, and backtest commands.
-- `quant.interfaces.cli_commands`: Layered alias for CLI command modules. `quant.cli_commands` remains the implementation path in v0.34.
+- `quant.cli_commands`: Auto-discovered parser registration and command handlers for data, data layer, scheduler, agent export, visualization, portfolio, rebalance, risk, optimizer, portfolio construction, alpha, factor, strategy evaluation, trading simulation, cost, execution, and backtest commands.
 - `quant.interfaces.mcp_server`: Local MCP-compatible research interface that exposes safe JSON tools over existing offline engines.
 - `quant.strategy_dsl`: Versioned YAML/JSON strategy definitions, validation, metadata persistence, and offline orchestration.
-- `quant.strategy_gates`: Deterministic offline Strategy Evaluation Gates over DSL validation, Factor Store history, walk-forward evidence, regime diagnostics, and trade simulation evidence.
+- `quant.engines.strategy_gates`: Deterministic offline Strategy Evaluation Gates over DSL validation, Factor Store history, walk-forward evidence, regime diagnostics, and trade simulation evidence.
 - `pyproject.toml`: PEP 621 packaging metadata, optional dependency groups, pytest defaults, and the `openclaw-quant` console entry point.
-- `quant.core.protocols`: Layered protocol namespace. `quant.core_protocols` remains supported.
-- `quant.reports.agent_export`: Layered report export namespace. `quant.agent_export` remains supported.
-- `quant.reports.visualization`: Layered visualization namespace. `quant.visualization` remains supported.
-- `quant.data.providers`: Layered data provider namespace. `quant.data_providers` remains supported.
-- `quant.data.layer`: Layered universe, metadata, coverage, and quality namespace. `quant.data_layer` remains supported.
-- `quant.data.fundamental`: Layered fundamental data namespace. `quant.fundamental_data` remains supported.
-- `quant.engines.*`: Layered aliases for pure engine modules such as alpha, backtest, factor evaluation, factor backtest, multi-factor, regime, portfolio construction, risk, execution, trading simulation, strategy evaluation, strategy gates, and walk-forward.
-- `quant.fundamental_data`: Stores, imports, queries, validates, and reports offline fundamental data.
-- `quant.fundamental_factors`: Computes report-date-aware accounting factors from `fundamental_metrics`.
-- `quant.multi_factor`: Combines price and fundamental factors into normalized, coverage-aware alpha scores.
-- `quant.data_layer.universe_manager`: Builds default, custom, sector, ETF, and large-cap universes.
-- `quant.data_layer.symbol_metadata`: Stores static symbol metadata in SQLite.
-- `quant.data_layer.data_quality`: Produces coverage, data quality, and research readiness reports.
+- `quant.core.protocols`: Protocol namespace.
+- `quant.reports.agent_export`: Report export namespace.
+- `quant.reports.visualization`: Visualization namespace.
+- `quant.data.providers`: Data provider namespace.
+- `quant.data.layer`: Universe, metadata, coverage, and quality namespace.
+- `quant.data.fundamental`: Fundamental data namespace.
+- `quant.engines.*`: Pure engine modules such as alpha, backtest, factor evaluation, factor backtest, multi-factor, regime, portfolio construction, risk, execution, trading simulation, strategy evaluation, strategy gates, and walk-forward.
+- `quant.data.fundamental`: Stores, imports, queries, validates, and reports offline fundamental data.
+- `quant.factors.fundamental`: Computes report-date-aware accounting factors from `fundamental_metrics`.
+- `quant.engines.multi_factor`: Combines price and fundamental factors into normalized, coverage-aware alpha scores.
+- `quant.data.layer.universe_manager`: Builds default, custom, sector, ETF, and large-cap universes.
+- `quant.data.layer.symbol_metadata`: Stores static symbol metadata in SQLite.
+- `quant.data.layer.data_quality`: Produces coverage, data quality, and research readiness reports.
 - `quant.services.price_service`: Coordinates daily price updates and reads.
 - `quant.services.portfolio_service`: Applies simulated account, buy, sell, and valuation rules.
 - `quant.services.backtest_service`: Runs SMA crossover backtests from stored prices and writes JSON reports.
-- `quant.alpha.alpha_engine`: Calculates alpha factors, ranks symbols, and generates target weights.
-- `quant.factor_backtest.factor_backtest`: Runs no-lookahead equal-weight long-short factor return backtests.
-- `quant.factor_store`: Persists factor definitions, values, evaluation history, backtest history, walk-forward fold history, stability, coverage, and versions.
-- `quant.factor_pipeline.factor_pipeline`: Preprocesses same-date factor cross-sections before alpha generation or evaluation.
-- `quant.factor_eval.factor_evaluation`: Evaluates factor predictive quality with no-lookahead IC, Rank IC, quintile, and decay metrics.
-- `quant.regime_detection`: Classifies deterministic market regimes, persists regime history, and summarizes factor performance by regime.
+- `quant.engines.alpha.alpha_engine`: Calculates alpha factors, ranks symbols, and generates target weights.
+- `quant.engines.factor_backtest.factor_backtest`: Runs no-lookahead equal-weight long-short factor return backtests.
+- `quant.factors.store`: Persists factor definitions, values, evaluation history, backtest history, walk-forward fold history, stability, coverage, and versions.
+- `quant.engines.factor_pipeline.factor_pipeline`: Preprocesses same-date factor cross-sections before alpha generation or evaluation.
+- `quant.engines.factor_eval.factor_evaluation`: Evaluates factor predictive quality with no-lookahead IC, Rank IC, quintile, and decay metrics.
+- `quant.engines.regime`: Classifies deterministic market regimes, persists regime history, and summarizes factor performance by regime.
 - `quant.scheduler`: Orchestrates daily offline research pipeline runs and persists scheduler history.
 - `quant.performance`: Measures runtime, store/query calls, slowest modules, and profiling recommendations without changing engine semantics.
-- `quant.strategy_eval.strategy_evaluation`: Explains returns, risk, drawdowns, rolling metrics, and attribution from generated reports.
-- `quant.trading_simulation`: Runs offline account-style historical simulations with in-memory cash, positions, trades, costs, and equity curves.
-- `quant.market_realism`: Applies deterministic slippage, ADV liquidity, marketability, and position-size constraints to simulated execution.
-- `quant.backtest.backtest_engine`: Runs daily portfolio backtests from stored prices, optimizer targets, rebalance logic, and costs.
-- `quant.rebalance.rebalance_engine`: Calculates current allocation and rebalance suggestions from account, position, and price state.
-- `quant.risk.risk_engine`: Calculates portfolio concentration, cash, Top 5, industry, and risk score metrics.
-- `quant.optimizer.optimizer_engine`: Generates target allocations for the Rebalance Engine.
-- `quant.portfolio_construction.portfolio_construction`: Builds target allocations from stored close prices, covariance, and risk contribution calculations.
-- `quant.cost.cost_engine`: Estimates transaction costs for suggested trades.
-- `quant.execution.execution_engine`: Simulates execution of rebalance suggestions and costs.
+- `quant.engines.strategy_eval.strategy_evaluation`: Explains returns, risk, drawdowns, rolling metrics, and attribution from generated reports.
+- `quant.engines.trading_simulation`: Runs offline account-style historical simulations with in-memory cash, positions, trades, costs, and equity curves.
+- `quant.engines.execution`: Applies deterministic slippage, ADV liquidity, marketability, position-size constraints, costs, and simulated execution.
+- `quant.engines.backtest.backtest_engine`: Runs daily portfolio backtests from stored prices, optimizer targets, rebalance logic, and costs.
+- `quant.engines.portfolio.rebalance_engine`: Calculates current allocation and rebalance suggestions from account, position, and price state.
+- `quant.engines.risk.risk_engine`: Calculates portfolio concentration, cash, Top 5, industry, and risk score metrics.
+- `quant.engines.portfolio.optimizer_engine`: Generates target allocations for the Rebalance Engine.
+- `quant.engines.portfolio.portfolio_construction`: Builds target allocations from stored close prices, covariance, and risk contribution calculations.
+- `quant.engines.execution.cost_engine`: Estimates transaction costs for suggested trades.
+- `quant.engines.execution.execution_engine`: Simulates execution of rebalance suggestions and costs.
 - `quant.storage.sqlite_store`: Owns the `prices` table.
 - `quant.storage.portfolio_store`: Owns `accounts`, `positions`, and `trades`.
-- `quant.data_source.yfinance_client`: Legacy yfinance normalization client used by `quant.data_providers.yfinance_provider`.
+- `quant.data_source.yfinance_client`: Legacy yfinance normalization client used by `quant.data.providers.yfinance_provider`.
 
 ## Data Flow
 
@@ -190,6 +187,8 @@ CLI visualize-report -> ReportVisualizer -> existing reports/*.json -> reports/c
 ```
 
 The visualization layer is read-only with respect to source reports. It does not modify quant calculations, report schemas, portfolio state, or execution behavior.
+
+Report architecture follows `docs/REPORT_ARCHITECTURE.md`. Compact JSON and Markdown reports are the default interface for humans, Agent Export, MCP, and dashboards. CSV/table artifacts are for analysis. Large detailed audit artifacts live under `reports/runs/<run_id>/` and are referenced by manifest paths instead of being embedded into compact reports.
 
 Market realism flow:
 
@@ -338,25 +337,18 @@ The trading simulator is offline and deterministic. It does not write to SQLite 
 
 ## Extension Points
 
-- `quant/core_protocols`: stable JSON-safe protocol boundary for future MCP/OpenClaw, broker adapter, and agent integrations.
-- `quant/data_layer`: stable universe, metadata, coverage, and data quality boundary for future factor research.
-- `quant/agent_export`: stable report-to-agent context boundary for future OpenClaw and LLM agent integrations.
-- `quant/risk`: future portfolio and strategy risk checks.
-- `quant/openclaw`: future OpenClaw integration boundary.
-- `quant/portfolio`: reserved for domain objects if the portfolio module grows beyond services and storage.
-- `quant/alpha`: stable signal and target-weight boundary for future research callers.
-- `quant/factor_backtest`: stable single-factor long-short return research boundary.
-- `quant/factor_pipeline`: stable factor preprocessing boundary for future alpha and evaluation callers.
-- `quant/factor_eval`: stable research diagnostics boundary for future factor and alpha research callers.
-- `quant/strategy_eval`: stable report explanation and attribution boundary.
-- `quant/trading_simulation`: stable offline historical account simulation boundary for future research and agent review.
-- `quant/rebalance`: stable calculation boundary for future Risk Engine, OpenClaw, and AI research callers.
-- `quant/risk`: stable calculation boundary for future OpenClaw Risk Agent callers.
-- `quant/optimizer`: stable target-allocation boundary for future research and OpenClaw callers.
-- `quant/portfolio_construction`: stable risk-aware target-construction boundary for future optimizer, backtest, and research callers.
-- `quant/cost`: stable cost-estimation boundary for future Backtest and Execution Engines.
-- `quant/backtest`: stable daily portfolio backtest boundary for future research callers.
-- `quant/execution`: stable simulated execution boundary for future OpenClaw Execution Agent callers.
+- `quant/core/protocols`: stable JSON-safe protocol boundary for future MCP/OpenClaw, broker adapter, and agent integrations.
+- `quant/data/layer`: stable universe, metadata, coverage, and data quality boundary for future factor research.
+- `quant/reports/agent_export`: stable report-to-agent context boundary for future OpenClaw and LLM agent integrations.
+- `quant/engines/risk`: stable calculation boundary for future portfolio and strategy risk checks.
+- `quant/engines/alpha`: stable signal and target-weight boundary for future research callers.
+- `quant/engines/factor_backtest`: stable single-factor long-short return research boundary.
+- `quant/engines/factor_pipeline`: stable factor preprocessing boundary for future alpha and evaluation callers.
+- `quant/engines/factor_eval`: stable research diagnostics boundary for future factor and alpha research callers.
+- `quant/engines/strategy_eval`: stable report explanation and attribution boundary.
+- `quant/engines/trading_simulation`: stable offline historical account simulation boundary for future research and agent review.
+- `quant/engines/portfolio`: stable portfolio construction, optimizer, and rebalance boundary.
+- `quant/engines/execution`: stable cost-estimation and simulated execution boundary.
 
 ## v0.19 Factor Library
 
@@ -369,4 +361,4 @@ All v0.19 factors are computed from stored rows at or before the signal date. Fu
 
 ## v0.20 Walk Forward Validation
 
-`quant/walk_forward` is the out-of-sample validation boundary. It orchestrates existing Alpha, PortfolioBacktest, FactorEvaluation, FactorBacktest, and rolling-validation helpers. It does not change strategy, factor, or no-lookahead semantics. It produces `reports/walk_forward_*.json` for downstream Strategy Evaluation and Agent Export consumption.
+`quant/engines/walk_forward` is the out-of-sample validation boundary. It orchestrates existing Alpha, PortfolioBacktest, FactorEvaluation, FactorBacktest, and rolling-validation helpers. It does not change strategy, factor, or no-lookahead semantics. It produces `reports/walk_forward_*.json` for downstream Strategy Evaluation and Agent Export consumption.

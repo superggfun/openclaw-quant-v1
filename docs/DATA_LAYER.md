@@ -2,7 +2,7 @@
 
 `v0.17.0` expands the research data foundation for larger universes, symbol metadata, historical data refresh, coverage diagnostics, and research readiness scoring. `v0.24.0` adds a provider abstraction so these workflows no longer depend directly on `yfinance` internals.
 
-This layer is offline research infrastructure. The default provider remains Yahoo Finance / `yfinance` daily OHLCV data, but access now goes through `quant/data_providers`. It does not connect to brokers, place orders, provide real-time market data, run high-frequency logic, trade options, or use machine learning.
+This layer is offline research infrastructure. The default provider remains Yahoo Finance / `yfinance` daily OHLCV data, but access now goes through `quant/data/providers`. It does not connect to brokers, place orders, provide real-time market data, run high-frequency logic, trade options, or use machine learning.
 
 AkShare, Tushare, A-share universes, and other regional/provider integrations are future provider additions. They are registered as placeholders only.
 

@@ -5,129 +5,184 @@ from __future__ import annotations
 import json
 import sys
 from dataclasses import dataclass
+from functools import cached_property
 from pathlib import Path
 
 import pandas as pd
 
-from quant.alpha.alpha_engine import AlphaEngine
-from quant.agent_export.agent_exporter import AgentExporter
-from quant.backtest.backtest_engine import PortfolioBacktestEngine
-from quant.cost.cost_engine import CostEngine, TradeInput
-from quant.data_layer.data_quality import DataQualityAnalyzer, DataRefreshManager
-from quant.data_layer.symbol_metadata import SymbolMetadataStore
-from quant.data_layer.universe_manager import UniverseManager
-from quant.data_providers import DataProvider, ProviderRegistry, create_default_registry
-from quant.execution.execution_engine import ExecutionEngine
-from quant.factor_backtest.factor_backtest import FactorBacktest
-from quant.factor_eval.factor_evaluation import FactorEvaluation
-from quant.factor_store.factor_history import FactorHistory
-from quant.factor_store.factor_registry_store import FactorRegistryStore
-from quant.factor_store.factor_store import FactorStore
-from quant.fundamental_data.fundamental_service import FundamentalService
-from quant.fundamental_data.fundamental_store import FundamentalStore
-from quant.optimizer.optimizer_engine import OptimizerEngine
-from quant.portfolio_construction.portfolio_construction import PortfolioConstructionEngine
-from quant.rebalance.rebalance_engine import RebalanceEngine
-from quant.regime_detection.regime_analytics import RegimeAnalytics
-from quant.regime_detection.regime_detector import RegimeDetector
-from quant.regime_detection.regime_history import RegimeHistoryStore
-from quant.risk.risk_engine import RiskEngine
+from quant.engines.alpha.alpha_engine import AlphaEngine
+from quant.reports.agent_export.agent_exporter import AgentExporter
+from quant.engines.backtest.backtest_engine import PortfolioBacktestEngine
+from quant.engines.execution.cost_engine import CostEngine, TradeInput
+from quant.data.layer.data_quality import DataQualityAnalyzer, DataRefreshManager
+from quant.data.layer.symbol_metadata import SymbolMetadataStore
+from quant.data.layer.universe_manager import UniverseManager
+from quant.data.providers import DataProvider, ProviderRegistry, create_default_registry
+from quant.engines.execution.execution_engine import ExecutionEngine
+from quant.engines.factor_backtest.factor_backtest import FactorBacktest
+from quant.engines.factor_eval.factor_evaluation import FactorEvaluation
+from quant.factors.store.factor_history import FactorHistory
+from quant.factors.store.factor_registry_store import FactorRegistryStore
+from quant.factors.store.factor_store import FactorStore
+from quant.data.fundamental.fundamental_service import FundamentalService
+from quant.data.fundamental.fundamental_store import FundamentalStore
+from quant.engines.portfolio.optimizer_engine import OptimizerEngine
+from quant.engines.portfolio.portfolio_construction import PortfolioConstructionEngine
+from quant.engines.portfolio.rebalance_engine import RebalanceEngine
+from quant.engines.regime.regime_analytics import RegimeAnalytics
+from quant.engines.regime.regime_detector import RegimeDetector
+from quant.engines.regime.regime_history import RegimeHistoryStore
+from quant.engines.risk.risk_engine import RiskEngine
 from quant.services.backtest_service import BacktestService
 from quant.services.portfolio_service import PortfolioService
 from quant.services.price_service import PriceService
 from quant.storage.portfolio_store import SQLitePortfolioStore
 from quant.storage.sqlite_store import SQLitePriceStore
-from quant.strategy_eval.strategy_evaluation import StrategyEvaluation
-from quant.trading_simulation.trading_simulator import TradingSimulator
-from quant.visualization.report_visualizer import ReportVisualizer
-from quant.walk_forward.walk_forward import WalkForwardEngine
+from quant.engines.strategy_eval.strategy_evaluation import StrategyEvaluation
+from quant.engines.trading_simulation.trading_simulator import TradingSimulator
+from quant.reports.visualization.report_visualizer import ReportVisualizer
+from quant.engines.walk_forward.walk_forward import WalkForwardEngine
 
 
 @dataclass(frozen=True)
 class CLIContext:
     db_path: Path
-    price_store: SQLitePriceStore
-    portfolio_store: SQLitePortfolioStore
-    metadata_store: SymbolMetadataStore
-    fundamental_store: FundamentalStore
-    provider_registry: ProviderRegistry
-    data_provider: DataProvider
-    price_service: PriceService
-    portfolio_service: PortfolioService
-    backtest_service: BacktestService
-    portfolio_backtest_engine: PortfolioBacktestEngine
-    rebalance_engine: RebalanceEngine
-    risk_engine: RiskEngine
-    optimizer_engine: OptimizerEngine
-    portfolio_construction_engine: PortfolioConstructionEngine
-    execution_engine: ExecutionEngine
-    alpha_engine: AlphaEngine
-    factor_evaluation: FactorEvaluation
-    factor_backtest_engine: FactorBacktest
-    factor_store: FactorStore
-    factor_history: FactorHistory
-    factor_registry_store: FactorRegistryStore
-    regime_detector: RegimeDetector
-    regime_history_store: RegimeHistoryStore
-    regime_analytics: RegimeAnalytics
-    strategy_evaluation: StrategyEvaluation
-    universe_manager: UniverseManager
-    data_quality_analyzer: DataQualityAnalyzer
-    data_refresh_manager: DataRefreshManager
-    fundamental_service: FundamentalService
-    agent_exporter: AgentExporter
-    walk_forward_engine: WalkForwardEngine
-    trading_simulator: TradingSimulator
-    report_visualizer: ReportVisualizer
+
+    @cached_property
+    def price_store(self) -> SQLitePriceStore:
+        return SQLitePriceStore(self.db_path)
+
+    @cached_property
+    def portfolio_store(self) -> SQLitePortfolioStore:
+        return SQLitePortfolioStore(self.db_path)
+
+    @cached_property
+    def metadata_store(self) -> SymbolMetadataStore:
+        return SymbolMetadataStore(self.db_path)
+
+    @cached_property
+    def fundamental_store(self) -> FundamentalStore:
+        return FundamentalStore(self.db_path)
+
+    @cached_property
+    def provider_registry(self) -> ProviderRegistry:
+        return create_default_registry()
+
+    @cached_property
+    def data_provider(self) -> DataProvider:
+        return self.provider_registry.default_provider()
+
+    @cached_property
+    def price_service(self) -> PriceService:
+        return PriceService(self.price_store, data_source=self.data_provider)
+
+    @cached_property
+    def portfolio_service(self) -> PortfolioService:
+        return PortfolioService(self.portfolio_store)
+
+    @cached_property
+    def backtest_service(self) -> BacktestService:
+        return BacktestService(self.price_store)
+
+    @cached_property
+    def portfolio_backtest_engine(self) -> PortfolioBacktestEngine:
+        return PortfolioBacktestEngine(self.price_store)
+
+    @cached_property
+    def rebalance_engine(self) -> RebalanceEngine:
+        return RebalanceEngine(self.portfolio_store)
+
+    @cached_property
+    def risk_engine(self) -> RiskEngine:
+        return RiskEngine(self.portfolio_store)
+
+    @cached_property
+    def optimizer_engine(self) -> OptimizerEngine:
+        return OptimizerEngine(self.price_store, self.portfolio_store)
+
+    @cached_property
+    def portfolio_construction_engine(self) -> PortfolioConstructionEngine:
+        return PortfolioConstructionEngine(self.price_store)
+
+    @cached_property
+    def execution_engine(self) -> ExecutionEngine:
+        return ExecutionEngine(self.price_store, self.portfolio_store)
+
+    @cached_property
+    def alpha_engine(self) -> AlphaEngine:
+        return AlphaEngine(self.price_store, self.fundamental_store)
+
+    @cached_property
+    def factor_evaluation(self) -> FactorEvaluation:
+        return FactorEvaluation(self.price_store, self.fundamental_store)
+
+    @cached_property
+    def factor_backtest_engine(self) -> FactorBacktest:
+        return FactorBacktest(self.price_store, self.fundamental_store)
+
+    @cached_property
+    def factor_store(self) -> FactorStore:
+        return FactorStore(self.db_path)
+
+    @cached_property
+    def factor_history(self) -> FactorHistory:
+        return FactorHistory(self.factor_store)
+
+    @cached_property
+    def factor_registry_store(self) -> FactorRegistryStore:
+        return FactorRegistryStore(self.factor_store)
+
+    @cached_property
+    def regime_detector(self) -> RegimeDetector:
+        return RegimeDetector(self.price_store)
+
+    @cached_property
+    def regime_history_store(self) -> RegimeHistoryStore:
+        return RegimeHistoryStore(self.db_path)
+
+    @cached_property
+    def regime_analytics(self) -> RegimeAnalytics:
+        return RegimeAnalytics(self.regime_detector, self.regime_history_store, self.factor_store)
+
+    @cached_property
+    def strategy_evaluation(self) -> StrategyEvaluation:
+        return StrategyEvaluation()
+
+    @cached_property
+    def universe_manager(self) -> UniverseManager:
+        return UniverseManager(self.metadata_store, self.data_provider)
+
+    @cached_property
+    def data_quality_analyzer(self) -> DataQualityAnalyzer:
+        return DataQualityAnalyzer(self.price_store, self.metadata_store)
+
+    @cached_property
+    def data_refresh_manager(self) -> DataRefreshManager:
+        return DataRefreshManager(self.price_store, self.data_provider)
+
+    @cached_property
+    def fundamental_service(self) -> FundamentalService:
+        return FundamentalService(self.fundamental_store)
+
+    @cached_property
+    def agent_exporter(self) -> AgentExporter:
+        return AgentExporter()
+
+    @cached_property
+    def walk_forward_engine(self) -> WalkForwardEngine:
+        return WalkForwardEngine(self.price_store, self.fundamental_store)
+
+    @cached_property
+    def trading_simulator(self) -> TradingSimulator:
+        return TradingSimulator(self.price_store, self.fundamental_store)
+
+    @cached_property
+    def report_visualizer(self) -> ReportVisualizer:
+        return ReportVisualizer()
 
 
 def create_context(db_path: Path) -> CLIContext:
-    price_store = SQLitePriceStore(db_path)
-    portfolio_store = SQLitePortfolioStore(db_path)
-    metadata_store = SymbolMetadataStore(db_path)
-    fundamental_store = FundamentalStore(db_path)
-    provider_registry = create_default_registry()
-    data_provider = provider_registry.default_provider()
-    price_service = PriceService(price_store, data_source=data_provider)
-    factor_store = FactorStore(db_path)
-    regime_detector = RegimeDetector(price_store)
-    regime_history_store = RegimeHistoryStore(db_path)
-    return CLIContext(
-        db_path=db_path,
-        price_store=price_store,
-        portfolio_store=portfolio_store,
-        metadata_store=metadata_store,
-        fundamental_store=fundamental_store,
-        provider_registry=provider_registry,
-        data_provider=data_provider,
-        price_service=price_service,
-        portfolio_service=PortfolioService(portfolio_store),
-        backtest_service=BacktestService(price_store),
-        portfolio_backtest_engine=PortfolioBacktestEngine(price_store),
-        rebalance_engine=RebalanceEngine(portfolio_store),
-        risk_engine=RiskEngine(portfolio_store),
-        optimizer_engine=OptimizerEngine(price_store, portfolio_store),
-        portfolio_construction_engine=PortfolioConstructionEngine(price_store),
-        execution_engine=ExecutionEngine(price_store, portfolio_store),
-        alpha_engine=AlphaEngine(price_store, fundamental_store),
-        factor_evaluation=FactorEvaluation(price_store, fundamental_store),
-        factor_backtest_engine=FactorBacktest(price_store, fundamental_store),
-        factor_store=factor_store,
-        factor_history=FactorHistory(factor_store),
-        factor_registry_store=FactorRegistryStore(factor_store),
-        regime_detector=regime_detector,
-        regime_history_store=regime_history_store,
-        regime_analytics=RegimeAnalytics(regime_detector, regime_history_store, factor_store),
-        strategy_evaluation=StrategyEvaluation(),
-        universe_manager=UniverseManager(metadata_store, data_provider),
-        data_quality_analyzer=DataQualityAnalyzer(price_store, metadata_store),
-        data_refresh_manager=DataRefreshManager(price_store, data_provider),
-        fundamental_service=FundamentalService(fundamental_store),
-        agent_exporter=AgentExporter(),
-        walk_forward_engine=WalkForwardEngine(price_store, fundamental_store),
-        trading_simulator=TradingSimulator(price_store, fundamental_store),
-        report_visualizer=ReportVisualizer(),
-    )
+    return CLIContext(db_path=db_path)
 
 
 def format_optional_money(value: float | None) -> str:

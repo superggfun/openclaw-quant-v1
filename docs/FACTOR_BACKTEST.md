@@ -111,7 +111,7 @@ Long-short factor returns may also disagree with IC direction because of sample 
 Reports are written as:
 
 ```text
-reports/factor_backtest_YYYYMMDD_HHMMSS.json
+reports/factor_backtest_<factor>_YYYYMMDD_HHMMSS_<id>.json
 ```
 
 Top-level keys match the printed metrics and include per-period long symbols, short symbols, long and short weights, net exposure, gross exposure, quantile returns, long-short returns, and turnover.
@@ -125,3 +125,7 @@ Use Long-Short Factor Backtest to check whether a single factor creates a plausi
 Do not treat this module as full strategy evaluation. Portfolio-level explanation, benchmark comparison, exposure attribution, risk contribution, exposure decomposition, and performance attribution are handled by the separate Strategy Evaluation layer.
 
 Use `docs/STRATEGY_EVALUATION.md` and `python -m quant.cli strategy-eval --factor-backtest-report <factor_backtest_report>` to explain a generated factor backtest report.
+
+## v0.41 Bulk Matrix Reuse
+
+`FactorBacktest.run(..., bulk_matrix=True)` can reuse the semantic-preserving observation matrix builder introduced for factor evaluation. The long-short, quantile, turnover, exposure, IC, Rank IC, and drawdown formulas are unchanged. This path is intended for explicit acceleration callers such as research-validation.

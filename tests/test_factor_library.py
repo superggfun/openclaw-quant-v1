@@ -6,10 +6,11 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from quant.alpha.alpha_engine import AlphaEngine
-from quant.factor_backtest.factor_backtest import FactorBacktest
-from quant.factor_eval.factor_evaluation import FactorEvaluation
-from quant.factors.factor_registry import FactorRegistry
+from quant.engines.alpha.alpha_engine import AlphaEngine
+from quant.engines.factor_backtest.factor_backtest import FactorBacktest
+from quant.engines.factor_eval.factor_evaluation import FactorEvaluation
+from quant.factors.registry import FACTOR_DEFINITIONS, discover_factor_modules, discover_factor_specs
+from quant.factors.price.factor_registry import FactorRegistry
 from quant.storage.sqlite_store import SQLitePriceStore
 
 
@@ -56,6 +57,17 @@ def test_factor_registry_lists_new_factor_families() -> None:
     assert quality.higher_is_better is True
     assert quality.no_lookahead is True
     assert registry.describe("volatility_20d").higher_is_better is False
+
+
+def test_factor_specs_are_auto_discovered() -> None:
+    modules = discover_factor_modules()
+    discovered = discover_factor_specs(modules)
+
+    assert discovered == FACTOR_DEFINITIONS
+    assert "momentum_20d" in discovered
+    assert "fundamental_quality_score" in discovered
+    assert discovered["momentum_20d"].compute.__module__.endswith(".momentum_factors")
+    assert discovered["fundamental_quality_score"].data_source == "fundamental"
 
 
 def test_price_proxy_factors_produce_values() -> None:

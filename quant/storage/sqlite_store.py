@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from quant.storage.sqlite_connection import connect_sqlite
+
 
 class SQLitePriceStore:
     """Store normalized daily prices in SQLite."""
@@ -17,12 +19,10 @@ class SQLitePriceStore:
         self.initialize()
 
     def connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.db_path)
-        connection.row_factory = sqlite3.Row
-        return connection
+        return connect_sqlite(self.db_path)
 
     def initialize(self) -> None:
-        with sqlite3.connect(self.db_path) as connection:
+        with self.connect() as connection:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS prices (
@@ -133,6 +133,52 @@ class SQLitePriceStore:
             rows = connection.execute(query, params).fetchall()
 
         return pd.DataFrame([dict(row) for row in rows])
+
+    def get_price_history_many(
+        self,
+        symbols: list[str],
+        start: str | None = None,
+        end: str | None = None,
+    ) -> dict[str, pd.DataFrame]:
+        normalized = []
+        seen = set()
+        for symbol in symbols:
+            ticker = str(symbol).upper().strip()
+            if ticker and ticker not in seen:
+                normalized.append(ticker)
+                seen.add(ticker)
+        if not normalized:
+            return {}
+
+        placeholders = ",".join("?" for _ in normalized)
+        conditions = [f"symbol IN ({placeholders})"]
+        params: list[str] = list(normalized)
+        if start:
+            conditions.append("date >= ?")
+            params.append(start)
+        if end:
+            conditions.append("date <= ?")
+            params.append(end)
+
+        query = f"""
+            SELECT symbol, date, open, high, low, close, adj_close, volume
+            FROM prices
+            WHERE {' AND '.join(conditions)}
+            ORDER BY symbol ASC, date ASC
+        """
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+
+        empty_columns = ["symbol", "date", "open", "high", "low", "close", "adj_close", "volume"]
+        frame = pd.DataFrame([dict(row) for row in rows], columns=empty_columns)
+        grouped = {
+            symbol: group.reset_index(drop=True)
+            for symbol, group in frame.groupby("symbol", sort=False)
+        } if not frame.empty else {}
+        return {
+            symbol: grouped.get(symbol, pd.DataFrame(columns=empty_columns))
+            for symbol in normalized
+        }
 
     def list_symbols(self) -> list[str]:
         with self.connect() as connection:

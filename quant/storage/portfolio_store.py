@@ -5,6 +5,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+from quant.storage.sqlite_connection import connect_sqlite
+
 
 DEFAULT_ACCOUNT_NAME = "default"
 
@@ -18,10 +20,7 @@ class SQLitePortfolioStore:
         self.initialize()
 
     def connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.db_path)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        return connection
+        return connect_sqlite(self.db_path, foreign_keys=True)
 
     def initialize(self) -> None:
         with self.connect() as connection:
@@ -298,4 +297,3 @@ class SQLitePortfolioStore:
             """,
             (account_id, symbol),
         ).fetchone()
-

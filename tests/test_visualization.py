@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quant.agent_export.agent_exporter import AgentExporter
-from quant.visualization.report_visualizer import ReportVisualizer
+from quant.reports.agent_export.agent_exporter import AgentExporter
+from quant.reports.visualization.registry import REPORT_SPECS, discover_report_specs, discover_spec_modules
+from quant.reports.visualization.report_visualizer import ReportVisualizer
 
 
 def write_report(tmp_path: Path, name: str, payload: dict) -> Path:
@@ -70,11 +71,22 @@ def test_visualizer_detects_and_generates_trade_sim_files(tmp_path: Path) -> Non
 
     assert result.report_type == "trade_sim"
     assert Path(result.dashboard_path).exists()
+    assert Path(result.visual_summary_path).exists()
     assert len(result.charts) >= 5
     for chart in result.charts:
         assert Path(chart["png_path"]).exists()
         assert Path(chart["svg_path"]).exists()
         assert Path(chart["png_path"]).read_bytes().startswith(b"\x89PNG")
+
+
+def test_visualization_report_specs_are_auto_discovered() -> None:
+    modules = discover_spec_modules()
+    discovered = discover_report_specs(modules)
+
+    assert discovered == REPORT_SPECS
+    assert "factor_eval" in discovered
+    assert discovered["factor_eval"].build_charts.__module__.endswith(".factors")
+    assert all(not module.__name__.endswith(".common") for module in modules)
 
 
 def test_walk_forward_dashboard_generation(tmp_path: Path) -> None:
@@ -153,6 +165,7 @@ def test_agent_export_includes_visualization_paths(tmp_path: Path) -> None:
     payload = json.loads(export)
 
     assert payload["report_type"] == "trade_sim"
+    assert payload["visual_summary_paths"]
     assert payload["visualization_paths"]
     assert any(path.endswith(".png") for path in payload["visualization_paths"])
 

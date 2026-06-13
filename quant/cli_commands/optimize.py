@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from quant.cli_commands.common import load_optimizer_config
-from quant.optimizer.optimizer_engine import DEFAULT_CONSTRAINTS
+from quant.engines.portfolio.optimizer_engine import DEFAULT_CONSTRAINTS
 
 
 def register_parser(subparsers) -> None:

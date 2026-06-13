@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from quant.cli import main
-from quant.strategy_eval.strategy_evaluation import StrategyEvaluation
+from quant.engines.strategy_eval.strategy_evaluation import StrategyEvaluation
 
 
 def write_json(path: Path, data: dict) -> Path:

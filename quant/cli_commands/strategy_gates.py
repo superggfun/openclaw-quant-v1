@@ -6,7 +6,7 @@ import argparse
 from pathlib import Path
 
 from quant.cli_commands.common import CLIContext
-from quant.strategy_gates.gate_runner import DEFAULT_GATE_CONFIG_PATH, StrategyGateRunner
+from quant.engines.strategy_gates.gate_runner import DEFAULT_GATE_CONFIG_PATH, StrategyGateRunner
 
 
 def register_parser(subparsers: argparse._SubParsersAction) -> None:

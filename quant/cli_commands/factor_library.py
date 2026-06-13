@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from quant.factors.factor_registry import FactorRegistry
+from quant.factors.price.factor_registry import FactorRegistry
 
 
 def register_parser(subparsers) -> None:

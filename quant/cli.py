@@ -3,143 +3,53 @@
 from __future__ import annotations
 
 import argparse
+import importlib
+import pkgutil
 import sys
+from types import ModuleType
 from pathlib import Path
 
-from quant.cli_commands import (
-    agent_export,
-    alpha,
-    backtest,
-    cost,
-    data,
-    data_layer,
-    execution,
-    factor_backtest,
-    factor_eval,
-    factor_library,
-    factor_pipeline,
-    factor_store,
-    fundamental_data,
-    mcp,
-    optimize,
-    performance,
-    portfolio,
-    portfolio_construction,
-    providers,
-    regime,
-    rebalance,
-    research_validation,
-    risk,
-    scheduler,
-    strategy_dsl,
-    strategy_gates,
-    strategy_eval,
-    trading_simulation,
-    visualization,
-    walk_forward,
-)
+import quant.cli_commands as cli_commands_package
 from quant.cli_commands.common import create_context
 from quant.config import DB_PATH
 
 
-COMMAND_MODULES = [
-    data,
-    data_layer,
-    providers,
-    agent_export,
-    portfolio,
-    rebalance,
-    risk,
-    optimize,
-    portfolio_construction,
-    performance,
-    regime,
-    research_validation,
-    scheduler,
-    strategy_dsl,
-    strategy_gates,
-    alpha,
-    factor_eval,
-    factor_library,
-    factor_pipeline,
-    factor_store,
-    fundamental_data,
-    mcp,
-    factor_backtest,
-    strategy_eval,
-    walk_forward,
-    trading_simulation,
-    visualization,
-    cost,
-    execution,
-    backtest,
-]
+SKIPPED_COMMAND_MODULES = {"common"}
 
 
-COMMAND_HANDLERS = {
-    "update-prices": data.handle,
-    "show-prices": data.handle,
-    "list-symbols": data.handle,
-    "universe-list": data_layer.handle,
-    "universe-build": data_layer.handle,
-    "data-refresh": data_layer.handle,
-    "data-coverage": data_layer.handle,
-    "research-readiness": data_layer.handle,
-    "provider-list": providers.handle,
-    "provider-health": providers.handle,
-    "provider-info": providers.handle,
-    "export-for-agent": agent_export.handle,
-    "init-account": portfolio.handle,
-    "buy": portfolio.handle,
-    "sell": portfolio.handle,
-    "portfolio": portfolio.handle,
-    "trades": portfolio.handle,
-    "allocation": rebalance.handle,
-    "rebalance": rebalance.handle,
-    "risk": risk.handle,
-    "optimize": optimize.handle,
-    "portfolio-construct": portfolio_construction.handle,
-    "performance-profile": performance.handle,
-    "performance-report": performance.handle,
-    "performance-summary": performance.handle,
-    "detect-regime": regime.handle,
-    "regime-history": regime.handle,
-    "regime-report": regime.handle,
-    "regime-rank": regime.handle,
-    "research-validation": research_validation.handle,
-    "research-run": scheduler.handle,
-    "research-status": scheduler.handle,
-    "research-history": scheduler.handle,
-    "research-report": scheduler.handle,
-    "strategy-list": strategy_dsl.handle,
-    "strategy-show": strategy_dsl.handle,
-    "strategy-validate": strategy_dsl.handle,
-    "strategy-run": strategy_dsl.handle,
-    "strategy-gate": strategy_gates.handle,
-    "strategy-gate-report": strategy_gates.handle,
-    "alpha": alpha.handle,
-    "factor-eval": factor_eval.handle,
-    "factor-list": factor_library.handle,
-    "factor-pipeline": factor_pipeline.handle,
-    "factor-store-summary": factor_store.handle,
-    "factor-history": factor_store.handle,
-    "factor-rank": factor_store.handle,
-    "fundamental-import": fundamental_data.handle,
-    "fundamental-show": fundamental_data.handle,
-    "fundamental-coverage": fundamental_data.handle,
-    "fundamental-quality": fundamental_data.handle,
-    "mcp-list-tools": mcp.handle,
-    "mcp-tool-info": mcp.handle,
-    "mcp-smoke": mcp.handle,
-    "factor-backtest": factor_backtest.handle,
-    "strategy-eval": strategy_eval.handle,
-    "walk-forward": walk_forward.handle,
-    "trade-sim": trading_simulation.handle,
-    "visualize-report": visualization.handle,
-    "cost": cost.handle,
-    "execute-sim": execution.handle,
-    "backtest": backtest.handle,
-}
+def discover_command_modules() -> list[ModuleType]:
+    modules = []
+    for module_info in pkgutil.iter_modules(cli_commands_package.__path__):
+        if module_info.ispkg or module_info.name in SKIPPED_COMMAND_MODULES:
+            continue
+        module = importlib.import_module(f"{cli_commands_package.__name__}.{module_info.name}")
+        if not hasattr(module, "register_parser") or not hasattr(module, "handle"):
+            raise ValueError(f"CLI command module {module.__name__} must define register_parser() and handle()")
+        modules.append(module)
+    return sorted(modules, key=lambda module: module.__name__)
+
+
+def register_command_modules(
+    subparsers: argparse._SubParsersAction,
+    modules: list[ModuleType],
+) -> dict[str, object]:
+    handlers: dict[str, object] = {}
+    for module in modules:
+        before = set(subparsers.choices)
+        module.register_parser(subparsers)
+        registered = sorted(set(subparsers.choices) - before)
+        if not registered:
+            raise ValueError(f"CLI command module {module.__name__} did not register any commands")
+        for command in registered:
+            if command in handlers:
+                raise ValueError(f"duplicate CLI command registered: {command}")
+            handlers[command] = module.handle
+    return handlers
+
+
+COMMAND_MODULES = discover_command_modules()
+_DISCOVERY_PARSER = argparse.ArgumentParser(prog="openclaw-quant-discovery", add_help=False)
+COMMAND_HANDLERS = register_command_modules(_DISCOVERY_PARSER.add_subparsers(dest="command"), COMMAND_MODULES)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -151,8 +61,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
-    for module in COMMAND_MODULES:
-        module.register_parser(subparsers)
+    register_command_modules(subparsers, COMMAND_MODULES)
     return parser
 
 

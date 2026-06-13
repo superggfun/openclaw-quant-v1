@@ -1,2 +1,0 @@
-"""Portfolio backtest engine package."""
-

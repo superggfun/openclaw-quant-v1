@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 
 from quant.config import DEFAULT_SYMBOLS
-from quant.portfolio_construction.portfolio_construction import SUPPORTED_METHODS
+from quant.engines.portfolio.portfolio_construction import SUPPORTED_METHODS
 
 
 def register_parser(subparsers) -> None:

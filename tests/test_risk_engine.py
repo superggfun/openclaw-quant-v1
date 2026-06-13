@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from quant.rebalance.rebalance_engine import RebalanceEngine
-from quant.risk.risk_engine import RiskEngine
+from quant.engines.portfolio.rebalance_engine import RebalanceEngine
+from quant.engines.risk.risk_engine import RiskEngine
 from quant.storage.portfolio_store import SQLitePortfolioStore
 from quant.storage.sqlite_store import SQLitePriceStore
 

@@ -6,14 +6,14 @@ import time
 from pathlib import Path
 from typing import Any
 
-from quant.factor_backtest.factor_backtest import FactorBacktest
-from quant.factor_eval.factor_evaluation import FactorEvaluation
+from quant.engines.factor_backtest.factor_backtest import FactorBacktest
+from quant.engines.factor_eval.factor_evaluation import FactorEvaluation
 from quant.performance.performance_registry import DEFAULT_PROFILE_FACTORS, normalize_targets
 from quant.performance.performance_report import PerformanceReportBuilder
 from quant.performance.runtime_tracker import RuntimeTracker
 from quant.research_validation import ResearchValidationRunner
 from quant.strategy_dsl.strategy_registry import StrategyRegistry
-from quant.walk_forward.walk_forward import WalkForwardEngine
+from quant.engines.walk_forward.walk_forward import WalkForwardEngine
 
 
 class ProfiledPriceStore:

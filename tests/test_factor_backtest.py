@@ -5,8 +5,8 @@ import pandas as pd
 import pytest
 
 from quant.cli import main
-from quant.factor_backtest.factor_backtest import FactorBacktest
-from quant.factor_eval.factor_evaluation import FactorEvaluation
+from quant.engines.factor_backtest.factor_backtest import FactorBacktest
+from quant.engines.factor_eval.factor_evaluation import FactorEvaluation
 from quant.storage.sqlite_store import SQLitePriceStore
 
 

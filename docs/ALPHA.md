@@ -112,7 +112,7 @@ v0.19 adds optional `factor_weights` support. When configured, Alpha normalizes 
 
 Missing values receive zero contribution for that factor. Symbols with no valid composite inputs are excluded with a clear reason. The no-lookahead rule is unchanged: all factor values are computed from `as_of_date` and earlier rows, and generated targets should be executed or backtested on the next available trading day.
 
-Factor direction comes from the central registry. Most score factors are `higher_is_better=true`; raw `volatility_20d` is `higher_is_better=false` because it is a risk measure, while `low_volatility_score` flips that into a preference score. Reversal factors use negative recent momentum, so a higher `reversal_20d` means the symbol recently underperformed more and has a stronger mean-reversion score.
+Factor direction comes from `FactorRegistry` metadata discovered from factor module specs. Most score factors are `higher_is_better=true`; raw `volatility_20d` is `higher_is_better=false` because it is a risk measure, while `low_volatility_score` flips that into a preference score. Reversal factors use negative recent momentum, so a higher `reversal_20d` means the symbol recently underperformed more and has a stronger mean-reversion score.
 
 `value_score`, `quality_score`, and `growth_score` remain price-only proxies for backward compatibility. True accounting-based factors use the `fundamental_*` naming, such as `fundamental_value_score`, `fundamental_quality_score`, and `fundamental_growth_score`, and require report-date-filtered fundamental data.
 

@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from quant.storage.sqlite_connection import connect_sqlite
 from quant.strategy_dsl.strategy_definition import StrategyDefinition
 
 
@@ -20,9 +21,7 @@ class StrategyMetadataStore:
         self.initialize()
 
     def connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.db_path)
-        connection.row_factory = sqlite3.Row
-        return connection
+        return connect_sqlite(self.db_path)
 
     def initialize(self) -> None:
         with self.connect() as connection:

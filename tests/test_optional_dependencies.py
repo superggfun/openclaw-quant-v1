@@ -5,18 +5,18 @@ import importlib
 import pytest
 
 from quant.cli import main
-from quant.data_providers import ProviderRegistry
-from quant.data_providers.yfinance_provider import YFinanceProvider
+from quant.data.providers import ProviderRegistry
+from quant.data.providers.yfinance_provider import YFinanceProvider
 
 
 def test_yfinance_provider_module_imports_without_loading_yfinance() -> None:
-    module = importlib.import_module("quant.data_providers.yfinance_provider")
+    module = importlib.import_module("quant.data.providers.yfinance_provider")
 
     assert module.YFinanceProvider.name == "yfinance"
 
 
 def test_yfinance_missing_reports_not_installed(monkeypatch: pytest.MonkeyPatch) -> None:
-    import quant.data_providers.yfinance_provider as yfp
+    import quant.data.providers.yfinance_provider as yfp
 
     monkeypatch.setattr(yfp, "yf", None)
 
@@ -35,7 +35,7 @@ def test_yfinance_missing_reports_not_installed(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_provider_registry_and_cli_start_without_yfinance(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-    import quant.data_providers.yfinance_provider as yfp
+    import quant.data.providers.yfinance_provider as yfp
 
     monkeypatch.setattr(yfp, "yf", None)
 

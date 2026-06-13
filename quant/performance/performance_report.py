@@ -7,6 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from quant.reports.report_io import generate_report_path, write_json_report
+
 
 class PerformanceReportBuilder:
     """Assemble deterministic profiling reports."""
@@ -72,15 +74,11 @@ class PerformanceReportBuilder:
         return json.loads(reports[0].read_text(encoding="utf-8"))
 
     def _write(self, report: dict[str, Any]) -> dict[str, Any]:
-        self.report_dir.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        path = self.report_dir / f"performance_profile_{stamp}.json"
-        report = report | {"report_path": str(path)}
-        path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+        path = generate_report_path(self.report_dir, "performance_profile")
         summary_path = self.report_dir / "performance_profile_summary.md"
+        report = report | {"report_path": str(path), "summary_path": str(summary_path)}
         summary_path.write_text(self._markdown(report), encoding="utf-8")
-        report["summary_path"] = str(summary_path)
-        path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+        write_json_report(path, report, sort_keys=True)
         return report
 
     @staticmethod

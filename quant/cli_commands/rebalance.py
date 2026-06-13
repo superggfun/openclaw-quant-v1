@@ -13,7 +13,7 @@ from quant.cli_commands.common import (
     print_cost_report,
     trades_from_rebalance_plan,
 )
-from quant.rebalance.rebalance_engine import DEFAULT_COMMISSION_RATE
+from quant.engines.portfolio.rebalance_engine import DEFAULT_COMMISSION_RATE
 
 
 def register_parser(subparsers) -> None:

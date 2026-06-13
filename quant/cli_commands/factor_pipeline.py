@@ -12,8 +12,8 @@ from quant.cli_commands.common import (
     load_factor_pipeline_config,
 )
 from quant.config import DEFAULT_SYMBOLS
-from quant.factor_eval.factor_evaluation import SUPPORTED_FACTORS
-from quant.factor_pipeline.factor_pipeline import FactorPipeline
+from quant.engines.factor_eval.factor_evaluation import SUPPORTED_FACTORS
+from quant.engines.factor_pipeline.factor_pipeline import FactorPipeline
 
 
 def register_parser(subparsers) -> None:

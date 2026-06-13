@@ -30,14 +30,56 @@ GENERATED_PATHS = [
     "examples/portfolio_constructed_targets.json",
 ]
 ALLOWED_EMPTY_PACKAGES = {
-    Path("quant/adapters/langchain"),
-    Path("quant/adapters/openclaw"),
-    Path("quant/adapters/pyfolio"),
-    Path("quant/adapters/quantstats"),
-    Path("quant/interfaces/api"),
     Path("quant/interfaces/mcp_server"),
-    Path("quant/openclaw"),
-    Path("quant/portfolio"),
+}
+FORBIDDEN_SOURCE_PATHS = {
+    "quant/adapters",
+    "quant/agent_export",
+    "quant/alpha",
+    "quant/backtest",
+    "quant/core_protocols",
+    "quant/cost",
+    "quant/data_layer",
+    "quant/data_providers",
+    "quant/execution",
+    "quant/factor_backtest",
+    "quant/factor_eval",
+    "quant/factor_pipeline",
+    "quant/factor_store",
+    "quant/fundamental_data",
+    "quant/fundamental_factors",
+    "quant/interfaces/api",
+    "quant/interfaces/cli_commands",
+    "quant/market_realism",
+    "quant/multi_factor",
+    "quant/openclaw",
+    "quant/optimizer",
+    "quant/portfolio",
+    "quant/portfolio_construction",
+    "quant/rebalance",
+    "quant/regime_detection",
+    "quant/risk",
+    "quant/strategy_eval",
+    "quant/strategy_gates",
+    "quant/trading_simulation",
+    "quant/utils/module_alias.py",
+    "quant/visualization",
+    "quant/walk_forward",
+}
+FORBIDDEN_IMPORT_PATTERNS = (
+    "quant.core_protocols",
+    "quant.factor_store",
+    "quant.fundamental_factors",
+    "quant.interfaces.cli_commands",
+    "quant.utils.module_alias",
+)
+MAX_MODULE_LINES = 800
+ALLOWED_OVERSIZED_MODULES = {
+    "quant/engines/alpha/alpha_engine.py",
+    "quant/engines/factor_backtest/factor_backtest.py",
+    "quant/engines/strategy_eval/strategy_evaluation.py",
+    "quant/research_validation/research_validation.py",
+    "quant/factors/store/factor_store.py",
 }
 REQUIRED_MODULE_DOCS = {
     "docs/AGENT_EXPORT.md",
@@ -45,6 +87,8 @@ REQUIRED_MODULE_DOCS = {
     "docs/DATA_LAYER.md",
     "docs/DATA_PROVIDERS.md",
     "docs/FACTOR_BACKTEST.md",
+    "docs/FACTOR_ACCELERATION.md",
+    "docs/FACTOR_CACHE.md",
     "docs/FACTOR_EVALUATION.md",
     "docs/FACTOR_LIBRARY.md",
     "docs/FACTOR_STORE.md",
@@ -133,7 +177,7 @@ def empty_package_dirs(root: Path | None = None) -> list[str]:
         dirs = [path for path in package_dir.iterdir() if path.is_dir() and path.name != "__pycache__"]
         relative = package_dir.relative_to(base)
         init_text = package_init.read_text(encoding="utf-8")
-        has_package_logic = any(token in init_text for token in ("alias_modules", "__all__", "import ", "from "))
+        has_package_logic = any(token in init_text for token in ("__all__", "import ", "from "))
         if (
             len(files) == 1
             and files[0].name == "__init__.py"
@@ -153,6 +197,36 @@ def missing_packaging_files() -> list[str]:
     return sorted(path for path in REQUIRED_PACKAGING_FILES if not (ROOT / path).exists())
 
 
+def forbidden_source_paths() -> list[str]:
+    return sorted(path for path in FORBIDDEN_SOURCE_PATHS if (ROOT / path).exists())
+
+
+def forbidden_imports() -> list[str]:
+    offenders = []
+    for path in (ROOT / "quant").rglob("*.py"):
+        if "__pycache__" in path.parts:
+            continue
+        text = path.read_text(encoding="utf-8")
+        matches = [pattern for pattern in FORBIDDEN_IMPORT_PATTERNS if pattern in text]
+        if matches:
+            offenders.append(f"{path.relative_to(ROOT).as_posix()}: {matches}")
+    return sorted(offenders)
+
+
+def oversized_modules(max_lines: int = MAX_MODULE_LINES) -> list[str]:
+    oversized = []
+    for path in (ROOT / "quant").rglob("*.py"):
+        if "__pycache__" in path.parts:
+            continue
+        relative = path.relative_to(ROOT).as_posix()
+        if relative in ALLOWED_OVERSIZED_MODULES:
+            continue
+        lines = len(path.read_text(encoding="utf-8").splitlines())
+        if lines > max_lines:
+            oversized.append(f"{relative}: {lines} lines")
+    return sorted(oversized)
+
+
 def run_audit() -> list[AuditResult]:
     missing_commands = missing_documented_commands()
     stale_refs = stale_version_references()
@@ -160,6 +234,9 @@ def run_audit() -> list[AuditResult]:
     empty_packages = empty_package_dirs()
     missing_docs = missing_module_docs()
     missing_packaging = missing_packaging_files()
+    forbidden_paths = forbidden_source_paths()
+    forbidden_import_matches = forbidden_imports()
+    oversized = oversized_modules()
     return [
         AuditResult("cli_docs", not missing_commands, missing_commands),
         AuditResult("stale_versions", not stale_refs, [f"{path}: {items}" for path, items in stale_refs.items()]),
@@ -167,6 +244,9 @@ def run_audit() -> list[AuditResult]:
         AuditResult("empty_package_dirs", not empty_packages, empty_packages),
         AuditResult("module_docs", not missing_docs, missing_docs),
         AuditResult("packaging_files", not missing_packaging, missing_packaging),
+        AuditResult("forbidden_source_paths", not forbidden_paths, forbidden_paths),
+        AuditResult("forbidden_imports", not forbidden_import_matches, forbidden_import_matches),
+        AuditResult("oversized_modules", not oversized, oversized),
     ]
 
 

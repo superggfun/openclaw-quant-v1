@@ -1,22 +1,23 @@
-"""Layered protocol package.
+"""JSON-safe account, order, fill, position, signal, and trade protocols."""
 
-New imports should prefer `quant.core.protocols.*`. The v0.29
-`quant.core_protocols.*` modules remain supported.
-"""
+from quant.core.protocols.account import AccountState
+from quant.core.protocols.fill import Fill
+from quant.core.protocols.order import ORDER_STATUSES, Order
+from quant.core.protocols.portfolio_snapshot import PortfolioSnapshot
+from quant.core.protocols.position import Position
+from quant.core.protocols.recommendation import RECOMMENDATION_ACTIONS, Recommendation
+from quant.core.protocols.signal import Signal
+from quant.core.protocols.trade import TradeRecord
 
-from quant.utils.module_alias import alias_modules
-
-_ALIASES = {
-    "account": "quant.core_protocols.account",
-    "fill": "quant.core_protocols.fill",
-    "order": "quant.core_protocols.order",
-    "portfolio_snapshot": "quant.core_protocols.portfolio_snapshot",
-    "position": "quant.core_protocols.position",
-    "protocol_validation": "quant.core_protocols.protocol_validation",
-    "recommendation": "quant.core_protocols.recommendation",
-    "signal": "quant.core_protocols.signal",
-    "trade": "quant.core_protocols.trade",
-}
-
-alias_modules(__name__, _ALIASES)
-
+__all__ = [
+    "ORDER_STATUSES",
+    "RECOMMENDATION_ACTIONS",
+    "AccountState",
+    "Fill",
+    "Order",
+    "PortfolioSnapshot",
+    "Position",
+    "Recommendation",
+    "Signal",
+    "TradeRecord",
+]

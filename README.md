@@ -6,13 +6,13 @@ This project is research infrastructure only. It is not investment advice, does 
 
 ## Current Version
 
-`v0.40.0-performance-baseline-profiling`
+`v0.41.0-factor-eval-cache`
 
-This release adds a measurement-only Performance Baseline & Profiling layer for existing factor evaluation, factor backtest, walk-forward, strategy-run, and research-validation workflows.
+This release adds an opt-in Factor Eval Cache / Bulk Factor Matrix layer and safe parallel factor-batch research validation for existing factor evaluation and bounded research-validation workflows.
 
-No alpha factors, data providers, MCP features, broker integrations, live trading, order submission, machine learning, strategy logic, quant calculation behavior, report schemas, validation logic, optimization, or no-lookahead rules are intentionally changed in v0.40.
+No alpha factors, data providers, MCP features, broker integrations, live trading, order submission, machine learning, strategy logic, IC/RankIC/future-return calculations, factor backtest semantics, walk-forward semantics, research-validation semantics, or no-lookahead rules are intentionally changed in v0.41.
 
-`performance-profile` is the bounded local smoke profiling workflow. It records slowest modules, functions, database calls, and recommendations without implementing numba, multiprocessing, parquet, or vectorized rewrites. MCP capability gates still enable only `READ_ONLY` and `OFFLINE_SIMULATION`; paper/live trading capabilities are reserved or forbidden and blocked before execution.
+`factor-eval --use-cache --cache-stats` enables a process-local in-memory factor matrix cache. `factor-eval --bulk-matrix --cache-stats` enables bulk matrix construction without cache reuse. `research-validation --bulk-matrix --parallel --workers 4 --cache-stats` parallelizes independent factor batches while keeping SQLite writes in the main process. These paths are disabled by default and are tested against the legacy path for metric parity. MCP capability gates still enable only `READ_ONLY` and `OFFLINE_SIMULATION`; paper/live trading capabilities are reserved or forbidden and blocked before execution.
 
 ## Quick Start
 
@@ -53,6 +53,8 @@ Factor and alpha research:
 ```bash
 python -m quant.cli factor-list
 python -m quant.cli factor-eval --factor fundamental_quality_score
+python -m quant.cli factor-eval --factor momentum_20d --use-cache --cache-stats
+python -m quant.cli factor-eval --factor momentum_20d --bulk-matrix --cache-stats
 python -m quant.cli factor-backtest --factor fundamental_value_score
 python -m quant.cli factor-eval --factor momentum_20d --save-factor-history
 python -m quant.cli factor-history --factor momentum_20d
@@ -85,6 +87,8 @@ python -m quant.cli strategy-validate
 python -m quant.cli strategy-gate --strategy momentum_fundamental
 python -m quant.cli strategy-run --strategy momentum_fundamental --with-gates
 python -m quant.cli research-validation --mode quick
+python -m quant.cli research-validation --mode quick --max-symbols 20 --max-factors 3 --use-cache --cache-stats
+python -m quant.cli research-validation --mode quick --max-symbols 20 --max-factors 3 --bulk-matrix --parallel --workers 4 --cache-stats
 python -m quant.cli performance-profile
 python -m quant.cli performance-summary
 ```
@@ -102,6 +106,7 @@ See `docs/CLI.md` and `docs/CLI_COMMANDS.md` for the full command reference.
 - Formal multi-factor model with factor families, normalization, coverage-aware confidence, and contribution reporting.
 - Alpha target generation with no-lookahead signal dates.
 - Factor pipeline, factor evaluation, long-short factor backtest, and walk-forward validation.
+- Opt-in factor evaluation matrix cache for repeated no-lookahead factor research workloads.
 - Persistent factor store for definitions, values, IC history, backtest history, walk-forward folds, stability, coverage, and versions.
 - Deterministic regime detection and factor-by-regime diagnostics.
 - Daily Research Scheduler for offline pipeline automation.
@@ -129,12 +134,11 @@ Layered package areas:
 - `quant/engines/`: pure quant/research/simulation engines.
 - `quant/services/`: application orchestration services.
 - `quant/reports/`: agent export and visualization.
-- `quant/interfaces/`: CLI boundary, local MCP research interface, and reserved API namespace.
+- `quant/interfaces/`: local MCP research interface and future external boundaries.
 - `quant/strategy_dsl/`: versioned research strategy definitions and validation.
-- `quant/adapters/`: reserved external framework adapter namespaces.
 - `quant/scheduler/`: failure-isolated daily research pipeline automation.
 
-Legacy paths such as `quant/core_protocols`, `quant/data_providers`, `quant/alpha`, and `quant/agent_export` remain import-compatible for at least this release. API/adapters are placeholders only; the MCP interface in v0.35 is local research infrastructure, not a broker or execution API.
+Layered paths are canonical. Future API/adapters should be added only with real implementation and tests; the MCP interface in v0.35 is local research infrastructure, not a broker or execution API.
 
 ## No-Lookahead Contract
 
@@ -163,10 +167,18 @@ Provider-specific imports are lazy. If `yfinance` is not installed, provider dis
 Generated local artifacts are intentionally ignored:
 
 - `data/quant.db`
+- `data/*.db`
 - `reports/*.json`
+- `reports/*.md`
 - `reports/agent_summary.*`
+- `reports/agent_export_*.*`
 - `reports/charts/`
+- `reports/runs/`
+- `reports/research_validation_batches/`
+- `reports/hpc_rolling*.txt`
 - `examples/portfolio_constructed_targets.json`
+
+Report outputs follow `docs/REPORT_ARCHITECTURE.md`: compact JSON/Markdown summaries for humans, LLMs, Agent Export, and MCP; CSV/table artifacts for analysis; and detailed audit/debug artifacts under `reports/runs/<run_id>/`.
 
 ## Documentation Index
 
@@ -183,6 +195,8 @@ Generated local artifacts are intentionally ignored:
 - `docs/MARKET_REALISM.md`
 - `docs/FACTOR_LIBRARY.md`
 - `docs/FACTOR_STORE.md`
+- `docs/REPORT_ARCHITECTURE.md`
+- `docs/FACTOR_CACHE.md`
 - `docs/REGIME_DETECTION.md`
 - `docs/SCHEDULER.md`
 - `docs/FACTOR_PIPELINE.md`

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from quant.cli_commands.common import load_alpha_config
+
+logger = logging.getLogger(__name__)
 
 
 def register_parser(subparsers) -> None:
@@ -40,25 +43,25 @@ def handle(args, context) -> int:
             alpha_pipeline_config=None,
         )
         metrics = result.metrics
-        print("Portfolio Backtest Summary")
-        print(f"period: {result.start} to {result.end}")
-        print(f"strategy: {result.strategy}")
-        print(f"mode: {result.mode}")
-        print(f"rebalance_frequency: {result.rebalance_frequency}")
-        print(f"no_lookahead: {str(result.no_lookahead).lower()}")
-        print(f"signal_execution_lag: {result.signal_execution_lag}")
-        print(f"initial_cash: {result.initial_cash:.2f}")
-        print(f"final_value: {metrics.final_value:.2f}")
-        print(f"total_return: {metrics.total_return:.4f}")
-        print(f"annual_return: {metrics.annual_return:.4f}")
-        print(f"max_drawdown: {metrics.max_drawdown:.4f}")
-        print(f"volatility: {metrics.volatility:.4f}")
-        print(f"sharpe_ratio: {metrics.sharpe_ratio:.4f}")
-        print(f"trade_count: {metrics.trade_count}")
-        print(f"turnover: {metrics.turnover:.4f}")
-        print(f"total_cost: {metrics.total_cost:.2f}")
-        print(f"cash_ratio: {metrics.cash_ratio:.4f}")
-        print(f"report: {result.report_path}")
+        logger.info("Portfolio Backtest Summary")
+        logger.info("period: %s to %s", result.start, result.end)
+        logger.info("strategy: %s", result.strategy)
+        logger.info("mode: %s", result.mode)
+        logger.info("rebalance_frequency: %s", result.rebalance_frequency)
+        logger.info("no_lookahead: %s", str(result.no_lookahead).lower())
+        logger.info("signal_execution_lag: %s", result.signal_execution_lag)
+        logger.info("initial_cash: %.2f", result.initial_cash)
+        logger.info("final_value: %.2f", metrics.final_value)
+        logger.info("total_return: %.4f", metrics.total_return)
+        logger.info("annual_return: %.4f", metrics.annual_return)
+        logger.info("max_drawdown: %.4f", metrics.max_drawdown)
+        logger.info("volatility: %.4f", metrics.volatility)
+        logger.info("sharpe_ratio: %.4f", metrics.sharpe_ratio)
+        logger.info("trade_count: %s", metrics.trade_count)
+        logger.info("turnover: %.4f", metrics.turnover)
+        logger.info("total_cost: %.2f", metrics.total_cost)
+        logger.info("cash_ratio: %.4f", metrics.cash_ratio)
+        logger.info("report: %s", result.report_path)
         return 0
 
     result = context.backtest_service.run_sma_crossover(
@@ -71,16 +74,16 @@ def handle(args, context) -> int:
         commission=args.commission,
     )
     metrics = result.metrics
-    print("Backtest Summary")
-    print(f"symbol: {metrics.symbol}")
-    print(f"period: {metrics.start} to {metrics.end}")
-    print(f"initial_cash: {metrics.initial_cash:.2f}")
-    print(f"final_value: {metrics.final_value:.2f}")
-    print(f"total_return_pct: {metrics.total_return_pct:.2f}")
-    print(f"max_drawdown_pct: {metrics.max_drawdown_pct:.2f}")
-    print(f"sharpe_ratio: {metrics.sharpe_ratio:.4f}")
-    print(f"number_of_trades: {metrics.number_of_trades}")
-    print(f"win_rate_pct: {metrics.win_rate_pct:.2f}")
-    print(f"report: {result.report_path}")
+    logger.info("Backtest Summary")
+    logger.info("symbol: %s", metrics.symbol)
+    logger.info("period: %s to %s", metrics.start, metrics.end)
+    logger.info("initial_cash: %.2f", metrics.initial_cash)
+    logger.info("final_value: %.2f", metrics.final_value)
+    logger.info("total_return_pct: %.2f", metrics.total_return_pct)
+    logger.info("max_drawdown_pct: %.2f", metrics.max_drawdown_pct)
+    logger.info("sharpe_ratio: %.4f", metrics.sharpe_ratio)
+    logger.info("number_of_trades: %s", metrics.number_of_trades)
+    logger.info("win_rate_pct: %.2f", metrics.win_rate_pct)
+    logger.info("report: %s", result.report_path)
     return 0
 

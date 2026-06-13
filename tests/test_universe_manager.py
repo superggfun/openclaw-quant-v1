@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from quant.data_layer.symbol_metadata import SymbolMetadataStore
-from quant.data_layer.universe_manager import UniverseManager
+from quant.data.layer.symbol_metadata import SymbolMetadataStore
+from quant.data.layer.universe_manager import UniverseManager
 
 
 def manager(tmp_path: Path) -> UniverseManager:

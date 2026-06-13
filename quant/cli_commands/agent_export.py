@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from quant.agent_export.agent_exporter import SUPPORTED_FORMATS
+from quant.reports.agent_export.agent_exporter import SUPPORTED_FORMATS
 
 
 def register_parser(subparsers) -> None:

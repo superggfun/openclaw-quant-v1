@@ -6,8 +6,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from quant.agent_export.agent_exporter import AgentExporter
-from quant.core_protocols import (
+from quant.reports.agent_export.agent_exporter import AgentExporter
+from quant.core.protocols import (
     AccountState,
     Fill,
     Order,
@@ -17,15 +17,15 @@ from quant.core_protocols import (
     Signal,
     TradeRecord,
 )
-from quant.core_protocols.protocol_validation import (
+from quant.core.protocols.protocol_validation import (
     reconcile_account,
     validate_fill_references_order,
     validate_signal_execution_dates,
     validate_weights,
 )
 from quant.storage.sqlite_store import SQLitePriceStore
-from quant.trading_simulation.portfolio_account import PortfolioAccount
-from quant.trading_simulation.trading_simulator import TradingSimulator
+from quant.engines.trading_simulation.portfolio_account import PortfolioAccount
+from quant.engines.trading_simulation.trading_simulator import TradingSimulator
 
 
 def test_account_validation_and_reconciliation() -> None:

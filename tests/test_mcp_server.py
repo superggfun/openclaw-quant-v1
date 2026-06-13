@@ -15,7 +15,9 @@ from quant.interfaces.mcp_server.capabilities import (
 from quant.interfaces.mcp_server.mcp_models import MCPResponse
 from quant.interfaces.mcp_server.server import LocalMCPServer
 from quant.interfaces.mcp_server.tool_categories import DATA, FACTORS, RESEARCH, SECURITY
+from quant.interfaces.mcp_server.tool_discovery import discover_mcp_tool_specs
 from quant.interfaces.mcp_server.tool_registry import FORBIDDEN_TOOL_NAMES, create_default_mcp_registry
+from quant.interfaces.mcp_server.tool_runner import MCPToolRunner
 
 
 def test_mcp_tool_registration_and_categories() -> None:
@@ -31,6 +33,20 @@ def test_mcp_tool_registration_and_categories() -> None:
     assert registry.list_capabilities()[READ_ONLY] >= 20
     assert registry.list_capabilities()[OFFLINE_SIMULATION] == 4
     assert registry.list_capabilities()[LIVE_TRADING_FORBIDDEN] == len(FORBIDDEN_TOOL_NAMES)
+
+
+def test_mcp_registry_uses_auto_discovered_specs() -> None:
+    registry = create_default_mcp_registry()
+    discovered_names = {spec.name for spec in discover_mcp_tool_specs()}
+
+    assert set(registry.tools) == discovered_names
+
+
+def test_mcp_runner_facade_exposes_domain_handlers() -> None:
+    runner = MCPToolRunner()
+
+    for handler_name in ["get_provider_status", "list_factors", "research_status", "run_trade_sim", "get_report_summary"]:
+        assert callable(getattr(runner, handler_name))
 
 
 def test_mcp_tool_lookup_and_metadata() -> None:

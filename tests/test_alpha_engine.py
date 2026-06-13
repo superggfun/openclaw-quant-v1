@@ -4,8 +4,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from quant.alpha.alpha_engine import AlphaEngine
-from quant.rebalance.rebalance_engine import RebalanceEngine
+from quant.engines.alpha.alpha_engine import AlphaEngine
+from quant.engines.portfolio.rebalance_engine import RebalanceEngine
 from quant.storage.portfolio_store import SQLitePortfolioStore
 from quant.storage.sqlite_store import SQLitePriceStore
 

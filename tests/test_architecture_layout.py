@@ -7,17 +7,11 @@ from tools.project_audit import ignored_generated_paths
 
 
 def test_layered_imports_resolve_to_existing_implementations() -> None:
-    from quant.agent_export.agent_exporter import AgentExporter as OldAgentExporter
-    from quant.alpha.alpha_engine import AlphaEngine as OldAlphaEngine
     from quant.core.protocols.account import AccountState
-    from quant.core_protocols.account import AccountState as OldAccountState
     from quant.data.fundamental.fundamental_store import FundamentalStore
     from quant.data.layer.data_quality import DataQualityAnalyzer
     from quant.data.layer.universe_manager import UniverseManager
     from quant.data.providers.provider_registry import ProviderRegistry
-    from quant.data_layer.data_quality import DataQualityAnalyzer as OldDataQualityAnalyzer
-    from quant.data_layer.universe_manager import UniverseManager as OldUniverseManager
-    from quant.data_providers.provider_registry import ProviderRegistry as OldProviderRegistry
     from quant.engines.alpha.alpha_engine import AlphaEngine
     from quant.engines.factor_backtest.factor_backtest import FactorBacktest
     from quant.engines.factor_eval.factor_evaluation import FactorEvaluation
@@ -27,58 +21,43 @@ def test_layered_imports_resolve_to_existing_implementations() -> None:
     from quant.engines.strategy_gates.gate_runner import StrategyGateRunner
     from quant.engines.trading_simulation.trading_simulator import TradingSimulator
     from quant.engines.walk_forward.walk_forward import WalkForwardEngine
-    from quant.factor_backtest.factor_backtest import FactorBacktest as OldFactorBacktest
-    from quant.factor_eval.factor_evaluation import FactorEvaluation as OldFactorEvaluation
-    from quant.factors.factor_registry import FactorRegistry as OldFactorRegistry
     from quant.factors.price.factor_registry import FactorRegistry
     from quant.factors.store.factor_store import FactorStore
-    from quant.factor_store.factor_store import FactorStore as OldFactorStore
-    from quant.fundamental_data.fundamental_store import FundamentalStore as OldFundamentalStore
-    from quant.interfaces.cli_commands.alpha import handle as LayeredAlphaHandle
-    from quant.cli_commands.alpha import handle as OldAlphaHandle
-    from quant.multi_factor.multi_factor_model import MultiFactorModel as OldMultiFactorModel
-    from quant.portfolio_construction.portfolio_construction import (
-        PortfolioConstructionEngine as OldPortfolioConstructionEngine,
-    )
-    from quant.regime_detection.regime_detector import RegimeDetector as OldRegimeDetector
+    from quant.cli_commands.alpha import handle as AlphaHandle
     from quant.reports.agent_export.agent_exporter import AgentExporter
     from quant.reports.visualization.report_visualizer import ReportVisualizer
-    from quant.strategy_gates.gate_runner import StrategyGateRunner as OldStrategyGateRunner
-    from quant.trading_simulation.trading_simulator import TradingSimulator as OldTradingSimulator
-    from quant.visualization.report_visualizer import ReportVisualizer as OldReportVisualizer
-    from quant.walk_forward.walk_forward import WalkForwardEngine as OldWalkForwardEngine
 
-    assert AccountState is OldAccountState
-    assert AlphaEngine is OldAlphaEngine
-    assert AgentExporter is OldAgentExporter
-    assert FactorBacktest is OldFactorBacktest
-    assert FactorEvaluation is OldFactorEvaluation
-    assert FactorRegistry is OldFactorRegistry
-    assert FactorStore is OldFactorStore
-    assert FundamentalStore is OldFundamentalStore
-    assert MultiFactorModel is OldMultiFactorModel
-    assert PortfolioConstructionEngine is OldPortfolioConstructionEngine
-    assert ProviderRegistry is OldProviderRegistry
-    assert RegimeDetector is OldRegimeDetector
-    assert ReportVisualizer is OldReportVisualizer
-    assert StrategyGateRunner is OldStrategyGateRunner
-    assert TradingSimulator is OldTradingSimulator
-    assert UniverseManager is OldUniverseManager
-    assert WalkForwardEngine is OldWalkForwardEngine
-    assert DataQualityAnalyzer is OldDataQualityAnalyzer
-    assert LayeredAlphaHandle is OldAlphaHandle
+    assert AccountState.__name__ == "AccountState"
+    assert AlphaEngine.__name__ == "AlphaEngine"
+    assert AgentExporter.__name__ == "AgentExporter"
+    assert DataQualityAnalyzer.__name__ == "DataQualityAnalyzer"
+    assert FactorBacktest.__name__ == "FactorBacktest"
+    assert FactorEvaluation.__name__ == "FactorEvaluation"
+    assert FactorRegistry.__name__ == "FactorRegistry"
+    assert FactorStore.__name__ == "FactorStore"
+    assert FundamentalStore.__name__ == "FundamentalStore"
+    assert MultiFactorModel.__name__ == "MultiFactorModel"
+    assert PortfolioConstructionEngine.__name__ == "PortfolioConstructionEngine"
+    assert ProviderRegistry.__name__ == "ProviderRegistry"
+    assert RegimeDetector.__name__ == "RegimeDetector"
+    assert ReportVisualizer.__name__ == "ReportVisualizer"
+    assert StrategyGateRunner.__name__ == "StrategyGateRunner"
+    assert TradingSimulator.__name__ == "TradingSimulator"
+    assert UniverseManager.__name__ == "UniverseManager"
+    assert WalkForwardEngine.__name__ == "WalkForwardEngine"
+    assert callable(AlphaHandle)
 
 
-def test_reserved_interface_and_adapter_packages_are_importable() -> None:
-    import quant.adapters.langchain
-    import quant.adapters.openclaw
-    import quant.adapters.pyfolio
-    import quant.adapters.quantstats
-    import quant.interfaces.api
+def test_unimplemented_extension_namespaces_are_not_precreated() -> None:
     import quant.interfaces.mcp_server
 
+    root = Path(__file__).resolve().parents[1] / "quant"
+
     assert "research" in (quant.interfaces.mcp_server.__doc__ or "").lower()
-    assert "future" in (quant.adapters.openclaw.__doc__ or "").lower()
+    assert not (root / "adapters").exists()
+    assert not (root / "interfaces" / "api").exists()
+    assert not (root / "openclaw").exists()
+    assert not (root / "portfolio").exists()
 
 
 def test_cli_still_registers_existing_commands() -> None:
@@ -119,7 +98,5 @@ def test_layered_package_directories_exist() -> None:
         "engines/alpha",
         "engines/strategy_gates",
         "reports/agent_export",
-        "interfaces/cli_commands",
-        "adapters/openclaw",
     ]:
         assert (root / relative / "__init__.py").exists()

@@ -1,2 +1,0 @@
-"""Transaction cost engine package."""
-

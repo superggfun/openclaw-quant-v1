@@ -36,7 +36,7 @@ The project currently includes:
 - A visualization layer that turns existing JSON reports into PNG, SVG, and HTML dashboards.
 - CLI commands for price updates, price inspection, account initialization, simulated buys and sells, portfolio snapshots, trade history, alpha, factor pipeline, factor evaluation, factor backtest, strategy evaluation, backtests, allocation, rebalance plans, cost estimates, optimization, risk, and execution simulation.
 - A modular CLI implementation under `quant/cli_commands/`.
-- A layered package layout under `quant/core`, `quant/data`, `quant/factors`, `quant/engines`, `quant/services`, `quant/reports`, `quant/interfaces`, and `quant/adapters`.
+- A layered package layout under `quant/core`, `quant/data`, `quant/factors`, `quant/engines`, `quant/services`, `quant/reports`, and `quant/interfaces`.
 - A local MCP-compatible research interface under `quant/interfaces/mcp_server`.
 - A Strategy DSL layer under `quant/strategy_dsl` for versioned offline research definitions.
 
@@ -58,6 +58,7 @@ The project intentionally does not include:
 - Do not introduce live trading or broker integration without a separate design document and risk review.
 - Prefer deterministic service and engine tests with temporary SQLite databases.
 - Keep CLI behavior backward compatible unless the README and tests are updated together.
+- CLI command modules are auto-discovered from `quant/cli_commands/`; new command files must implement `register_parser(subparsers)` and `handle(args, context)`.
 - Do not commit `.venv/`, `data/quant.db`, `__pycache__/`, `.pytest_cache/`, generated reports, or other cache files.
 - New features must include both a stable CLI path and pytest coverage.
 - LLMs must not directly decide trade quantities. Trade quantities are computed by deterministic code from inputs such as cash, price, risk rules, targets, and configuration.
@@ -77,51 +78,45 @@ The project intentionally does not include:
 - Agent export features must remain read-only and export-only. Do not change source report schemas, quant logic, factor evaluation, backtest behavior, portfolio state, or execution behavior.
 - Fundamental data features must remain storage/import/query/quality only until a later explicit factor-scoring release. Do not change existing price-only factor semantics.
 - Fundamental factors must use `report_date <= signal_date`; never use `fiscal_period_end` alone for tradable availability.
-- Multi-factor work should stay inside `quant/multi_factor` or Alpha integration. Do not add ML, news sentiment, broker APIs, or live execution under the multi-factor label.
+- Multi-factor work should stay inside `quant/engines/multi_factor` or Alpha integration. Do not add ML, news sentiment, broker APIs, or live execution under the multi-factor label.
 - Multi-factor confidence is coverage-aware. Missing fundamentals should lower confidence or produce warnings, not be silently treated as true zero signals.
 - Multi-factor confidence is diagnostic only. Do not present it as expected return, investment advice, or a guarantee.
 
 ## Important Files
 
 - `quant/config.py`: project defaults and symbol universe.
-- `quant/data_providers/`: provider interface, registry, yfinance provider, CSV provider, mock provider, and future-provider placeholders.
-- `quant/data/providers/`: preferred layered import path for data providers. `quant/data_providers/` remains compatibility-supported.
-- `quant/fundamental_data/`: fundamental store, importer, service, coverage, and quality checks.
-- `quant/fundamental_factors/`: accounting factor functions and registry extension metadata.
-- `quant/multi_factor/`: factor normalization, weighting, confidence, family contribution, and final alpha score model.
+- `quant/data/providers/`: provider interface, registry, yfinance provider, CSV provider, mock provider, and future-provider placeholders.
+- `quant/data/fundamental/`: fundamental store, importer, service, coverage, and quality checks.
+- `quant/factors/fundamental/`: accounting factor functions and registry extension metadata.
+- `quant/engines/multi_factor/`: factor normalization, weighting, confidence, family contribution, and final alpha score model.
 - `quant/data_source/yfinance_client.py`: legacy yfinance normalization client used by the yfinance provider.
-- `quant/data_layer/`: universe, metadata, data quality, coverage, and readiness modules.
-- `quant/agent_export/agent_exporter.py`: compact report export layer for LLM/agent consumers.
-- `quant/reports/agent_export/`: preferred layered import path for agent export. `quant/agent_export/` remains compatibility-supported.
+- `quant/data/layer/`: universe, metadata, data quality, coverage, and readiness modules.
+- `quant/reports/agent_export/`: compact report export layer for LLM/agent consumers.
 - `quant/storage/sqlite_store.py`: price table persistence.
 - `quant/storage/portfolio_store.py`: account, position, and trade persistence.
 - `quant/services/price_service.py`: price update orchestration.
 - `quant/services/portfolio_service.py`: simulated portfolio business rules.
 - `quant/services/backtest_service.py`: SMA crossover backtest engine and metrics.
-- `quant/alpha/alpha_engine.py`: pure factor and target-weight engine.
-- `quant/factor_backtest/factor_backtest.py`: pure long-short factor backtest engine.
-- `quant/factor_store/`: persistent factor research history, registry sync, rankings, stability, coverage, and confidence analytics.
-- `quant/regime_detection/`: deterministic regime classification, regime history, factor-by-regime analytics, and regime-aware rankings.
-- `quant/factor_pipeline/factor_pipeline.py`: pure factor preprocessing pipeline.
-- `quant/factor_eval/factor_evaluation.py`: pure no-lookahead factor evaluation framework.
-- `quant/strategy_eval/strategy_evaluation.py`: pure strategy explanation and attribution engine.
-- `quant/backtest/backtest_engine.py`: deterministic daily portfolio backtest engine.
-- `quant/rebalance/rebalance_engine.py`: pure allocation and rebalance calculation engine.
-- `quant/risk/risk_engine.py`: pure portfolio risk calculation engine.
-- `quant/optimizer/optimizer_engine.py`: pure target allocation optimizer.
-- `quant/portfolio_construction/portfolio_construction.py`: pure portfolio construction and risk contribution engine.
-- `quant/cost/cost_engine.py`: pure transaction cost estimator.
-- `quant/market_realism/`: deterministic slippage, liquidity, marketability, and position-size constraints.
-- `quant/execution/execution_engine.py`: pure simulated execution engine.
-- `quant/trading_simulation/`: offline historical account-style simulation.
-- `quant/walk_forward/`: offline walk-forward and rolling validation.
-- `quant/visualization/`: report charts and dashboards from existing JSON reports.
-- `quant/reports/visualization/`: preferred layered import path for visualization. `quant/visualization/` remains compatibility-supported.
-- `quant/core_protocols/`: JSON-safe account, order, fill, position, signal, recommendation, trade, and snapshot protocol objects.
-- `quant/core/protocols/`: preferred layered import path for protocol objects. `quant/core_protocols/` remains compatibility-supported.
+- `quant/engines/alpha/alpha_engine.py`: pure factor and target-weight engine.
+- `quant/engines/factor_backtest/factor_backtest.py`: pure long-short factor backtest engine.
+- `quant/factors/store/`: persistent factor research history, registry sync, rankings, stability, coverage, and confidence analytics.
+- `quant/engines/regime/`: deterministic regime classification, regime history, factor-by-regime analytics, and regime-aware rankings.
+- `quant/engines/factor_pipeline/factor_pipeline.py`: pure factor preprocessing pipeline.
+- `quant/engines/factor_eval/factor_evaluation.py`: pure no-lookahead factor evaluation framework.
+- `quant/engines/strategy_eval/strategy_evaluation.py`: pure strategy explanation and attribution engine.
+- `quant/engines/backtest/backtest_engine.py`: deterministic daily portfolio backtest engine.
+- `quant/engines/portfolio/rebalance_engine.py`: pure allocation and rebalance calculation engine.
+- `quant/engines/risk/risk_engine.py`: pure portfolio risk calculation engine.
+- `quant/engines/portfolio/optimizer_engine.py`: pure target allocation optimizer.
+- `quant/engines/portfolio/portfolio_construction.py`: pure portfolio construction and risk contribution engine.
+- `quant/engines/execution/cost_engine.py`: pure transaction cost estimator.
+- `quant/engines/execution/`: deterministic slippage, liquidity, marketability, position-size constraints, costs, and simulated execution.
+- `quant/engines/trading_simulation/`: offline historical account-style simulation.
+- `quant/engines/walk_forward/`: offline walk-forward and rolling validation.
+- `quant/reports/visualization/`: report charts and dashboards from existing JSON reports.
+- `quant/core/protocols/`: JSON-safe account, order, fill, position, signal, recommendation, trade, and snapshot protocol objects.
 - `quant/cli.py`: command line entry point and dispatcher.
 - `quant/cli_commands/`: command-specific parser registration and handlers.
-- `quant/interfaces/cli_commands/`: layered CLI command namespace. `quant/cli_commands/` remains the compatibility import path in v0.34.
 - `quant/interfaces/mcp_server/`: JSON-safe local MCP research tools. It is not a live trading or broker interface.
 - `quant/strategy_dsl/`: YAML/JSON strategy definitions, validation, metadata persistence, and offline orchestration.
 - `pyproject.toml`: packaging metadata, optional dependency groups, pytest defaults, and console script entry point.
@@ -147,35 +142,35 @@ Broker APIs, credentials, live execution, OpenClaw, Claude, GPT, and automatic t
 
 ## v0.19 Factor Development Notes
 
-Use `quant/factors/factor_registry.py` as the central registry for deterministic factors. Each factor must declare category, type, description, required inputs, and lookback window. Factor calculations must use only signal-date-and-earlier data, and new factors should be tested through `factor-eval`, `factor-backtest`, `factor-pipeline`, and `alpha` compatibility paths.
+Deterministic factors live under `quant/factors/price/` and `quant/factors/fundamental/`. Each factor module should declare `FACTOR_SPECS` next to its compute functions; `FactorRegistry` auto-discovers those specs. Each factor must declare category, type, description, required inputs, and lookback window. Factor calculations must use only signal-date-and-earlier data, and new factors should be tested through `factor-eval`, `factor-backtest`, `factor-pipeline`, and `alpha` paths.
 
 ## v0.20 Walk Forward Notes
 
-Walk-forward code belongs under `quant/walk_forward` and should orchestrate existing engines rather than rewriting strategy logic. Keep reports deterministic, no-lookahead, and offline. New validation warnings should be stable codes with clear reasons and pytest coverage.
+Walk-forward code belongs under `quant/engines/walk_forward` and should orchestrate existing engines rather than rewriting strategy logic. Keep reports deterministic, no-lookahead, and offline. New validation warnings should be stable codes with clear reasons and pytest coverage.
 
 ## v0.21 Trading Simulation Notes
 
-Trading simulation code belongs under `quant/trading_simulation`. Keep it offline and deterministic. Use `PortfolioAccount` for in-memory cash and position state, preserve `signal_date < execution_date`, and do not write simulated historical loop state into persistent portfolio tables. New simulator changes should include CLI coverage, report schema tests, and Agent Export compatibility tests.
+Trading simulation code belongs under `quant/engines/trading_simulation`. Keep it offline and deterministic. Use `PortfolioAccount` for in-memory cash and position state, preserve `signal_date < execution_date`, and do not write simulated historical loop state into persistent portfolio tables. New simulator changes should include CLI coverage, report schema tests, and Agent Export tests.
 
 ## v0.23 Visualization Notes
 
-Visualization code belongs under `quant/visualization`. It should read existing JSON reports and write generated artifacts under `reports/charts/`. Do not change source report schemas, quant calculations, factor logic, portfolio state, or execution behavior.
+Visualization code belongs under `quant/reports/visualization`. It should read existing JSON reports and write generated artifacts under `reports/charts/`. Do not change source report schemas, quant calculations, factor logic, portfolio state, or execution behavior.
 
 ## v0.24 Data Provider Notes
 
-Provider code belongs under `quant/data_providers`. `PriceService` and data refresh should call the `DataProvider` interface rather than importing provider implementations directly. Keep `yfinance` as the default until a later release explicitly changes configuration. New providers must include health checks, deterministic tests, documentation, and must preserve no-lookahead semantics by only loading historical data requested by callers.
+Provider code belongs under `quant/data/providers`. `PriceService` and data refresh should call the `DataProvider` interface rather than importing provider implementations directly. Keep `yfinance` as the default until a later release explicitly changes configuration. New providers should expose `PROVIDER_SPECS` next to their implementation so `ProviderRegistry` can auto-discover them. New providers must include health checks, deterministic tests, documentation, and must preserve no-lookahead semantics by only loading historical data requested by callers.
 
 ## v0.25 Fundamental Data Notes
 
-Fundamental data code belongs under `quant/fundamental_data`. Store `report_date` separately from `fiscal_period_end`; factor code must use `report_date` for no-lookahead alignment. CSV import is the main supported path in v0.25.
+Fundamental data code belongs under `quant/data/fundamental`. Store `report_date` separately from `fiscal_period_end`; factor code must use `report_date` for no-lookahead alignment. CSV import is the main supported path in v0.25.
 
 ## v0.26 Fundamental Factor Notes
 
-Fundamental factor code belongs under `quant/fundamental_factors` and must be registered through `quant/factors/factor_registry.py`. Every fundamental factor must enforce `report_date <= signal_date`; `fiscal_period_end` alone is not enough. Missing metrics must be skipped or excluded, never filled with fake zero values.
+Fundamental factor code belongs under `quant/factors/fundamental` and must declare `FACTOR_SPECS` with fundamental metrics used. Every fundamental factor must enforce `report_date <= signal_date`; `fiscal_period_end` alone is not enough. Missing metrics must be skipped or excluded, never filled with fake zero values.
 
 ## v0.27 Multi-Factor Notes
 
-Multi-factor code belongs under `quant/multi_factor`. It may combine registered price and fundamental factors, but it must not introduce new factors, ML models, broker integration, or live trading. Preserve the existing Alpha, FactorEval, FactorBacktest, WalkForward, and TradingSimulation no-lookahead contracts.
+Multi-factor code belongs under `quant/engines/multi_factor`. It may combine registered price and fundamental factors, but it must not introduce new factors, ML models, broker integration, or live trading. Preserve the existing Alpha, FactorEval, FactorBacktest, WalkForward, and TradingSimulation no-lookahead contracts.
 
 ## v0.28 Packaging And CI Notes
 
@@ -183,15 +178,15 @@ Packaging work belongs in `pyproject.toml`, `requirements.txt`, `.github/`, repo
 
 ## v0.29 Protocol Notes
 
-Protocol work belongs under `quant/core_protocols`. It may add JSON-safe objects and internal validation, but it must not add live broker behavior, automatic trading, new alpha factors, new data providers, or report schema changes. Future MCP/OpenClaw work should consume these objects rather than scraping engine internals.
+Protocol work belongs under `quant/core/protocols`. It may add JSON-safe objects and internal validation, but it must not add live broker behavior, automatic trading, new alpha factors, new data providers, or report schema changes. Future MCP/OpenClaw work should consume these objects rather than scraping engine internals.
 
 ## v0.31 Factor Store Notes
 
-Factor Store work belongs under `quant/factor_store`. It may persist factor definitions, values, evaluation history, backtest history, walk-forward folds, stability scores, coverage, confidence, and versions. It must not add new factors, change factor evaluation semantics, change factor backtest semantics, alter walk-forward no-lookahead behavior, or generate trades. Persistence through `--save-factor-history` is opt-in.
+Factor Store work belongs under `quant/factors/store`. It may persist factor definitions, values, evaluation history, backtest history, walk-forward folds, stability scores, coverage, confidence, and versions. It must not add new factors, change factor evaluation semantics, change factor backtest semantics, alter walk-forward no-lookahead behavior, or generate trades. Persistence through `--save-factor-history` is opt-in.
 
 ## v0.32 Regime Detection Notes
 
-Regime Detection work belongs under `quant/regime_detection`. It may classify stored benchmark price history into deterministic market regimes and persist factor-by-regime diagnostics. It must not add ML, news sentiment, broker integration, live trading, automatic factor disabling, or automatic portfolio changes. Regime diagnostics must preserve signal-date no-lookahead alignment.
+Regime Detection work belongs under `quant/engines/regime`. It may classify stored benchmark price history into deterministic market regimes and persist factor-by-regime diagnostics. It must not add ML, news sentiment, broker integration, live trading, automatic factor disabling, or automatic portfolio changes. Regime diagnostics must preserve signal-date no-lookahead alignment.
 
 ## v0.33 Scheduler Notes
 
@@ -213,13 +208,13 @@ New code should prefer layered imports:
 - `quant.engines.*` for pure quant engines.
 - `quant.reports.agent_export` and `quant.reports.visualization` for report consumers.
 - `quant.interfaces.*` for CLI/API/MCP boundaries.
-- `quant.adapters.*` for optional external framework adapters.
+- Optional external framework adapter packages should be added only with real implementation and tests.
 
-v0.34 is phase 1 of the namespace refactor. Do not remove legacy imports during v0.34 work. Compatibility shims are intentional and should remain until a later release explicitly schedules their removal. Future physical module migration may happen gradually after new callers adopt the layered namespaces. The reserved API/OpenClaw/LangChain/QuantStats/PyFolio packages are placeholders only; do not add those integrations under the architecture-refactor label.
+Layered namespaces are canonical. Do not add compatibility shims or precreate future API/OpenClaw/LangChain/QuantStats/PyFolio placeholder packages; add those packages only with real implementation and tests.
 
 ## v0.35 MCP Notes
 
-MCP code belongs under `quant/interfaces/mcp_server`. It may expose existing research capabilities through JSON-safe tool objects, but it must stay read-only or local offline simulation only. Do not add broker connectivity, live order submission, position mutation, automatic trading, ML, news sentiment, or new factors under the MCP label.
+MCP code belongs under `quant/interfaces/mcp_server`. It may expose existing research capabilities through JSON-safe tool objects, but it must stay read-only or local offline simulation only. MCP tool specs live under `quant/interfaces/mcp_server/tools/`; handler methods live under `quant/interfaces/mcp_server/runners/` and are exposed through the `MCPToolRunner` facade. Do not add broker connectivity, live order submission, position mutation, automatic trading, ML, news sentiment, or new factors under the MCP label.
 
 Every MCP tool must declare exactly one `capability_level`: `READ_ONLY`, `OFFLINE_SIMULATION`, `PAPER_TRADING_RESERVED`, or `LIVE_TRADING_FORBIDDEN`. v0.35 may only enable `READ_ONLY` and `OFFLINE_SIMULATION`. Disabled capability levels must be blocked before runner execution.
 
@@ -233,7 +228,7 @@ Forbidden trading/broker tool names must return `NOT_SUPPORTED`, including `plac
 
 ## v0.37 Strategy Gate Notes
 
-Strategy Evaluation Gate code belongs under `quant/strategy_gates`. It may read Strategy DSL validation, Factor Store history, walk-forward history, regime diagnostics, and offline strategy-run/trade-sim reports. It must not add factors, alter quant calculations, change report schemas for existing reports, connect brokers, submit orders, mutate real accounts, or weaken no-lookahead rules.
+Strategy Evaluation Gate code belongs under `quant/engines/strategy_gates`. Gate specs live under `quant/engines/strategy_gates/gates/` and are auto-discovered by `GateRegistry`; `StrategyGateRunner` executes discovered specs in order. It may read Strategy DSL validation, Factor Store history, walk-forward history, regime diagnostics, and offline strategy-run/trade-sim reports. It must not add factors, alter quant calculations, change report schemas for existing reports, connect brokers, submit orders, mutate real accounts, or weaken no-lookahead rules.
 
 `strategy-gate` and `strategy-run --with-gates` are offline research quality-control commands. MCP `run_strategy_gates` must remain `OFFLINE_SIMULATION`; `latest_strategy_gate_report` must remain `READ_ONLY`.
 
@@ -243,8 +238,22 @@ Research validation code belongs under `quant/research_validation`. It may orche
 
 Use `research-validation --mode quick` for bounded local smoke validation. Use `--mode full` only for deliberate long-running research sessions. The workflow must record partial results, skipped steps, timeouts, slow steps, and runtime seconds.
 
+For report work, follow `docs/REPORT_ARCHITECTURE.md`: compact JSON/Markdown is for humans, LLMs, Agent Export, MCP, and dashboards; CSV/table artifacts are for analysis; detailed audit artifacts live under `reports/runs/<run_id>/`. Do not embed huge arrays in compact reports.
+
 ## v0.40 Performance Profiling Notes
 
 Performance profiling code belongs under `quant/performance`. It may time existing engines, store/query calls, Factor Store lookups, fundamental lookups, and report generation. It must not optimize, parallelize, cache, vectorize, tune, suppress warnings, change report schemas, or alter quant semantics.
 
 Use `performance-profile` to measure bottlenecks before proposing optimization work. Any future optimization must preserve no-lookahead behavior and existing factor evaluation, factor backtest, walk-forward, strategy, research validation, and trade simulation semantics.
+
+## v0.41 Factor Eval Cache Notes
+
+Factor cache code belongs under `quant/factor_cache`. It may cache no-lookahead factor/future-return matrices in memory and report cache diagnostics. It must not change IC, Rank IC, ICIR, quintiles, spread return, decay, observations, excluded symbols, warning semantics, factor backtest behavior, walk-forward behavior, research-validation behavior, or report schemas except for optional performance metadata.
+
+Shared factor research helpers live under `quant/engines/factor_common`. Factor evaluation, factor backtest, and future factor research engines should reuse these modules for statistics, symbol normalization, fundamental coverage, report writing, and pipeline application instead of copying local helper implementations. Observation construction remains engine-owned unless a refactor explicitly proves no-lookahead equivalence.
+
+Factor acceleration code belongs under `quant/factor_acceleration`. It may bulk-load prices, build no-lookahead observation matrices, reuse factor value series across decay horizons, and run independent research-validation factor batches in worker processes. Worker processes must not write Factor Store, regime history, or final reports. Do not parallelize stateful portfolio/account date progression. Parquet, Numba, swifter, pandarallel, broker integration, and live trading remain out of scope.
+
+Cache keys must include factor name, universe hash, date range, forward days, factor version, newest stored data date, and `no_lookahead=true`. Fundamental factors must continue to use `report_date <= signal_date`; never use `fiscal_period_end` alone as tradable availability.
+
+Do not add Parquet, numba, multiprocessing, swifter, pandarallel, or vectorized backtest rewrites in this cache layer.

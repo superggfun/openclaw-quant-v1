@@ -5,13 +5,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from quant.agent_export.agent_exporter import AgentExporter
-from quant.factor_eval.factor_evaluation import FactorEvaluation
-from quant.factor_store.factor_analytics import FactorAnalytics
-from quant.factor_store.factor_registry_store import FactorRegistryStore
-from quant.factor_store.factor_store import FactorStore
+from quant.reports.agent_export.agent_exporter import AgentExporter
+from quant.engines.factor_eval.factor_evaluation import FactorEvaluation
+from quant.factors.store.factor_analytics import FactorAnalytics
+from quant.factors.store.factor_registry_store import FactorRegistryStore
+from quant.factors.store.factor_store import FactorStore
 from quant.storage.sqlite_store import SQLitePriceStore
-from quant.visualization.report_visualizer import ReportVisualizer
+from quant.reports.visualization.report_visualizer import ReportVisualizer
 
 
 def seed_factor_prices(db_path: Path) -> None:

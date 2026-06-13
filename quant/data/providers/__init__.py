@@ -1,20 +1,18 @@
-"""Layered data-provider package.
+"""Data provider abstraction layer."""
 
-New imports should prefer `quant.data.providers.*`. Existing
-`quant.data_providers.*` imports remain supported.
-"""
+from quant.data.providers.base import DataProvider, PlaceholderProvider, ProviderHealth
+from quant.data.providers.csv_provider import CSVProvider
+from quant.data.providers.mock_provider import MockProvider
+from quant.data.providers.provider_registry import ProviderRegistry, create_default_registry
+from quant.data.providers.yfinance_provider import YFinanceProvider
 
-from quant.utils.module_alias import alias_modules
-
-_ALIASES = {
-    "base": "quant.data_providers.base",
-    "csv_provider": "quant.data_providers.csv_provider",
-    "mock_provider": "quant.data_providers.mock_provider",
-    "provider_registry": "quant.data_providers.provider_registry",
-    "yfinance_provider": "quant.data_providers.yfinance_provider",
-}
-
-alias_modules(__name__, _ALIASES)
-
-from quant.data_providers import *  # noqa: F401,F403,E402
-
+__all__ = [
+    "CSVProvider",
+    "DataProvider",
+    "MockProvider",
+    "PlaceholderProvider",
+    "ProviderHealth",
+    "ProviderRegistry",
+    "YFinanceProvider",
+    "create_default_registry",
+]

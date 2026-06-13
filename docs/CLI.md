@@ -4,6 +4,8 @@ This file is the concise CLI index. See `docs/CLI_COMMANDS.md` for fuller exampl
 
 The public entry point remains `python -m quant.cli`. In `v0.15.0`, command parser registration and command execution were split into `quant/cli_commands/` modules without changing command names, arguments, output text, or report schemas.
 
+CLI command modules are auto-discovered from `quant/cli_commands/`. A new command module must define `register_parser(subparsers)` and `handle(args, context)`; `quant/cli.py` does not need a manual module list or handler map update.
+
 `v0.28.0` also exposes the installed console script `openclaw-quant` when the project is installed from `pyproject.toml`. Existing `python -m quant.cli` usage remains the canonical documented path.
 
 ```bash
@@ -140,11 +142,20 @@ python -m quant.cli research-status
 python -m quant.cli research-history
 python -m quant.cli research-report
 python -m quant.cli research-validation --mode quick
+python -m quant.cli research-validation --mode quick --start 2024-01-01 --end 2026-06-11
+python -m quant.cli research-validation --mode quick --max-symbols 20 --max-factors 3 --use-cache --cache-stats
+python -m quant.cli research-validation --mode quick --max-symbols 20 --max-factors 3 --bulk-matrix --parallel --workers 4 --cache-stats
 ```
 
 `research-run` executes the offline daily research pipeline from `examples/research_scheduler_config.json`: coverage checks, factor evaluation, Factor Store update, regime detection, historical trade simulation, visualization, Agent Export, and a compact summary. The default config is lightweight daily/smoke mode, not full-universe validation. Full research remains available by enabling data refresh, expanding symbols, adding factors, and extending the trade simulation window in config. Steps are failure-isolated where possible. This is research automation only; it does not connect to brokers, place orders, or perform live trading.
 
-`research-validation` is the v0.39 bounded evidence and coverage sprint. Use `--mode quick` for local smoke validation and `--mode full` for long-running validation over broader factor and strategy sets. It records partial results, skipped steps, timeouts, slow steps, warning frequencies, and recommendations without changing engine semantics.
+`research-validation` is the v0.39 bounded evidence and coverage sprint. Use `--mode quick` for local smoke validation and `--mode full` for long-running validation over broader factor and strategy sets. Quick mode uses a bounded daily signal-date window by default (`2024-01-01` to latest available selected-universe price date); use `--start` and `--end` to override it. It records partial results, skipped steps, timeouts, slow steps, warning frequencies, and recommendations without changing engine semantics.
+
+`--use-cache --cache-stats` enables the v0.41 in-memory factor matrix cache for factor-eval steps and prints cache diagnostics. `--bulk-matrix` enables bulk observation matrix construction. `--parallel --workers N` parallelizes independent factor batches while keeping Factor Store writes in the main process. These paths are opt-in and preserve factor-eval and factor-backtest semantics.
+
+Research-validation quick mode is compact by default. The top-level `reports/` directory receives only the aggregate report, summary, and optional agent export; run details are organized under `reports/runs/<run_id>/manifest.json`.
+
+Research-validation charts, sub-step reports, batch artifacts, intermediate reports, and debug logs are disabled by default for both quick and full runs. Use `--write-charts`/`--charts`, `--write-substep-reports`, `--write-batch-artifacts`, `--write-intermediate-reports`, or `--write-debug-logs` when you want detailed outputs under `reports/runs/<run_id>/`. Use `--artifact-dir` to choose a different run artifact directory.
 
 ## Performance Profiling
 

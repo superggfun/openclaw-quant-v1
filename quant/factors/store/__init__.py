@@ -1,13 +1,8 @@
-"""Layered factor-store package."""
+"""Persistent factor research store."""
 
-from quant.utils.module_alias import alias_modules
+from quant.factors.store.factor_analytics import FactorAnalytics
+from quant.factors.store.factor_history import FactorHistory
+from quant.factors.store.factor_registry_store import FactorRegistryStore
+from quant.factors.store.factor_store import FactorStore
 
-_ALIASES = {
-    "factor_analytics": "quant.factor_store.factor_analytics",
-    "factor_history": "quant.factor_store.factor_history",
-    "factor_registry_store": "quant.factor_store.factor_registry_store",
-    "factor_store": "quant.factor_store.factor_store",
-}
-
-alias_modules(__name__, _ALIASES)
-
+__all__ = ["FactorAnalytics", "FactorHistory", "FactorRegistryStore", "FactorStore"]

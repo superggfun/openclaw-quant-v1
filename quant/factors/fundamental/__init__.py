@@ -1,13 +1,10 @@
-"""Layered fundamental-factor package."""
+"""Report-date-aware fundamental factor library."""
 
-from quant.utils.module_alias import alias_modules
 
-_ALIASES = {
-    "factor_registry_extension": "quant.fundamental_factors.factor_registry_extension",
-    "financial_health_factors": "quant.fundamental_factors.financial_health_factors",
-    "growth_factors": "quant.fundamental_factors.growth_factors",
-    "quality_factors": "quant.fundamental_factors.quality_factors",
-    "value_factors": "quant.fundamental_factors.value_factors",
-}
+def fundamental_factor_definitions():
+    from quant.factors.fundamental.factor_registry_extension import fundamental_factor_definitions as _definitions
 
-alias_modules(__name__, _ALIASES)
+    return _definitions()
+
+
+__all__ = ["fundamental_factor_definitions"]

@@ -6,11 +6,12 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 
-from quant.data_layer.data_quality import DataRefreshManager
-from quant.data_layer.symbol_metadata import SymbolMetadataStore
-from quant.data_layer.universe_manager import UniverseManager
-from quant.data_providers import CSVProvider, MockProvider, ProviderRegistry
-from quant.data_providers.yfinance_provider import YFinanceProvider
+from quant.data.layer.data_quality import DataRefreshManager
+from quant.data.layer.symbol_metadata import SymbolMetadataStore
+from quant.data.layer.universe_manager import UniverseManager
+from quant.data.providers import CSVProvider, MockProvider, ProviderRegistry
+from quant.data.providers.provider_discovery import discover_provider_specs
+from quant.data.providers.yfinance_provider import YFinanceProvider
 from quant.cli import main
 from quant.services.price_service import PriceService
 from quant.storage.sqlite_store import SQLitePriceStore
@@ -28,6 +29,13 @@ def test_registry_lists_default_and_placeholders() -> None:
     assert providers["tushare"].status == "not installed"
     assert providers["alpha_vantage"].status == "not installed"
     assert providers["polygon"].status == "not installed"
+
+
+def test_provider_registry_uses_auto_discovered_specs() -> None:
+    registry = ProviderRegistry()
+    discovered_names = {spec.name for spec in discover_provider_specs()}
+
+    assert {item.name for item in registry.list_providers()} == discovered_names
 
 
 def test_registry_resolves_and_rejects_unknown() -> None:
@@ -110,7 +118,7 @@ def test_yfinance_provider_uses_same_download_arguments_and_normalizes(monkeypat
         )
 
     monkeypatch.setattr(
-        "quant.data_providers.yfinance_provider.yf",
+        "quant.data.providers.yfinance_provider.yf",
         SimpleNamespace(download=fake_download),
     )
 

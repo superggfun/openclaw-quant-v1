@@ -2,6 +2,8 @@
 
 `v0.18.0` adds an Agent Export Layer for compact report summaries optimized for OpenClaw, Claude, GPT, Qwen, and other LLM agents.
 
+Report exporters are auto-discovered from `quant/reports/agent_export/exporters/`. New report summaries should add an `EXPORT_SPECS` entry in the relevant exporter module or a new exporter module, not modify `AgentExporter` directly.
+
 This is an export-only layer. It does not modify existing report schemas, quant logic, factor evaluation, backtests, portfolio state, broker connectivity, or live execution. Agent exports are research summaries, not investment advice.
 
 ## CLI
@@ -138,6 +140,8 @@ This direct protocol export is an in-process API, not a CLI report schema change
 
 When `visualize-report` has generated charts for the same source report, Agent Export includes those files in `visualization_paths`. The source JSON report is not modified.
 
+When the visualization step has also written `*_visual_summary.json`, Agent Export includes it in `visual_summary_paths`. LLM consumers should prefer the visual summary JSON over raw image or dashboard paths for decision context.
+
 ## Walk Forward Reports
 
 Agent Export supports `reports/walk_forward_*.json`. Summaries include fold count, average train/test return and Sharpe, factor stability ranking, warnings such as `WARN_OVERFIT` and `WARN_FACTOR_DECAY`, and deterministic next steps like reviewing out-of-sample folds or comparing factor stability.
@@ -164,6 +168,8 @@ Agent Export supports `reports/regime_detection_*.json`, `reports/regime_history
 ## Scheduler Reports
 
 Agent Export supports `research_run`, `research_status`, and `research_history` reports. Exports summarize run status, current regime, best and weak factors, trade simulation return, generated artifacts, warnings, and recommended next checks. These summaries are context compaction for LLM agents, not investment advice or autonomous trading instructions.
+
+Agent Export consumes compact report summaries. It includes key metrics, warnings, recommendations, observation counts, and artifact paths, but it must not inline large arrays such as factor observations, backtest periods, symbol-by-date maps, holdings, raw matrices, or binary chart payloads. Detailed data should be followed through `reports/runs/<run_id>/manifest.json`.
 
 ## Strategy DSL Reports
 

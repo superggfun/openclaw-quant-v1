@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
+from quant.reports.report_io import generate_report_path, write_json_report
 from quant.scheduler.research_pipeline import ResearchPipeline
 from quant.scheduler.scheduler_config import SchedulerConfig
 from quant.strategy_dsl.strategy_registry import StrategyRegistry
@@ -272,8 +272,10 @@ class DailyResearchRun:
                 warnings.append(f"WARN_VISUALIZATION_SKIPPED: {Path(report_path).name}: {exc}")
                 continue
             artifacts.append(visual.dashboard_path)
+            artifacts.append(visual.visual_summary_path)
             artifacts.extend(chart.get("png_path") for chart in visual.charts if chart.get("png_path"))
             state["generated_visualizations"].append(visual.dashboard_path)
+            state["generated_visualizations"].append(visual.visual_summary_path)
             state["generated_visualizations"].extend(chart.get("png_path") for chart in visual.charts if chart.get("png_path"))
             warnings.extend(visual.warnings)
         return {
@@ -431,10 +433,8 @@ class DailyResearchRun:
         return self.report_dir / f"agent_export_{source.stem}.txt"
 
     def _report_path(self) -> Path:
-        self.report_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return self.report_dir / f"research_run_{timestamp}.json"
+        return generate_report_path(self.report_dir, "research_run")
 
     @staticmethod
     def _write_report(report: dict[str, Any], path: Path) -> None:
-        path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+        write_json_report(path, report, sort_keys=True)

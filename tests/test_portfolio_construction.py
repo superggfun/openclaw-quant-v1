@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from quant.cli import main
-from quant.portfolio_construction.portfolio_construction import PortfolioConstructionEngine
+from quant.engines.portfolio.portfolio_construction import PortfolioConstructionEngine
 from quant.storage.portfolio_store import SQLitePortfolioStore
 from quant.storage.sqlite_store import SQLitePriceStore
 
