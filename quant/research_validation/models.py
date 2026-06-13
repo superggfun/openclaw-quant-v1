@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections import Counter
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -71,3 +72,35 @@ class ResearchValidationRunContext:
     batch_artifact_dir: Path
     chart_dir: Path
     log_dir: Path
+
+
+@dataclass
+class ResearchValidationPhaseState:
+    substep_report_paths: list[str] = field(default_factory=list)
+    artifact_paths: list[str] = field(default_factory=list)
+    log_paths: list[str] = field(default_factory=list)
+    steps: list[ValidationStep] = field(default_factory=list)
+    skipped_steps: list[dict[str, Any]] = field(default_factory=list)
+    warning_counter: Counter[str] = field(default_factory=Counter)
+    factor_eval_results: list[dict[str, Any]] = field(default_factory=list)
+    factor_backtest_results: list[dict[str, Any]] = field(default_factory=list)
+    walk_forward_results: list[dict[str, Any]] = field(default_factory=list)
+    strategy_results: list[dict[str, Any]] = field(default_factory=list)
+    gate_results: list[dict[str, Any]] = field(default_factory=list)
+    completed_batches: list[dict[str, Any]] = field(default_factory=list)
+    skipped_batches: list[dict[str, Any]] = field(default_factory=list)
+    factor_eval_serial: bool = True
+    factor_backtest_serial: bool = True
+    parallel_compute_seconds: float = 0.0
+    parallel_finalize_seconds: float = 0.0
+    factor_store_write_seconds: float = 0.0
+    report_compaction_seconds: float = 0.0
+    detailed_artifact_count: int = 0
+    batch_write_summary: dict[str, Any] = field(
+        default_factory=lambda: {
+            "factor_evaluations": 0,
+            "factor_backtests": 0,
+            "regime_items": 0,
+            "regime_rows": 0,
+        }
+    )
