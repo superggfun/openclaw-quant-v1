@@ -9,6 +9,7 @@ from typing import Mapping
 import pandas as pd
 import numpy as np
 
+from quant.core.symbols import normalize_symbols
 from quant.engines.risk.risk_engine import DEFAULT_INDUSTRY_MAP
 from quant.reports.report_io import generate_report_path, write_json_report
 from quant.storage.sqlite_store import SQLitePriceStore
@@ -421,16 +422,12 @@ class PortfolioConstructionEngine:
 
     @staticmethod
     def _normalize_symbols(symbols: list[str]) -> list[str]:
-        normalized = []
-        seen = set()
-        for symbol in symbols:
-            ticker = symbol.upper().strip()
-            if ticker and ticker not in seen and ticker != "CASH":
-                normalized.append(ticker)
-                seen.add(ticker)
-        if not normalized:
-            raise ValueError("at least one non-cash symbol is required")
-        return normalized
+        return normalize_symbols(
+            symbols,
+            exclude={"CASH"},
+            require_non_empty=True,
+            empty_message="at least one non-cash symbol is required",
+        )
 
     @staticmethod
     def _normalize_constraints(

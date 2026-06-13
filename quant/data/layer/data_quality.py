@@ -9,6 +9,7 @@ from pathlib import Path
 import pandas as pd
 
 from quant.config import DEFAULT_START_DATE
+from quant.core.symbols import normalize_symbols
 from quant.data.layer.symbol_metadata import SymbolMetadataStore
 from quant.data.providers import DataProvider, YFinanceProvider
 from quant.reports.report_io import generate_report_path, write_json_report
@@ -400,14 +401,7 @@ class DataQualityAnalyzer:
 
     @staticmethod
     def _normalize_symbols(symbols: list[str]) -> list[str]:
-        normalized = []
-        seen = set()
-        for symbol in symbols:
-            ticker = symbol.upper().strip()
-            if ticker and ticker not in seen:
-                normalized.append(ticker)
-                seen.add(ticker)
-        return normalized
+        return normalize_symbols(symbols)
 
     def _write_report(self, prefix: str, payload: dict) -> Path:
         return write_json_report(

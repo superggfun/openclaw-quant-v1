@@ -8,6 +8,7 @@ from typing import Any
 from uuid import uuid4
 
 from quant.config import DEFAULT_SYMBOLS
+from quant.core.collections import dedupe_text
 from quant.reports.report_io import generate_report_path, write_json_report
 from quant.strategy_dsl.strategy_definition import StrategyDefinition
 from quant.strategy_dsl.strategy_loader import StrategyLoader
@@ -253,11 +254,4 @@ class StrategyRegistry:
 
 
 def _dedupe(values: list[str]) -> list[str]:
-    output = []
-    seen = set()
-    for value in values:
-        text = str(value)
-        if text and text not in seen:
-            output.append(text)
-            seen.add(text)
-    return output
+    return dedupe_text(values)

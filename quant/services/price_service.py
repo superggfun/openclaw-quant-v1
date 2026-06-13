@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta
 from typing import Iterable
 
 from quant.config import DEFAULT_START_DATE, DEFAULT_SYMBOLS
+from quant.core.symbols import normalize_symbols
 from quant.data.providers import DataProvider, YFinanceProvider
 from quant.storage.sqlite_store import SQLitePriceStore
 
@@ -62,14 +63,7 @@ class PriceService:
 
     @staticmethod
     def _normalize_symbols(symbols: Iterable[str]) -> list[str]:
-        normalized = []
-        seen = set()
-        for symbol in symbols:
-            ticker = symbol.upper().strip()
-            if ticker and ticker not in seen:
-                normalized.append(ticker)
-                seen.add(ticker)
-        return normalized
+        return normalize_symbols(symbols)
 
     def _get_price_history(
         self,

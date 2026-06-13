@@ -8,6 +8,7 @@ import pytest
 
 from quant.reports.agent_export.agent_exporter import AgentExporter
 from quant.storage.sqlite_store import SQLitePriceStore
+from quant.engines.execution.cost_engine import CostEngine, TradeInput
 from quant.engines.trading_simulation.portfolio_account import PortfolioAccount
 from quant.engines.trading_simulation.trading_simulator import TradingSimulator
 
@@ -336,6 +337,33 @@ def test_low_notional_cost_warning_is_reported(tmp_path: Path) -> None:
 
     assert len(result["executed_trades"]) == 1
     assert any("below min_trade_notional" in warning for warning in result["warnings"])
+
+
+def test_affordable_buy_search_preserves_cost_engine_semantics() -> None:
+    cost_engine = CostEngine(
+        {
+            "fixed_fee": 5,
+            "commission_rate": 0,
+            "min_commission": 0,
+            "slippage_bps": 0,
+            "market_impact_bps": 0,
+            "liquidity_impact_rate": 0,
+        }
+    )
+
+    shares, estimate, warnings = TradingSimulator._max_affordable_buy(
+        cost_engine=cost_engine,
+        trade=TradeInput("SPY", "BUY", 20, 100),
+        max_shares=20,
+        cash=1000,
+        average_daily_volume=None,
+        volatility=None,
+    )
+
+    assert shares == 9
+    assert estimate is not None
+    assert estimate.notional + estimate.total_cost <= 1000
+    assert warnings == []
 
 
 def test_trade_report_schema(tmp_path: Path) -> None:

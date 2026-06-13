@@ -9,6 +9,7 @@ from typing import Mapping
 import pandas as pd
 
 from quant.config import DEFAULT_SYMBOLS
+from quant.core.symbols import normalize_symbols
 from quant.engines.portfolio.rebalance_engine import RebalanceEngine
 from quant.engines.risk.risk_engine import DEFAULT_INDUSTRY_MAP, RiskEngine
 from quant.reports.report_io import generate_report_path, write_json_report
@@ -249,14 +250,7 @@ class OptimizerEngine:
 
     @staticmethod
     def _normalize_symbols(symbols: list[str]) -> list[str]:
-        normalized = []
-        seen = set()
-        for symbol in symbols:
-            ticker = symbol.upper().strip()
-            if ticker and ticker not in seen:
-                normalized.append(ticker)
-                seen.add(ticker)
-        return normalized
+        return normalize_symbols(symbols)
 
     @staticmethod
     def _normalize_constraints(constraints: Mapping) -> dict:

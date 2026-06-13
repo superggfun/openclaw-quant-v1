@@ -2,16 +2,7 @@
 
 from __future__ import annotations
 
-
-def normalize_symbols(symbols: list[str]) -> list[str]:
-    normalized = []
-    seen = set()
-    for symbol in symbols:
-        ticker = str(symbol).upper().strip()
-        if ticker and ticker not in seen:
-            normalized.append(ticker)
-            seen.add(ticker)
-    return normalized
+from quant.core.symbols import normalize_symbols
 
 
 def exclude_symbol(

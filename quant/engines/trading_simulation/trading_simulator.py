@@ -11,9 +11,12 @@ import pandas as pd
 
 from quant.engines.alpha.alpha_engine import AlphaEngine
 from quant.config import DEFAULT_SYMBOLS
+from quant.core.collections import dedupe_text
+from quant.core.equity import equity_curve_stats
 from quant.engines.execution.cost_engine import CostEngine, DEFAULT_COST_CONFIG, TradeInput
 from quant.core.protocols.fill import Fill
 from quant.core.protocols.order import Order
+from quant.core.symbols import normalize_symbols
 from quant.data.fundamental.fundamental_store import FundamentalStore
 from quant.engines.execution.execution_constraints import DEFAULT_MARKET_REALISM_CONFIG, ExecutionConstraints
 from quant.engines.execution.liquidity_model import LiquidityModel
@@ -386,23 +389,15 @@ class TradingSimulator:
                 continue
             if constrained.rejected_quantity:
                 rejected_trades.append(self._rejected_trade(trade, constrained))
-            affordable = constrained.adjusted_quantity
-            estimate = None
-            while affordable > 0:
-                candidate = TradeInput(
-                    trade.symbol,
-                    trade.side,
-                    affordable,
-                    trade.price,
-                    average_daily_volume=liquidity.average_daily_volume,
-                    volatility=liquidity.volatility,
-                )
-                candidate_report = cost_engine.estimate([candidate], write_report=False)
-                event["warnings"].extend(candidate_report.warnings)
-                estimate = candidate_report.trades[0]
-                if estimate.notional + estimate.total_cost <= account.cash + 1e-9:
-                    break
-                affordable -= 1
+            affordable, estimate, estimate_warnings = self._max_affordable_buy(
+                cost_engine=cost_engine,
+                trade=trade,
+                max_shares=constrained.adjusted_quantity,
+                cash=account.cash,
+                average_daily_volume=liquidity.average_daily_volume,
+                volatility=liquidity.volatility,
+            )
+            event["warnings"].extend(estimate_warnings)
             if affordable <= 0 or estimate is None:
                 event["warnings"].append(f"insufficient cash to buy {trade.symbol}")
                 rejected_trades.append(
@@ -450,6 +445,7 @@ class TradingSimulator:
             fills=protocol_fills,
         )
         event["warnings"].extend(f"protocol validation: {error}" for error in account_state.validate())
+        deduped_warnings = self._dedupe(event["warnings"])
         return event | {
             "executed_trades": executed,
             "cash_before": before.cash,
@@ -459,9 +455,44 @@ class TradingSimulator:
             "cost_paid": round(sum(trade.get("total_cost", 0.0) for trade in executed), 6),
             "liquidity": liquidity_snapshots,
             "rejected_trades": rejected_trades,
-            "execution_warnings": self._dedupe(event["warnings"]),
-            "warnings": self._dedupe(event["warnings"]),
+            "execution_warnings": deduped_warnings,
+            "warnings": deduped_warnings,
         }
+
+    @staticmethod
+    def _max_affordable_buy(
+        cost_engine: CostEngine,
+        trade: TradeInput,
+        max_shares: int,
+        cash: float,
+        average_daily_volume: float | None,
+        volatility: float | None,
+    ):
+        if max_shares <= 0:
+            return 0, None, []
+        best_estimate = None
+        best_warnings: list[str] = []
+        low = 1
+        high = int(max_shares)
+        while low <= high:
+            shares = (low + high) // 2
+            candidate = TradeInput(
+                trade.symbol,
+                trade.side,
+                shares,
+                trade.price,
+                average_daily_volume=average_daily_volume,
+                volatility=volatility,
+            )
+            candidate_report = cost_engine.estimate([candidate], write_report=False)
+            estimate = candidate_report.trades[0]
+            if estimate.notional + estimate.total_cost <= cash + 1e-9:
+                best_estimate = estimate
+                best_warnings = list(candidate_report.warnings)
+                low = shares + 1
+            else:
+                high = shares - 1
+        return high, best_estimate, best_warnings
 
     def _constrain_trade(
         self,
@@ -592,53 +623,30 @@ class TradingSimulator:
                 "max_drawdown": None,
                 "total_cost": total_cost,
             }
-        series = pd.Series(
-            [row["equity"] for row in equity_curve],
-            index=pd.to_datetime([row["date"] for row in equity_curve]),
-            dtype="float64",
+        stats = equity_curve_stats(
+            equity_curve,
+            initial_cash,
+            min_return_count_for_volatility=2,
+            empty_volatility=None,
+            empty_sharpe=None,
+            nonpositive_annual_return=-1.0,
         )
-        final_equity = float(series.iloc[-1])
-        total_return = final_equity / initial_cash - 1.0
-        returns = series.pct_change().dropna()
-        years = max((series.index[-1] - series.index[0]).days / 365.25, 1 / 365.25)
-        annual_return = (final_equity / initial_cash) ** (1 / years) - 1.0 if final_equity > 0 else -1.0
-        volatility = float(returns.std() * (252 ** 0.5)) if len(returns) > 1 else None
-        sharpe = float((returns.mean() / returns.std()) * (252 ** 0.5)) if len(returns) > 1 and returns.std() > 0 else None
-        running_max = series.cummax()
-        drawdowns = series / running_max - 1.0
-        max_drawdown = float(drawdowns.min()) if not drawdowns.empty else None
         return {
-            "total_return": round(total_return, 10),
-            "annual_return": round(float(annual_return), 10),
-            "volatility": round(volatility, 10) if volatility is not None else None,
-            "sharpe": round(sharpe, 10) if sharpe is not None else None,
-            "max_drawdown": round(max_drawdown, 10) if max_drawdown is not None else None,
+            "total_return": round(stats.total_return, 10),
+            "annual_return": round(stats.annual_return, 10),
+            "volatility": round(stats.volatility, 10) if stats.volatility is not None else None,
+            "sharpe": round(stats.sharpe, 10) if stats.sharpe is not None else None,
+            "max_drawdown": round(stats.max_drawdown, 10) if stats.max_drawdown is not None else None,
             "total_cost": round(total_cost, 6),
         }
 
     @staticmethod
     def _normalize_symbols(symbols: list[str]) -> list[str]:
-        normalized = []
-        seen = set()
-        for symbol in symbols:
-            ticker = str(symbol).upper().strip()
-            if ticker and ticker not in seen and ticker != "CASH":
-                normalized.append(ticker)
-                seen.add(ticker)
-        if not normalized:
-            raise ValueError("at least one symbol is required")
-        return normalized
+        return normalize_symbols(symbols, exclude={"CASH"}, require_non_empty=True)
 
     @staticmethod
     def _dedupe(values: list[str]) -> list[str]:
-        output = []
-        seen = set()
-        for value in values:
-            text = str(value)
-            if text and text not in seen:
-                output.append(text)
-                seen.add(text)
-        return output
+        return dedupe_text(values)
 
     @staticmethod
     def _normalize_market_realism_config(market_realism_config: Mapping | None, cost_config: Mapping | None) -> dict:

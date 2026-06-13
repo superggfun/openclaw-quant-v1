@@ -6,6 +6,7 @@ from collections import defaultdict
 from datetime import date, datetime
 from typing import Any
 
+from quant.core.symbols import normalize_symbols
 from quant.data.fundamental.fundamental_models import STATEMENT_FIELDS
 from quant.data.fundamental.fundamental_store import FundamentalStore
 
@@ -151,14 +152,7 @@ class FundamentalQualityAnalyzer:
 
     @staticmethod
     def _normalize_symbols(symbols: list[str]) -> list[str]:
-        output = []
-        seen = set()
-        for symbol in symbols:
-            ticker = symbol.upper().strip()
-            if ticker and ticker not in seen:
-                output.append(ticker)
-                seen.add(ticker)
-        return output
+        return normalize_symbols(symbols)
 
     @staticmethod
     def _warning(code: str, statement: str, symbol: str | None, message: str) -> dict:

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from quant.config import DEFAULT_SYMBOLS
+from quant.core.collections import dedupe_text
 from quant.data.fundamental.fundamental_service import FundamentalService
 from quant.data.layer.data_quality import DataQualityAnalyzer
 from quant.strategy_dsl.strategy_definition import StrategyDefinition
@@ -410,11 +411,4 @@ class StrategyGateRunner:
 
     @staticmethod
     def _dedupe(values: list[Any]) -> list[str]:
-        output = []
-        seen = set()
-        for value in values:
-            text = str(value)
-            if text and text not in seen:
-                output.append(text)
-                seen.add(text)
-        return output
+        return dedupe_text(values)

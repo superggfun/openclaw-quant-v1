@@ -9,6 +9,7 @@ from typing import Mapping
 import pandas as pd
 
 from quant.config import DEFAULT_SYMBOLS
+from quant.core.symbols import normalize_symbols
 from quant.engines.factor_pipeline.factor_pipeline import FactorPipeline
 from quant.factors.price.factor_registry import FactorRegistry
 from quant.data.fundamental.fundamental_store import FundamentalStore
@@ -768,14 +769,7 @@ class AlphaEngine:
 
     @staticmethod
     def _normalize_symbols(symbols: list[str]) -> list[str]:
-        normalized = []
-        seen = set()
-        for symbol in symbols:
-            ticker = str(symbol).upper().strip()
-            if ticker and ticker not in seen:
-                normalized.append(ticker)
-                seen.add(ticker)
-        return normalized
+        return normalize_symbols(symbols)
 
     def _factor_definitions_for_row(self, factor_names: list[str] | None):
         if factor_names is None:

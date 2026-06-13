@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from quant.config import DEFAULT_SYMBOLS
+from quant.core.symbols import normalize_symbols
 from quant.data.layer.symbol_metadata import SymbolMetadata, SymbolMetadataStore
 from quant.data.providers import DataProvider
 
@@ -71,13 +72,8 @@ class UniverseManager:
         selected: list[str] = []
         excluded: list[str] = []
         reasons: dict[str, str] = {}
-        seen = set()
 
-        for symbol in requested:
-            ticker = symbol.upper().strip()
-            if not ticker or ticker in seen:
-                continue
-            seen.add(ticker)
+        for ticker in normalize_symbols(requested):
             metadata = self._metadata_for(ticker)
             if not metadata:
                 excluded.append(ticker)

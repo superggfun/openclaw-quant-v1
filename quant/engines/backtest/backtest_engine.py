@@ -10,6 +10,8 @@ import pandas as pd
 
 from quant.engines.alpha.alpha_engine import AlphaEngine
 from quant.config import DEFAULT_SYMBOLS
+from quant.core.equity import equity_curve_stats
+from quant.core.symbols import normalize_symbols
 from quant.engines.execution.cost_engine import CostEngine, TradeInput
 from quant.engines.portfolio.optimizer_engine import DEFAULT_CONSTRAINTS
 from quant.engines.risk.risk_engine import DEFAULT_INDUSTRY_MAP
@@ -161,16 +163,16 @@ class PortfolioBacktestEngine:
                 gross_trade_value += sum(trade.notional for trade in day_trades)
                 total_cost += sum(trade.total_cost for trade in day_trades)
 
-            equity = cash + sum(positions[symbol] * price_map[symbol] for symbol in active_symbols)
             equity_curve.append(
-                {
-                    "date": date_text,
-                    "cash": cash,
-                    "equity": equity,
-                    "positions": dict(positions),
-                    "last_signal_date": date_text,
-                    "last_execution_date": date_text,
-                }
+                self._equity_point(
+                    date_text=date_text,
+                    cash=cash,
+                    positions=positions,
+                    prices=price_map,
+                    symbols=active_symbols,
+                    last_signal_date=date_text,
+                    last_execution_date=date_text,
+                )
             )
 
         metrics = self._metrics(
@@ -289,17 +291,16 @@ class PortfolioBacktestEngine:
                     )
                     last_signal_date = signal_date
 
-            price_map = {symbol: float(prices[symbol]) for symbol in active_symbols}
-            equity = cash + sum(positions[symbol] * price_map[symbol] for symbol in active_symbols)
             equity_curve.append(
-                {
-                    "date": date_text,
-                    "cash": cash,
-                    "equity": equity,
-                    "positions": dict(positions),
-                    "last_signal_date": last_signal_date,
-                    "last_execution_date": last_execution_date,
-                }
+                self._equity_point(
+                    date_text=date_text,
+                    cash=cash,
+                    positions=positions,
+                    prices={symbol: float(prices[symbol]) for symbol in active_symbols},
+                    symbols=active_symbols,
+                    last_signal_date=last_signal_date,
+                    last_execution_date=last_execution_date,
+                )
             )
 
         metrics = self._metrics(
@@ -359,6 +360,25 @@ class PortfolioBacktestEngine:
                     "close": float(row["close"]),
                 }
         return lookup
+
+    @staticmethod
+    def _equity_point(
+        date_text: str,
+        cash: float,
+        positions: dict[str, int],
+        prices: dict[str, float],
+        symbols: list[str],
+        last_signal_date: str | None,
+        last_execution_date: str | None,
+    ) -> dict:
+        return {
+            "date": date_text,
+            "cash": cash,
+            "equity": cash + sum(positions[symbol] * prices[symbol] for symbol in symbols),
+            "positions": dict(positions),
+            "last_signal_date": last_signal_date,
+            "last_execution_date": last_execution_date,
+        }
 
     def _target_weights(
         self,
@@ -587,31 +607,25 @@ class PortfolioBacktestEngine:
         total_cost: float,
         trade_count: int,
     ) -> PortfolioBacktestMetrics:
-        equities = pd.Series([point["equity"] for point in equity_curve], dtype="float64")
-        returns = equities.pct_change().dropna()
-        final_value = float(equities.iloc[-1])
-        total_return = (final_value / initial_cash) - 1.0
-        start_date = pd.to_datetime(equity_curve[0]["date"])
-        end_date = pd.to_datetime(equity_curve[-1]["date"])
-        years = max((end_date - start_date).days / 365.25, 1 / 365.25)
-        annual_return = (final_value / initial_cash) ** (1 / years) - 1.0
-        drawdowns = (equities / equities.cummax()) - 1.0
-        volatility = float(returns.std() * math.sqrt(252)) if not returns.empty else 0.0
-        sharpe_ratio = 0.0
-        if not returns.empty and returns.std() != 0 and not pd.isna(returns.std()):
-            sharpe_ratio = float((returns.mean() / returns.std()) * math.sqrt(252))
+        stats = equity_curve_stats(
+            equity_curve,
+            initial_cash,
+            min_return_count_for_volatility=1,
+            empty_volatility=0.0,
+            empty_sharpe=0.0,
+        )
 
         return PortfolioBacktestMetrics(
-            final_value=final_value,
-            total_return=float(total_return),
-            annual_return=float(annual_return),
-            max_drawdown=abs(float(drawdowns.min())),
-            volatility=volatility,
-            sharpe_ratio=sharpe_ratio,
+            final_value=stats.final_value,
+            total_return=stats.total_return,
+            annual_return=stats.annual_return,
+            max_drawdown=abs(float(stats.max_drawdown or 0.0)),
+            volatility=float(stats.volatility or 0.0),
+            sharpe_ratio=float(stats.sharpe or 0.0),
             trade_count=trade_count,
             turnover=float(gross_trade_value / initial_cash),
             total_cost=float(total_cost),
-            cash_ratio=float(equity_curve[-1]["cash"] / final_value) if final_value else 0.0,
+            cash_ratio=float(equity_curve[-1]["cash"] / stats.final_value) if stats.final_value else 0.0,
         )
 
     @staticmethod
@@ -641,14 +655,7 @@ class PortfolioBacktestEngine:
 
     @staticmethod
     def _normalize_symbols(symbols: list[str]) -> list[str]:
-        normalized = []
-        seen = set()
-        for symbol in symbols:
-            ticker = symbol.upper().strip()
-            if ticker and ticker not in seen:
-                normalized.append(ticker)
-                seen.add(ticker)
-        return normalized
+        return normalize_symbols(symbols)
 
     @staticmethod
     def _normalize_constraints(constraints: dict) -> dict:

@@ -11,6 +11,8 @@ import pandas as pd
 
 from quant.engines.backtest.backtest_engine import PortfolioBacktestEngine
 from quant.config import DEFAULT_SYMBOLS
+from quant.core.collections import dedupe_by
+from quant.core.symbols import normalize_symbols
 from quant.engines.factor_backtest.factor_backtest import FactorBacktest
 from quant.factors.price.factor_registry import FactorRegistry
 from quant.data.fundamental.fundamental_store import FundamentalStore
@@ -613,25 +615,11 @@ class WalkForwardEngine:
 
     @staticmethod
     def _dedupe_warnings(warnings: list[dict[str, str]]) -> list[dict[str, str]]:
-        output = []
-        seen = set()
-        for warning in warnings:
-            key = (warning["code"], warning["reason"])
-            if key not in seen:
-                output.append(warning)
-                seen.add(key)
-        return output
+        return dedupe_by(warnings, ("code", "reason"))
 
     @staticmethod
     def _normalize_symbols(symbols: list[str]) -> list[str]:
-        output = []
-        seen = set()
-        for symbol in symbols:
-            ticker = str(symbol).upper().strip()
-            if ticker and ticker not in seen:
-                output.append(ticker)
-                seen.add(ticker)
-        return output
+        return normalize_symbols(symbols)
 
     def _write_report(self, result: WalkForwardResult) -> Path:
         strategy = str((result.parameters or {}).get("strategy") or "walk_forward")
