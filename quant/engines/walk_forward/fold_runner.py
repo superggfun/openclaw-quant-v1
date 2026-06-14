@@ -171,10 +171,11 @@ def _with_fold_warnings(fold: WalkForwardFold, strategy: str) -> WalkForwardFold
 
 
 def factor_stability_worker(task: dict) -> tuple:
-    """Compute factor IC for one (factor, window) pair in a worker process."""
+    """Compute factor IC for one (factor, window) pair using FactorMatrixBuilder (vectorized)."""
     from quant.storage.sqlite_store import SQLitePriceStore
     from quant.data.fundamental.fundamental_store import FundamentalStore
     from quant.factors.price.factor_registry import FactorRegistry
+    from quant.factor_acceleration import FactorMatrixBuilder
     import pandas as pd
 
     db_path = Path(task["db_path"])
@@ -182,37 +183,23 @@ def factor_stability_worker(task: dict) -> tuple:
     fundamental_store = FundamentalStore(db_path)
     factor_registry = FactorRegistry(fundamental_store)
 
-    rows = []
-    for symbol in task["symbols"]:
-        history = price_store.get_price_history(symbol)
-        if history.empty:
-            continue
-        history = history.sort_values("date").reset_index(drop=True)
-        history["close"] = pd.to_numeric(history["close"], errors="coerce")
-        history = history.dropna(subset=["close"]).reset_index(drop=True)
-        for index in range(len(history)):
-            signal_date = str(history.iloc[index]["date"])
-            if signal_date < task["start"] or signal_date > task["end"]:
-                continue
-            future_index = index + task["forward_days"]
-            if future_index >= len(history):
-                continue
-            factor_value = factor_registry.factor_value(
-                history.iloc[: index + 1]["close"],
-                task["factor"],
-                symbol=symbol,
-                as_of_date=signal_date,
-            )
-            if factor_value is None or pd.isna(factor_value):
-                continue
-            signal_close = float(history.iloc[index]["close"])
-            future_close = float(history.iloc[future_index]["close"])
-            rows.append({
-                "signal_date": signal_date,
-                "symbol": symbol,
-                "factor_value": float(factor_value),
-                "future_return": (future_close / signal_close) - 1.0,
-            })
+    matrix = FactorMatrixBuilder(price_store, factor_registry).build(
+        factor=task["factor"],
+        symbols=task["symbols"],
+        start=task["start"],
+        end=task["end"],
+        forward_days=task["forward_days"],
+    )
+
+    rows = [
+        {
+            "signal_date": row.signal_date,
+            "symbol": row.symbol,
+            "factor_value": row.factor_value,
+            "future_return": row.future_return,
+        }
+        for row in matrix.valid_rows
+    ]
 
     if not rows:
         return (task["factor"], task["window_idx"], None, None)

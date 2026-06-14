@@ -162,11 +162,12 @@ Research-validation charts, sub-step reports, batch artifacts, intermediate repo
 ```bash
 python -m quant.cli performance-profile
 python -m quant.cli performance-profile --target factor_eval --factor momentum_20d --max-symbols 5
+python -m quant.cli hpc-benchmark --factor momentum_20d --workers 1 --workers 4
 python -m quant.cli performance-summary
 python -m quant.cli performance-report
 ```
 
-`performance-profile` is the v0.40 measurement-only workflow. It records runtime by target, slowest modules, slowest functions, store/query timing, and recommendations. It does not optimize, tune, parallelize, change schemas, or change quant semantics.
+`performance-profile` is the measurement-only workflow. It records runtime by target, slowest modules, slowest functions, store/query timing, provider metadata, fallback diagnostics, and recommendations. `hpc-benchmark` compares the serial reference, SQLite bulk, and strict InMemory bulk factor paths without changing quant semantics.
 
 ## Strategy DSL
 

@@ -41,23 +41,16 @@ DEFAULT_STABILITY_FACTORS = [
     "fundamental_composite_score",
 ]
 
-@dataclass(frozen=True)
-class WalkForwardFoldTask:
-    """Serializable task for parallel fold execution."""
-    index: int
-    strategy: str
-    factor: str
-    train_start: str
-    train_end: str
-    test_start: str
-    test_end: str
-    symbols: list[str]
-    initial_cash: float
-    rebalance_frequency: str
-    alpha_config: dict | None
-    pipeline_config: dict | None
-    db_path: str
-    report_dir: str
+# Module-level helper for row counting in purge/embargo reporting
+
+def _count_price_rows(price_store, symbols: list[str], start: str, end: str) -> int:
+    """Count unique trading days across all symbols in a date range."""
+    dates = set()
+    for symbol in symbols:
+        history = price_store.get_price_history(symbol, start=start, end=end)
+        if not history.empty and "date" in history.columns:
+            dates.update(str(d) for d in history["date"])
+    return len(dates)
 
 
 # Module-level worker for ProcessPoolExecutor (must be picklable)
@@ -78,6 +71,8 @@ def _run_fold_worker(task):
     if task.strategy == "alpha":
         config = dict(task.alpha_config or {})
         config["universe"] = task.symbols
+        if task.factor and not config.get("factor_weights") and not config.get("multi_factor"):
+            config["factor_weights"] = {task.factor: 1.0}
         engine = PortfolioBacktestEngine(price_store, report_dir=report_dir)
         train = engine.run(
             start=task.train_start,
@@ -97,6 +92,22 @@ def _run_fold_worker(task):
             alpha_config=config,
             alpha_pipeline_config=task.pipeline_config,
         )
+        # Compute purge/embargo row counts
+        purge_days = task.purge_days
+        embargo_days = task.embargo_days
+        effective_train_rows = _count_price_rows(price_store, task.symbols, task.train_start, task.train_end)
+        effective_test_rows = _count_price_rows(price_store, task.symbols, task.test_start, task.test_end)
+        import pandas as _pd
+        raw_train_end = _pd.Timestamp(task.train_end) + _pd.Timedelta(days=purge_days)
+        removed_by_purge = 0
+        if purge_days > 0:
+            purge_start = (_pd.Timestamp(task.train_end) + _pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+            removed_by_purge = _count_price_rows(price_store, task.symbols, purge_start, raw_train_end.strftime("%Y-%m-%d"))
+        removed_by_embargo = 0
+        if embargo_days > 0:
+            embargo_start = (raw_train_end + _pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+            embargo_end = (_pd.Timestamp(task.test_start) - _pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+            removed_by_embargo = _count_price_rows(price_store, task.symbols, embargo_start, embargo_end)
         fold = WalkForwardFold(
             fold=task.index,
             fold_id=f"fold_{task.index:03d}",
@@ -139,6 +150,22 @@ def _run_fold_worker(task):
             universe=task.symbols,
             pipeline_config=task.pipeline_config,
         )
+        # Compute purge/embargo row counts
+        import pandas as _pd
+        purge_days = task.purge_days
+        embargo_days = task.embargo_days
+        effective_train_rows = _count_price_rows(price_store, task.symbols, task.train_start, task.train_end)
+        effective_test_rows = _count_price_rows(price_store, task.symbols, task.test_start, task.test_end)
+        raw_train_end = _pd.Timestamp(task.train_end) + _pd.Timedelta(days=purge_days)
+        removed_by_purge = 0
+        if purge_days > 0:
+            purge_start = (_pd.Timestamp(task.train_end) + _pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+            removed_by_purge = _count_price_rows(price_store, task.symbols, purge_start, raw_train_end.strftime("%Y-%m-%d"))
+        removed_by_embargo = 0
+        if embargo_days > 0:
+            embargo_start = (raw_train_end + _pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+            embargo_end = (_pd.Timestamp(task.test_start) - _pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+            removed_by_embargo = _count_price_rows(price_store, task.symbols, embargo_start, embargo_end)
         fold = WalkForwardFold(
             fold=task.index,
             fold_id=f"fold_{task.index:03d}",
@@ -161,6 +188,12 @@ def _run_fold_worker(task):
             test_report=test.report_path,
             no_lookahead=bool(train.no_lookahead and test.no_lookahead),
             fold_warnings=[],
+            purge_days=purge_days,
+            embargo_days=embargo_days,
+            removed_by_purge=removed_by_purge,
+            removed_by_embargo=removed_by_embargo,
+            effective_train_rows=effective_train_rows,
+            effective_test_rows=effective_test_rows,
         )
         return _with_fold_warnings_worker(fold, strategy="factor_long_short")
 
@@ -216,32 +249,13 @@ def _with_fold_warnings_worker(fold, strategy):
         test_report=fold.test_report,
         no_lookahead=fold.no_lookahead,
         fold_warnings=warnings_list,
+        purge_days=getattr(fold, "purge_days", 0),
+        embargo_days=getattr(fold, "embargo_days", 0),
+        removed_by_purge=getattr(fold, "removed_by_purge", 0),
+        removed_by_embargo=getattr(fold, "removed_by_embargo", 0),
+        effective_train_rows=getattr(fold, "effective_train_rows", 0),
+        effective_test_rows=getattr(fold, "effective_test_rows", 0),
     )
-
-@dataclass(frozen=True)
-class WalkForwardFold:
-    fold: int
-    fold_id: str
-    train_start: str
-    train_end: str
-    test_start: str
-    test_end: str
-    train_return: float | None
-    test_return: float | None
-    train_sharpe: float | None
-    test_sharpe: float | None
-    train_max_drawdown: float | None
-    test_max_drawdown: float | None
-    ic: float | None
-    rank_ic: float | None
-    icir: float | None
-    turnover: float | None
-    cost: float | None
-    train_report: str | None
-    test_report: str | None
-    no_lookahead: bool
-    fold_warnings: list[dict[str, str]]
-
 
 @dataclass(frozen=True)
 class WalkForwardResult:
@@ -272,71 +286,7 @@ class WalkForwardResult:
 
 # Module-level worker for factor stability IC computation
 def _factor_stability_worker(task):
-    from pathlib import Path
-    from quant.storage.sqlite_store import SQLitePriceStore
-    from quant.data.fundamental.fundamental_store import FundamentalStore
-    from quant.factors.price.factor_registry import FactorRegistry
-    import pandas as pd
-    import numpy as np
-
-    db_path = Path(task["db_path"])
-    price_store = SQLitePriceStore(db_path)
-    fundamental_store = FundamentalStore(db_path)
-    factor_registry = FactorRegistry(fundamental_store)
-
-    rows = []
-    for symbol in task["symbols"]:
-        history = price_store.get_price_history(symbol)
-        if history.empty:
-            continue
-        history = history.sort_values("date").reset_index(drop=True)
-        history["close"] = pd.to_numeric(history["close"], errors="coerce")
-        history = history.dropna(subset=["close"]).reset_index(drop=True)
-        for index in range(len(history)):
-            signal_date = str(history.iloc[index]["date"])
-            if signal_date < task["start"] or signal_date > task["end"]:
-                continue
-            future_index = index + task["forward_days"]
-            if future_index >= len(history):
-                continue
-            factor_value = factor_registry.factor_value(
-                history.iloc[: index + 1]["close"],
-                task["factor"],
-                symbol=symbol,
-                as_of_date=signal_date,
-            )
-            if factor_value is None or pd.isna(factor_value):
-                continue
-            signal_close = float(history.iloc[index]["close"])
-            future_close = float(history.iloc[future_index]["close"])
-            rows.append({
-                "signal_date": signal_date,
-                "symbol": symbol,
-                "factor_value": float(factor_value),
-                "future_return": (future_close / signal_close) - 1.0,
-            })
-
-    if not rows:
-        return (task["factor"], task["window_idx"], None, None)
-
-    frame = pd.DataFrame(rows)
-    ic_values = []
-    rank_ic_values = []
-    for _, group in frame.groupby("signal_date"):
-        if len(group) < 2:
-            continue
-        if group["factor_value"].nunique() < 2 or group["future_return"].nunique() < 2:
-            continue
-        ic = group["factor_value"].corr(group["future_return"])
-        rank_ic = group["factor_value"].rank().corr(group["future_return"].rank())
-        if pd.notna(ic):
-            ic_values.append(float(ic))
-        if pd.notna(rank_ic):
-            rank_ic_values.append(float(rank_ic))
-
-    mean_ic = sum(ic_values) / len(ic_values) if ic_values else None
-    mean_rank_ic = sum(rank_ic_values) / len(rank_ic_values) if rank_ic_values else None
-    return (task["factor"], task["window_idx"], mean_ic, mean_rank_ic)
+    return factor_stability_worker(task)
 
 
 class WalkForwardEngine:
@@ -378,6 +328,16 @@ class WalkForwardEngine:
             raise ValueError("strategy must be one of: alpha, factor_long_short")
         if train_years <= 0 or test_years <= 0:
             raise ValueError("train_years and test_years must be positive")
+
+        # Auto-default purge_days to factor's forward_return_horizon if both are 0
+        if purge_days == 0 and embargo_days == 0:
+            try:
+                definition = self.factor_registry.describe(factor)
+                if definition.forward_return_horizon > 0:
+                    purge_days = definition.forward_return_horizon
+            except (ValueError, AttributeError):
+                pass
+
         symbols = self._normalize_symbols(universe or list(DEFAULT_SYMBOLS))
         start_date, end_date = self._date_range(symbols, start, end)
         fold_windows = self.generate_windows(start_date, end_date, train_years, test_years,
@@ -443,7 +403,7 @@ class WalkForwardEngine:
             },
             strategy=strategy,
             parameters={
-                "factor": factor if strategy == "factor_long_short" else None,
+                "factor": factor,
                 "validation_notes": (
                     "factor_long_short returns are research spread returns, not cash-account equity curves"
                     if strategy == "factor_long_short"
@@ -636,56 +596,28 @@ class WalkForwardEngine:
         end: str,
         forward_days: int,
     ) -> tuple[float | None, float | None]:
-        rows = []
-        for symbol in symbols:
-            history = self.price_store.get_price_history(symbol)
-            if history.empty:
-                continue
-            history = history.sort_values("date").reset_index(drop=True)
-            history["close"] = pd.to_numeric(history["close"], errors="coerce")
-            history = history.dropna(subset=["close"]).reset_index(drop=True)
-            for index in range(len(history)):
-                signal_date = str(history.iloc[index]["date"])
-                if signal_date < start or signal_date > end:
-                    continue
-                future_index = index + forward_days
-                if future_index >= len(history):
-                    continue
-                factor_value = self.factor_registry.factor_value(
-                    history.iloc[: index + 1]["close"],
-                    factor,
-                    symbol=symbol,
-                    as_of_date=signal_date,
-                )
-                if factor_value is None or pd.isna(factor_value):
-                    continue
-                signal_close = float(history.iloc[index]["close"])
-                future_close = float(history.iloc[future_index]["close"])
-                rows.append(
-                    {
-                        "signal_date": signal_date,
-                        "symbol": symbol,
-                        "factor_value": float(factor_value),
-                        "future_return": (future_close / signal_close) - 1.0,
-                    }
-                )
+        """Compute per-date IC / rank IC using FactorMatrixBuilder (vectorized)."""
+        from quant.factor_acceleration import FactorMatrixBuilder
+        matrix = FactorMatrixBuilder(self.price_store, self.factor_registry).build(
+            factor=factor,
+            symbols=symbols,
+            start=start,
+            end=end,
+            forward_days=forward_days,
+        )
+        rows = [
+            {
+                "signal_date": row.signal_date,
+                "symbol": row.symbol,
+                "factor_value": row.factor_value,
+                "future_return": row.future_return,
+            }
+            for row in matrix.valid_rows
+        ]
         if not rows:
             return None, None
         frame = pd.DataFrame(rows)
-        ic_values = []
-        rank_ic_values = []
-        for _, group in frame.groupby("signal_date"):
-            if len(group) < 2:
-                continue
-            if group["factor_value"].nunique() < 2 or group["future_return"].nunique() < 2:
-                continue
-            ic = group["factor_value"].corr(group["future_return"])
-            rank_ic = group["factor_value"].rank().corr(group["future_return"].rank())
-            if pd.notna(ic):
-                ic_values.append(float(ic))
-            if pd.notna(rank_ic):
-                rank_ic_values.append(float(rank_ic))
-        return self._mean(ic_values), self._mean(rank_ic_values)
+        return self._compute_ic_from_frame(frame)
 
 
     def _run_folds_parallel(
@@ -721,6 +653,8 @@ class WalkForwardEngine:
                 pipeline_config=dict(pipeline_config) if pipeline_config else None,
                 db_path=str(self.price_store.db_path),
                 report_dir=str(self.report_dir),
+                purge_days=w.get("purge_days", 0),
+                embargo_days=w.get("embargo_days", 0),
             ))
 
         results = []
@@ -756,7 +690,7 @@ class WalkForwardEngine:
         pipeline_config: dict | None,
     ) -> WalkForwardFold:
         if strategy == "alpha":
-            return self._run_alpha_fold(index, window, symbols, initial_cash, rebalance_frequency, alpha_config, pipeline_config)
+            return self._run_alpha_fold(index, window, symbols, initial_cash, rebalance_frequency, alpha_config, pipeline_config, factor)
         return self._run_factor_fold(index, factor, window, symbols, pipeline_config)
 
     def _run_alpha_fold(
@@ -768,9 +702,12 @@ class WalkForwardEngine:
         rebalance_frequency: str,
         alpha_config: dict | None,
         pipeline_config: dict | None,
+        factor: str = "",
     ) -> WalkForwardFold:
         config = dict(alpha_config or {})
         config["universe"] = symbols
+        if factor and not config.get("factor_weights") and not config.get("multi_factor"):
+            config["factor_weights"] = {factor: 1.0}
         engine = PortfolioBacktestEngine(self.price_store, report_dir=self.report_dir)
         train = engine.run(
             start=window["train_start"],
@@ -790,6 +727,17 @@ class WalkForwardEngine:
             alpha_config=config,
             alpha_pipeline_config=pipeline_config,
         )
+        # Compute row counts for purge/embargo reporting
+        e_train = _count_price_rows(self.price_store, symbols, window["train_start"], window["train_end"])
+        e_test = _count_price_rows(self.price_store, symbols, window["test_start"], window["test_end"])
+        pd = window.get("purge_days", 0)
+        ed = window.get("embargo_days", 0)
+        r_purge = 0
+        if pd > 0 and "train_end_raw" in window:
+            import pandas as _pd2
+            purge_start = (_pd2.Timestamp(window["train_end"]) + _pd2.Timedelta(days=1)).strftime("%Y-%m-%d")
+            r_purge = _count_price_rows(self.price_store, symbols, purge_start, window["train_end_raw"])
+        r_embargo = ed  # embargo calendar days = embargo gap
         fold = WalkForwardFold(
             fold=index,
             fold_id=f"fold_{index:03d}",
@@ -812,6 +760,12 @@ class WalkForwardEngine:
             test_report=test.report_path,
             no_lookahead=bool(train.no_lookahead and test.no_lookahead),
             fold_warnings=[],
+            purge_days=pd,
+            embargo_days=ed,
+            removed_by_purge=r_purge,
+            removed_by_embargo=r_embargo,
+            effective_train_rows=e_train,
+            effective_test_rows=e_test,
         )
         return self._with_fold_warnings(fold, strategy="alpha")
 
@@ -840,6 +794,21 @@ class WalkForwardEngine:
             universe=symbols,
             pipeline_config=pipeline_config,
         )
+        # Compute purge/embargo row counts
+        purge_days = int(window.get("purge_days", 0))
+        embargo_days = int(window.get("embargo_days", 0))
+        effective_train_rows = _count_price_rows(self.price_store, symbols, window["train_start"], window["train_end"])
+        effective_test_rows = _count_price_rows(self.price_store, symbols, window["test_start"], window["test_end"])
+        raw_train_end = pd.Timestamp(window["train_end"]) + pd.Timedelta(days=purge_days)
+        removed_by_purge = 0
+        if purge_days > 0:
+            purge_start = (pd.Timestamp(window["train_end"]) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+            removed_by_purge = _count_price_rows(self.price_store, symbols, purge_start, raw_train_end.strftime("%Y-%m-%d"))
+        removed_by_embargo = 0
+        if embargo_days > 0:
+            embargo_start = (raw_train_end + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+            embargo_end = (pd.Timestamp(window["test_start"]) - pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+            removed_by_embargo = _count_price_rows(self.price_store, symbols, embargo_start, embargo_end)
         fold = WalkForwardFold(
             fold=index,
             fold_id=f"fold_{index:03d}",
@@ -862,6 +831,12 @@ class WalkForwardEngine:
             test_report=test.report_path,
             no_lookahead=bool(train.no_lookahead and test.no_lookahead),
             fold_warnings=[],
+            purge_days=purge_days,
+            embargo_days=embargo_days,
+            removed_by_purge=removed_by_purge,
+            removed_by_embargo=removed_by_embargo,
+            effective_train_rows=effective_train_rows,
+            effective_test_rows=effective_test_rows,
         )
         return self._with_fold_warnings(fold, strategy="factor_long_short")
 
@@ -973,6 +948,12 @@ class WalkForwardEngine:
             test_report=fold.test_report,
             no_lookahead=fold.no_lookahead,
             fold_warnings=warnings,
+            purge_days=getattr(fold, "purge_days", 0),
+            embargo_days=getattr(fold, "embargo_days", 0),
+            removed_by_purge=getattr(fold, "removed_by_purge", 0),
+            removed_by_embargo=getattr(fold, "removed_by_embargo", 0),
+            effective_train_rows=getattr(fold, "effective_train_rows", 0),
+            effective_test_rows=getattr(fold, "effective_test_rows", 0),
         )
 
     @staticmethod
@@ -989,6 +970,26 @@ class WalkForwardEngine:
         if ranking:
             recommendations.append(f"prioritize stable factors such as {ranking[0]['factor']}")
         return recommendations
+
+    @staticmethod
+    def _compute_ic_from_frame(frame: pd.DataFrame) -> tuple[float | None, float | None]:
+        """Compute mean IC and mean rank IC from a DataFrame of per-day observations."""
+        ic_values = []
+        rank_ic_values = []
+        for _, group in frame.groupby("signal_date"):
+            if len(group) < 2:
+                continue
+            if group["factor_value"].nunique() < 2 or group["future_return"].nunique() < 2:
+                continue
+            ic = group["factor_value"].corr(group["future_return"])
+            rank_ic = group["factor_value"].rank().corr(group["future_return"].rank())
+            if pd.notna(ic):
+                ic_values.append(float(ic))
+            if pd.notna(rank_ic):
+                rank_ic_values.append(float(rank_ic))
+        mean_ic = sum(ic_values) / len(ic_values) if ic_values else None
+        mean_rank_ic = sum(rank_ic_values) / len(rank_ic_values) if rank_ic_values else None
+        return mean_ic, mean_rank_ic
 
     @staticmethod
     def _stability_score(ic_values: list[float], rank_ic_values: list[float]) -> float | None:
@@ -1026,7 +1027,70 @@ class WalkForwardEngine:
 
     def _write_report(self, result: WalkForwardResult) -> Path:
         strategy = str((result.parameters or {}).get("strategy") or "walk_forward")
-        return write_json_report(
+        json_path = write_json_report(
             generate_report_path(self.report_dir, f"walk_forward_{strategy}", unique=True),
             result.to_report(),
         )
+        # Also write a human-readable summary markdown
+        self._write_summary_markdown(result, json_path)
+        return json_path
+
+    @staticmethod
+    def _write_summary_markdown(result: WalkForwardResult, json_path: Path) -> None:
+        md_path = json_path.with_suffix(".md")
+        params = result.parameters or {}
+        purge_days = params.get("purge_days", 0)
+        embargo_days = params.get("embargo_days", 0)
+        folds = result.folds
+
+        lines = [
+            f"# Walk-Forward Report: {params.get('factor', 'unknown')}",
+            "",
+            f"- **Strategy**: {params.get('strategy', 'unknown')}",
+            f"- **Period**: {params.get('start', '?')} → {params.get('end', '?')}",
+            f"- **Train/Test**: {params.get('train_years', '?')}y / {params.get('test_years', '?')}y",
+            f"- **Folds**: {len(folds)}",
+            "",
+            "## Purge / Embargo Validation",
+            "",
+            f"| Parameter | Value |",
+            f"|-----------|-------|",
+            f"| purge_days | {purge_days} |",
+            f"| embargo_days | {embargo_days} |",
+            "",
+            "| Fold | Train | Train End | Test Start | Test End | Removed by Purge | Embargo Gap | Eff. Train Rows | Eff. Test Rows | Return | Sharpe |",
+            "|------|-------|-----------|------------|----------|-----------------|-------------|----------------|---------------|--------|--------|",
+        ]
+
+        for f in folds:
+            train_label = f"{f.train_start} → {f.train_end}"
+            test_label = f"{f.test_start} → {f.test_end}"
+            ret_str = f"{f.test_return*100:.1f}%" if f.test_return is not None else "N/A"
+            sh_str = f"{f.test_sharpe:.2f}" if f.test_sharpe is not None else "N/A"
+            lines.append(
+                f"| {f.fold} | {train_label} | {f.train_end} | {f.test_start} | {f.test_end} | "
+                f"{f.removed_by_purge} | {f.removed_by_embargo} | "
+                f"{f.effective_train_rows} | {f.effective_test_rows} | "
+                f"{ret_str} | {sh_str} |"
+            )
+
+        lines.append("")
+        lines.append("## No-Lookahead Certification")
+        lines.append("")
+        all_clean = all(f.no_lookahead for f in folds)
+        lines.append(f"- {'✅' if all_clean else '⚠️'} All folds certified no-lookahead: {'PASS' if all_clean else 'WARNINGS'}")
+        if purge_days > 0:
+            lines.append(f"- Purge window: {purge_days} calendar days removed from training")
+        if embargo_days > 0:
+            lines.append(f"- Embargo gap: {embargo_days} calendar days between train and test")
+
+        if result.recommendations:
+            lines.append("")
+            lines.append("## Recommendations")
+            for rec in result.recommendations:
+                lines.append(f"- {rec}")
+
+        lines.append("")
+        lines.append(f"*Report: [{json_path.name}]({json_path.name})*")
+
+        md_path.write_text("\n".join(lines), encoding="utf-8")

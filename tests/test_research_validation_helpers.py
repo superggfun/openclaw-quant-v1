@@ -48,6 +48,7 @@ def _minimal_report_input_kwargs(tmp_path: Path) -> dict:
         "bulk_matrix": False,
         "parallel": False,
         "worker_count": 1,
+        "matrix_workers": 4,
         "parallel_target": "factor_batch",
         "write_substep_reports": False,
         "write_batch_artifacts": False,

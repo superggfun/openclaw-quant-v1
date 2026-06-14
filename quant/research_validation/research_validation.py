@@ -1,4 +1,4 @@
-﻿"""Bounded research validation sprint orchestration."""
+"""Bounded research validation sprint orchestration."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ from quant.research_validation.models import (
     ResearchValidationRunOptions,
     ValidationStep,
 )
-from quant.research_validation.factor_phase import run_factor_validation_phase
+from quant.research_validation.factor_phase import FactorPhaseConfig, run_factor_validation_phase
 from quant.research_validation.regime_phase import run_regime_phase
 from quant.research_validation.ranking import factor_rankings, strategy_rankings
 from quant.research_validation.recommendations import recommendations as research_recommendations
@@ -115,62 +115,6 @@ class ResearchValidationRunner:
             workers=workers,
         )
 
-    def _normalize_options(
-        self,
-        mode: str,
-        start: str | None,
-        end: str | None,
-        max_factors: int | None,
-        max_strategies: int | None,
-        max_folds: int | None,
-        timeout_seconds: float | None,
-        batch_size: int | None,
-        max_symbols: int | None,
-        factor_family: str,
-        resume: bool,
-        skip_existing: bool,
-        use_cache: bool,
-        cache_stats: bool,
-        bulk_matrix: bool,
-        parallel: bool,
-        workers: int | None,
-        parallel_target: str,
-        charts: bool,
-        write_substep_reports: bool,
-        write_batch_artifacts: bool,
-        write_intermediate_reports: bool,
-        write_debug_logs: bool,
-        artifact_dir: str | Path | None,
-    ) -> ResearchValidationRunOptions:
-        return normalize_run_options(
-            config=self.config,
-            scope_planner=self.scope_planner,
-            mode=mode,
-            start=start,
-            end=end,
-            max_factors=max_factors,
-            max_strategies=max_strategies,
-            max_folds=max_folds,
-            timeout_seconds=timeout_seconds,
-            batch_size=batch_size,
-            max_symbols=max_symbols,
-            factor_family=factor_family,
-            resume=resume,
-            skip_existing=skip_existing,
-            use_cache=use_cache,
-            cache_stats=cache_stats,
-            bulk_matrix=bulk_matrix,
-            parallel=parallel,
-            workers=workers,
-            parallel_target=parallel_target,
-            charts=charts,
-            write_substep_reports=write_substep_reports,
-            write_batch_artifacts=write_batch_artifacts,
-            write_intermediate_reports=write_intermediate_reports,
-            write_debug_logs=write_debug_logs,
-            artifact_dir=artifact_dir,
-        )
-
     def _initialize_run_context(self, artifact_dir: str | Path | None) -> ResearchValidationRunContext:
         run_id = f"rv-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid4().hex[:8]}"
         run_dir = self._run_dir(run_id, artifact_dir)
@@ -201,7 +145,9 @@ class ResearchValidationRunner:
         skip_existing: bool = False,
         use_cache: bool = False,
         cache_stats: bool = False,
-        bulk_matrix: bool = False,
+        bulk_matrix: bool = True,
+        prefer_in_memory: bool = True,
+        strict_in_memory: bool = False,
         parallel: bool = False,
         workers: int | None = None,
         parallel_target: str = "factor_batch",
@@ -212,7 +158,9 @@ class ResearchValidationRunner:
         write_debug_logs: bool = False,
         artifact_dir: str | Path | None = None,
     ) -> dict[str, Any]:
-        options = self._normalize_options(
+        options = normalize_run_options(
+            config=self.config,
+            scope_planner=self.scope_planner,
             mode=mode,
             start=start,
             end=end,
@@ -228,6 +176,8 @@ class ResearchValidationRunner:
             use_cache=use_cache,
             cache_stats=cache_stats,
             bulk_matrix=bulk_matrix,
+            prefer_in_memory=prefer_in_memory,
+            strict_in_memory=strict_in_memory,
             parallel=parallel,
             workers=workers,
             parallel_target=parallel_target,
@@ -253,8 +203,11 @@ class ResearchValidationRunner:
         use_cache = options.use_cache
         cache_stats = options.cache_stats
         bulk_matrix = options.bulk_matrix
+        prefer_in_memory = options.prefer_in_memory
+        strict_in_memory = options.strict_in_memory
         parallel = options.parallel
         worker_count = options.worker_count
+        matrix_workers = options.matrix_workers
         parallel_target = options.parallel_target
         charts = options.charts
         write_substep_reports = options.write_substep_reports
@@ -302,20 +255,25 @@ class ResearchValidationRunner:
             state=phase_state,
             factors=factors,
             batches=batches,
-            started=started,
-            reserve_seconds=reserve_seconds,
-            timeout=timeout,
-            parallel=parallel,
-            worker_count=worker_count,
-            skip_existing=skip_existing,
-            resume=resume,
-            bulk_matrix=bulk_matrix,
-            effective_start=effective_start,
-            effective_end=effective_end,
-            write_substep_reports=write_substep_reports,
-            write_batch_artifacts=write_batch_artifacts,
-            substep_dir=substep_dir,
-            batch_artifact_dir=batch_artifact_dir,
+            config=FactorPhaseConfig(
+                started=started,
+                reserve_seconds=reserve_seconds,
+                timeout=timeout,
+                parallel=parallel,
+                worker_count=worker_count,
+                matrix_workers=matrix_workers,
+                skip_existing=skip_existing,
+                resume=resume,
+                bulk_matrix=bulk_matrix,
+                prefer_in_memory=prefer_in_memory,
+                strict_in_memory=strict_in_memory,
+                effective_start=effective_start,
+                effective_end=effective_end,
+                write_substep_reports=write_substep_reports,
+                write_batch_artifacts=write_batch_artifacts,
+                substep_dir=substep_dir,
+                batch_artifact_dir=batch_artifact_dir,
+            ),
         )
         regime_detection = run_regime_phase(
             self,
@@ -389,11 +347,16 @@ class ResearchValidationRunner:
         cache_summary_data = self._cache_summary(use_cache, cache_stats)
         performance_metadata = self._performance_metadata(
             bulk_matrix=bulk_matrix,
+            prefer_in_memory=prefer_in_memory,
+            strict_in_memory=strict_in_memory,
             parallel=parallel,
             factor_eval_serial=phase_state.factor_eval_serial,
             factor_backtest_serial=phase_state.factor_backtest_serial,
             worker_count=worker_count,
+            matrix_workers=matrix_workers,
             completed_batches=phase_state.completed_batches,
+            factor_eval_results=phase_state.factor_eval_results,
+            factor_backtest_results=phase_state.factor_backtest_results,
             parallel_compute_seconds=phase_state.parallel_compute_seconds,
             parallel_finalize_seconds=phase_state.parallel_finalize_seconds,
             factor_store_write_seconds=phase_state.factor_store_write_seconds,
@@ -430,6 +393,7 @@ class ResearchValidationRunner:
                 bulk_matrix=bulk_matrix,
                 parallel=parallel,
                 worker_count=worker_count,
+                matrix_workers=matrix_workers,
                 parallel_target=parallel_target,
                 write_substep_reports=write_substep_reports,
                 write_batch_artifacts=write_batch_artifacts,
@@ -510,11 +474,16 @@ class ResearchValidationRunner:
     def _performance_metadata(
         *,
         bulk_matrix: bool,
+        prefer_in_memory: bool,
+        strict_in_memory: bool,
         parallel: bool,
         factor_eval_serial: bool,
         factor_backtest_serial: bool,
         worker_count: int,
+        matrix_workers: int,
         completed_batches: list[dict[str, Any]],
+        factor_eval_results: list[dict[str, Any]],
+        factor_backtest_results: list[dict[str, Any]],
         parallel_compute_seconds: float,
         parallel_finalize_seconds: float,
         factor_store_write_seconds: float,
@@ -523,10 +492,42 @@ class ResearchValidationRunner:
         batch_write_summary: dict[str, Any],
         cache_summary_data: dict[str, Any],
     ) -> dict[str, Any]:
+        from quant.data.research_data_store import multiprocessing_start_method, platform_label
+
+        provider_summary = ResearchValidationRunner._provider_metadata_summary(
+            factor_eval_results,
+            factor_backtest_results,
+        )
         return {
             "bulk_matrix_enabled": bulk_matrix,
             "parallel_enabled": parallel and not factor_eval_serial and not factor_backtest_serial,
+            "provider_type": provider_summary.get("primary_provider_type") or ("bulk_matrix" if bulk_matrix else "serial_reference"),
+            "provider_types_used": provider_summary["provider_types_used"],
+            "preferred_provider_type": "in_memory" if prefer_in_memory else "sqlite",
+            "strict_in_memory": strict_in_memory,
+            "platform": provider_summary.get("primary_platform") or platform_label(),
+            "platforms_used": provider_summary["platforms_used"],
+            "multiprocessing_start_method": provider_summary.get("primary_multiprocessing_start_method") or multiprocessing_start_method(),
+            "multiprocessing_start_methods_used": provider_summary["multiprocessing_start_methods_used"],
+            "memory_preload_enabled": provider_summary["memory_preload_enabled_any"],
+            "memory_preload_enabled_any": provider_summary["memory_preload_enabled_any"],
+            "memory_preload_seconds": provider_summary["memory_preload_seconds_total"],
+            "memory_preload_seconds_total": provider_summary["memory_preload_seconds_total"],
+            "estimated_matrix_memory_mb": provider_summary["estimated_matrix_memory_mb_max"],
+            "estimated_matrix_memory_mb_max": provider_summary["estimated_matrix_memory_mb_max"],
+            "estimated_matrix_memory_mb_sum": provider_summary["estimated_matrix_memory_mb_sum"],
             "workers": worker_count,
+            "outer_workers": worker_count,
+            "requested_workers_used": provider_summary["requested_workers_used"],
+            "matrix_workers": matrix_workers,
+            "matrix_workers_used": provider_summary["matrix_workers_used"],
+            "matrix_build_seconds": provider_summary.get("matrix_build_seconds"),
+            "bulk_read_seconds": provider_summary.get("bulk_read_seconds"),
+            "fallback_used": provider_summary["fallback_count"] > 0,
+            "fallback_count": provider_summary["fallback_count"],
+            "fallback_reasons": provider_summary["fallback_reasons"],
+            "cache_strategy": provider_summary.get("primary_cache_strategy") or ("memory_first_bulk_matrix" if bulk_matrix else "sqlite_serial"),
+            "cache_strategies_used": provider_summary["cache_strategies_used"],
             "factor_batches": len(completed_batches),
             "parallel_compute_seconds": round(parallel_compute_seconds, 6),
             "parallel_finalize_seconds": round(parallel_finalize_seconds, 6),
@@ -541,6 +542,58 @@ class ResearchValidationRunner:
             "cache_misses": cache_summary_data.get("matrix_misses") or 0,
             "speedup_vs_baseline": None,
             "sqlite_writes": "main_process_only",
+        }
+
+    @staticmethod
+    def _provider_metadata_summary(
+        factor_eval_results: list[dict[str, Any]],
+        factor_backtest_results: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        metadata_rows = [
+            row.get("performance_metadata") or {}
+            for row in [*factor_eval_results, *factor_backtest_results]
+            if row.get("performance_metadata")
+        ]
+        provider_types = sorted({str(row.get("provider_type")) for row in metadata_rows if row.get("provider_type")})
+        cache_strategies = sorted({str(row.get("cache_strategy")) for row in metadata_rows if row.get("cache_strategy")})
+        platforms = sorted({str(row.get("platform")) for row in metadata_rows if row.get("platform")})
+        start_methods = sorted({str(row.get("multiprocessing_start_method")) for row in metadata_rows if row.get("multiprocessing_start_method")})
+        requested_workers = sorted({
+            int(row.get("requested_workers"))
+            for row in metadata_rows
+            if row.get("requested_workers") is not None
+        })
+        matrix_workers = sorted({
+            int(row.get("matrix_workers"))
+            for row in metadata_rows
+            if row.get("matrix_workers") is not None
+        })
+        fallback_rows = [row for row in metadata_rows if row.get("fallback_used")]
+        fallback_reasons = sorted({str(row.get("fallback_reason")) for row in fallback_rows if row.get("fallback_reason")})
+        matrix_build_values = [float(row["matrix_build_seconds"]) for row in metadata_rows if row.get("matrix_build_seconds") is not None]
+        bulk_read_values = [float(row["bulk_read_seconds"]) for row in metadata_rows if row.get("bulk_read_seconds") is not None]
+        memory_preload_values = [float(row["memory_preload_seconds"]) for row in metadata_rows if row.get("memory_preload_seconds") is not None]
+        estimated_memory_values = [float(row["estimated_matrix_memory_mb"]) for row in metadata_rows if row.get("estimated_matrix_memory_mb") is not None]
+        memory_preload_any = any(bool(row.get("memory_preload_enabled")) for row in metadata_rows)
+        return {
+            "primary_provider_type": provider_types[0] if len(provider_types) == 1 else None,
+            "provider_types_used": provider_types,
+            "primary_cache_strategy": cache_strategies[0] if len(cache_strategies) == 1 else None,
+            "cache_strategies_used": cache_strategies,
+            "primary_platform": platforms[0] if len(platforms) == 1 else None,
+            "platforms_used": platforms,
+            "primary_multiprocessing_start_method": start_methods[0] if len(start_methods) == 1 else None,
+            "multiprocessing_start_methods_used": start_methods,
+            "requested_workers_used": requested_workers,
+            "matrix_workers_used": matrix_workers,
+            "fallback_count": len(fallback_rows),
+            "fallback_reasons": fallback_reasons,
+            "matrix_build_seconds": round(sum(matrix_build_values), 6) if matrix_build_values else None,
+            "bulk_read_seconds": round(sum(bulk_read_values), 6) if bulk_read_values else None,
+            "memory_preload_enabled_any": memory_preload_any,
+            "memory_preload_seconds_total": round(sum(memory_preload_values), 6) if memory_preload_values else 0.0,
+            "estimated_matrix_memory_mb_max": round(max(estimated_memory_values), 6) if estimated_memory_values else None,
+            "estimated_matrix_memory_mb_sum": round(sum(estimated_memory_values), 6) if estimated_memory_values else None,
         }
 
     def _write_final_outputs(
@@ -599,14 +652,26 @@ class ResearchValidationRunner:
         universe: list[str] | None,
         start: str | None = None,
         end: str | None = None,
-        bulk_matrix: bool = False,
+        bulk_matrix: bool = True,
+        max_workers: int = 4,
+        prefer_in_memory: bool = True,
+        strict_in_memory: bool = False,
         write_report: bool = False,
         report_dir: str | Path | None = None,
     ) -> dict[str, Any]:
-        return run_factor_eval(self, factor, universe, start, end, bulk_matrix, write_report, report_dir)
-
-    def _finalize_factor_eval_result(self, result) -> dict[str, Any]:
-        return finalize_factor_eval_result(self, result)
+        return run_factor_eval(
+            self,
+            factor=factor,
+            universe=universe,
+            start=start,
+            end=end,
+            bulk_matrix=bulk_matrix,
+            max_workers=max_workers,
+            prefer_in_memory=prefer_in_memory,
+            strict_in_memory=strict_in_memory,
+            write_report=write_report,
+            report_dir=report_dir,
+        )
 
     def _cache_summary(self, use_cache: bool, cache_stats: bool) -> dict[str, Any]:
         return cache_summary(self, use_cache, cache_stats)
@@ -617,21 +682,30 @@ class ResearchValidationRunner:
         universe: list[str] | None,
         start: str | None = None,
         end: str | None = None,
-        bulk_matrix: bool = False,
+        bulk_matrix: bool = True,
+        max_workers: int = 4,
+        prefer_in_memory: bool = True,
+        strict_in_memory: bool = False,
         write_report: bool = False,
         write_batch_artifact: bool = False,
         report_dir: str | Path | None = None,
         artifact_dir: str | Path | None = None,
     ) -> dict[str, Any]:
-        return run_factor_backtest(self, factor, universe, start, end, bulk_matrix, write_report, write_batch_artifact, report_dir, artifact_dir)
-
-    def _finalize_factor_backtest_result(
-        self,
-        result,
-        write_batch_artifact: bool = False,
-        artifact_dir: str | Path | None = None,
-    ) -> dict[str, Any]:
-        return finalize_factor_backtest_result(self, result, write_batch_artifact, artifact_dir)
+        return run_factor_backtest(
+            self,
+            factor=factor,
+            universe=universe,
+            start=start,
+            end=end,
+            bulk_matrix=bulk_matrix,
+            max_workers=max_workers,
+            prefer_in_memory=prefer_in_memory,
+            strict_in_memory=strict_in_memory,
+            write_report=write_report,
+            write_batch_artifact=write_batch_artifact,
+            report_dir=report_dir,
+            artifact_dir=artifact_dir,
+        )
 
     def _compact_factor_eval_result(self, result, task: FactorBatchTask | None = None) -> dict[str, Any]:
         return compact_factor_eval_result(self, result, task)
@@ -646,10 +720,6 @@ class ResearchValidationRunner:
 
     def _write_batch_artifact(self, kind: str, task: FactorBatchTask | None, report: dict[str, Any], artifact_dir: Path) -> str:
         return write_batch_artifact(kind, task, report, artifact_dir)
-
-    @staticmethod
-    def _batch_id(task: FactorBatchTask | None) -> str | None:
-        return batch_id(task)
 
     @staticmethod
     def _coverage_pct(coverage: dict | None) -> float | None:
@@ -759,10 +829,6 @@ class ResearchValidationRunner:
             compaction_status=compaction_status,
         )
 
-    @staticmethod
-    def _directory_files(path: Path) -> set[str]:
-        return dir_files(path)
-
     def _timed_step(
         self,
         name: str,
@@ -785,41 +851,6 @@ class ResearchValidationRunner:
     def _select_factors(self, mode: str, max_factors: int | None, factor_family: str = "all") -> list[str]:
         return self.scope_planner.select_factors(mode, max_factors, factor_family)
 
-    def _select_and_filter_symbols(self, mode: str, max_symbols: int | None, factors: list[str]) -> dict[str, Any]:
-        return self.scope_planner.select_and_filter_symbols(mode, max_symbols, factors)
-
-    def _effective_date_range(self, mode: str, start: str | None, end: str | None, symbols: list[str]) -> tuple[str | None, str | None]:
-        return self.scope_planner.effective_date_range(mode, start, end, symbols)
-
-    def _latest_price_date(self, symbols: list[str]) -> str | None:
-        return self.scope_planner.latest_price_date(symbols)
-
-    def _earliest_price_date(self, symbols: list[str]) -> str | None:
-        return self.scope_planner.earliest_price_date(symbols)
-
-    def _price_date_bound(self, symbols: list[str], aggregate: str) -> str | None:
-        return self.scope_planner.price_date_bound(symbols, aggregate)
-
-    def _trading_day_count(self, symbols: list[str], start: str | None, end: str | None) -> int:
-        return self.scope_planner.trading_day_count(symbols, start, end)
-
-    def _minimum_history_days(self, factors: list[str]) -> int:
-        return self.scope_planner.minimum_history_days(factors)
-
-    @staticmethod
-    def _symbol_batches(symbols: list[str], batch_size: int) -> list[list[str]]:
-        return ResearchValidationScopePlanner.symbol_batches(symbols, batch_size)
-
-    @staticmethod
-    def _effective_batch_size(
-        symbol_count: int,
-        mode: str,
-        requested_batch_size: int | None,
-        parallel: bool,
-        workers: int,
-    ) -> int:
-        return ResearchValidationScopePlanner.effective_batch_size(symbol_count, mode, requested_batch_size, parallel, workers)
-
     def _fundamental_coverage(self, symbols: list[str]) -> dict[str, Any]:
         return self.scope_planner.fundamental_coverage(symbols)
 
@@ -832,9 +863,6 @@ class ResearchValidationRunner:
     @staticmethod
     def _factor_evidence_summary(evals: list[dict[str, Any]], backtests: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return factor_evidence_summary(evals, backtests)
-
-    def _select_strategies(self, mode: str, max_strategies: int | None) -> list[str]:
-        return self.scope_planner.select_strategies(mode, max_strategies)
 
     @staticmethod
     def _major_factors(factors: list[str]) -> list[str]:
@@ -881,17 +909,6 @@ class ResearchValidationRunner:
     @staticmethod
     def _write_aggregate_report(path: Path, report: dict[str, Any]) -> None:
         ResearchValidationReportWriter.write_aggregate_report(path, report)
-
-    def _charts(self, report: dict[str, Any], stamp: str, chart_dir: Path):
-        return self.report_writer.charts(report, stamp, chart_dir)
-
-    @staticmethod
-    def _markdown_summary(report: dict[str, Any]) -> str:
-        return markdown_summary(report)
-
-    @staticmethod
-    def _agent_summary(report: dict[str, Any]) -> str:
-        return agent_summary(report)
 
     @staticmethod
     def _warning_codes(warnings: list[Any]) -> list[str]:

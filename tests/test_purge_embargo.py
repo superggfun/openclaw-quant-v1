@@ -343,3 +343,146 @@ def test_cli_purge_embargo_args_propagated_to_engine(tmp_path: Path, monkeypatch
     assert len(windows) >= 1
     assert windows[0]["purge_days"] == 15
     assert windows[0]["embargo_days"] == 7
+
+
+def test_auto_default_purge_from_factor_forward_horizon(tmp_path: Path) -> None:
+    """When purge_days=0 and embargo_days=0, the engine auto-defaults purge_days
+    to the factor's forward_return_horizon if > 0."""
+    start = date(2020, 1, 1)
+    _seed_price_series(tmp_path / "test.db", ["SPY", "QQQ", "AAPL"], start=start, days=2000)
+    store = SQLitePriceStore(tmp_path / "test.db")
+    engine = WalkForwardEngine(store, report_dir=str(tmp_path / "reports"))
+    result = engine.run(
+        strategy="alpha", factor="momentum_60d",
+        start="2020-01-01", end="2025-06-01",
+        train_years=1, test_years=0.5, max_folds=2,
+        purge_days=0, embargo_days=0,
+        write_report=False, workers=1,
+    )
+    # momentum_60d forward_return_horizon = 60 (equal to lookback_days)
+    assert result.parameters["purge_days"] == 60
+    assert result.parameters["embargo_days"] == 0
+    for fold in result.folds:
+        assert fold.purge_days == 60
+
+
+def test_factor_zero_forward_horizon_stays_zero(tmp_path: Path) -> None:
+    """Fundamental factors with forward_return_horizon=0 keep purge_days=0."""
+    start = date(2020, 1, 1)
+    _seed_price_series(tmp_path / "test.db", ["SPY", "QQQ", "AAPL"], start=start, days=2000)
+    store = SQLitePriceStore(tmp_path / "test.db")
+    engine = WalkForwardEngine(store, report_dir=str(tmp_path / "reports"))
+    result = engine.run(
+        strategy="alpha", factor="pe_value_factor",
+        start="2020-01-01", end="2025-06-01",
+        train_years=1, test_years=0.5, max_folds=2,
+        purge_days=0, embargo_days=0,
+        write_report=False, workers=1,
+    )
+    assert result.parameters["purge_days"] == 0
+
+
+def test_purge_embargo_report_fields_populated(tmp_path: Path) -> None:
+    """WalkForwardFold must include purge/embargo report fields."""
+    start = date(2020, 1, 1)
+    _seed_price_series(tmp_path / "test.db", ["SPY", "QQQ", "AAPL"], start=start, days=2000)
+    store = SQLitePriceStore(tmp_path / "test.db")
+    engine = WalkForwardEngine(store, report_dir=str(tmp_path / "reports"))
+    result = engine.run(
+        strategy="alpha", factor="momentum_20d",
+        start="2020-01-01", end="2025-06-01",
+        train_years=1, test_years=0.5, max_folds=2,
+        purge_days=20, embargo_days=10,
+        write_report=False, workers=1,
+    )
+    for fold in result.folds:
+        assert fold.purge_days == 20
+        assert fold.embargo_days == 10
+        assert isinstance(fold.removed_by_purge, int) and fold.removed_by_purge >= 0
+        assert isinstance(fold.removed_by_embargo, int) and fold.removed_by_embargo >= 0
+        assert fold.effective_train_rows > 0, f"Fold {fold.fold} has no training rows"
+        assert fold.effective_test_rows > 0, f"Fold {fold.fold} has no test rows"
+
+
+def test_purge_ensures_no_label_overlap_with_test(tmp_path: Path) -> None:
+    """Purge ensures training ends before test_start; no label window overlaps test."""
+    start = date(2020, 1, 1)
+    _seed_price_series(tmp_path / "test.db", ["SPY", "QQQ", "AAPL"], start=start, days=2000)
+    store = SQLitePriceStore(tmp_path / "test.db")
+    engine = WalkForwardEngine(store, report_dir=str(tmp_path / "reports"))
+    result = engine.run(
+        strategy="alpha", factor="momentum_20d",
+        start="2020-01-01", end="2025-06-01",
+        train_years=1, test_years=0.5, max_folds=3,
+        purge_days=20, embargo_days=10,
+        write_report=False, workers=1,
+    )
+    for fold in result.folds:
+        assert fold.train_end < fold.test_start, (
+            f"Fold {fold.fold}: train_end {fold.train_end} on or after test_start {fold.test_start}"
+        )
+        # Verify the gap between train_end and test_start is >= 1 calendar day
+        import pandas as pd
+        gap = (pd.Timestamp(fold.test_start) - pd.Timestamp(fold.train_end)).days
+        assert gap >= 1, (
+            f"Fold {fold.fold}: gap={gap} days between train_end and test_start"
+        )
+
+
+def test_walk_forward_run_old_behavior_unchanged(tmp_path: Path) -> None:
+    """With purge=0, embargo=0 on a zero-horizon factor, behavior is unchanged
+    and report fields still populate."""
+    start = date(2020, 1, 1)
+    _seed_price_series(tmp_path / "test.db", ["SPY", "QQQ", "AAPL"], start=start, days=2000)
+    store = SQLitePriceStore(tmp_path / "test.db")
+    engine = WalkForwardEngine(store, report_dir=str(tmp_path / "reports"))
+    result = engine.run(
+        strategy="alpha", factor="pe_value_factor",
+        start="2020-01-01", end="2025-06-01",
+        train_years=1, test_years=0.5, max_folds=2,
+        purge_days=0, embargo_days=0,
+        write_report=False, workers=1,
+    )
+    assert result.parameters["purge_days"] == 0
+    for fold in result.folds:
+        assert fold.purge_days == 0
+        assert fold.embargo_days == 0
+        assert fold.removed_by_purge == 0
+        assert fold.removed_by_embargo == 0
+        assert fold.effective_train_rows > 0
+        assert fold.effective_test_rows > 0
+
+
+def test_forward_return_horizon_defined_for_all_factors() -> None:
+    """Every factor definition has forward_return_horizon >= 0, type int."""
+    from quant.factors.price.factor_registry import FactorRegistry
+    from quant.data.fundamental.fundamental_store import FundamentalStore
+    from quant.storage.sqlite_store import SQLitePriceStore
+    import tempfile, shutil
+    d = tempfile.mkdtemp()
+    try:
+        db = SQLitePriceStore(f"{d}/test.db")
+        # populate minimal data
+        syms = ["AAPL", "MSFT", "GOOG"]
+        from datetime import date as dte, timedelta as td
+        rows = []
+        for s in syms:
+            for i in range(100):
+                dt = dte(2020, 1, 1) + td(days=i)
+                rows.append({"symbol": s, "date": dt.isoformat(), "open": 100.0, "high": 100.0,
+                             "low": 100.0, "close": 100.0, "adj_close": 100.0, "volume": 1000})
+        import pandas as pd
+        db.upsert_prices(pd.DataFrame(rows))
+        fstore = FundamentalStore(f"{d}/test.db")
+        reg = FactorRegistry(fstore)
+        factors = reg.factor_names()
+        assert len(factors) > 0, "Expected factors to be registered"
+        for name in factors:
+            dfn = reg.describe(name)
+            assert hasattr(dfn, "forward_return_horizon"), f"{name} missing field"
+            assert dfn.forward_return_horizon >= 0, f"{name} horizon={dfn.forward_return_horizon}"
+            assert isinstance(dfn.forward_return_horizon, int), f"{name} horizon not int"
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+from quant.engines.walk_forward.walk_forward import WalkForwardEngine

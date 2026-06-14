@@ -122,6 +122,9 @@ class PerformanceProfiler:
         max_factors: int = 2,
         max_folds: int = 1,
         timeout_seconds: float = 180.0,
+        bulk_matrix: bool = True,
+        workers: int = 1,
+        strict_in_memory: bool = False,
     ) -> dict[str, Any]:
         tracker = RuntimeTracker()
         profiled_prices = ProfiledPriceStore(self.context.price_store, tracker)
@@ -140,15 +143,43 @@ class PerformanceProfiler:
                 results.append({"target": target, "status": "TIMEOUT", "runtime_seconds": 0.0, "details": {"reason": "profile budget exhausted"}})
                 continue
             if target == "factor_eval":
-                results.extend(self._profile_factor_eval(factor_evaluation, selected_factors, symbols, tracker))
+                results.extend(
+                    self._profile_factor_eval(
+                        factor_evaluation,
+                        selected_factors,
+                        symbols,
+                        tracker,
+                        bulk_matrix=bulk_matrix,
+                        workers=workers,
+                        strict_in_memory=strict_in_memory,
+                    )
+                )
             elif target == "factor_backtest":
-                results.extend(self._profile_factor_backtest(factor_backtest, selected_factors[:1], symbols, tracker))
+                results.extend(
+                    self._profile_factor_backtest(
+                        factor_backtest,
+                        selected_factors[:1],
+                        symbols,
+                        tracker,
+                        bulk_matrix=bulk_matrix,
+                        workers=workers,
+                        strict_in_memory=strict_in_memory,
+                    )
+                )
             elif target == "walk_forward":
                 results.extend(self._profile_walk_forward(walk_forward, selected_factors[:1], symbols, max_folds, tracker))
             elif target == "strategy_run":
                 results.append(self._profile_strategy_run(tracker))
             elif target == "research_validation":
-                results.append(self._profile_research_validation(max_symbols=min(max_symbols, 10), tracker=tracker))
+                results.append(
+                    self._profile_research_validation(
+                        max_symbols=min(max_symbols, 10),
+                        tracker=tracker,
+                        bulk_matrix=bulk_matrix,
+                        workers=workers,
+                        strict_in_memory=strict_in_memory,
+                    )
+                )
 
         factor_store_profile = self._profile_factor_store(tracker)
         report = PerformanceReportBuilder(self.report_dir).build(
@@ -160,6 +191,9 @@ class PerformanceProfiler:
                 "max_folds": max_folds,
                 "timeout_seconds": timeout_seconds,
                 "symbols": symbols,
+                "bulk_matrix": bulk_matrix,
+                "workers": workers,
+                "strict_in_memory": strict_in_memory,
             },
             tracker_summary=tracker.summary(),
             target_results=results,
@@ -178,13 +212,25 @@ class PerformanceProfiler:
         factors: list[str],
         symbols: list[str],
         tracker: RuntimeTracker,
+        bulk_matrix: bool,
+        workers: int,
+        strict_in_memory: bool,
     ) -> list[dict[str, Any]]:
         rows = []
         for factor in factors:
             with tracker.track("factor_eval", factor, symbols=len(symbols)):
                 started = time.perf_counter()
-                result = engine.evaluate(factor=factor, universe=symbols)
+                result = engine.evaluate(
+                    factor=factor,
+                    universe=symbols,
+                    bulk_matrix=bulk_matrix,
+                    max_workers=workers,
+                    strict_in_memory=strict_in_memory,
+                    cache_stats=bulk_matrix,
+                )
                 runtime = time.perf_counter() - started
+            hpc_details = self._hpc_details(result.performance_metadata)
+            hpc_details["eval_seconds"] = hpc_details.get("eval_seconds") or round(runtime, 6)
             rows.append(
                 {
                     "target": "factor_eval",
@@ -197,6 +243,7 @@ class PerformanceProfiler:
                         "rank_ic_mean": result.rank_ic_mean,
                         "report_path": result.report_path,
                         "warnings": result.warnings,
+                        **hpc_details,
                     },
                 }
             )
@@ -208,13 +255,23 @@ class PerformanceProfiler:
         factors: list[str],
         symbols: list[str],
         tracker: RuntimeTracker,
+        bulk_matrix: bool,
+        workers: int,
+        strict_in_memory: bool,
     ) -> list[dict[str, Any]]:
         rows = []
         for factor in factors:
             with tracker.track("factor_backtest", factor, symbols=len(symbols)):
                 started = time.perf_counter()
-                result = engine.run(factor=factor, universe=symbols)
+                result = engine.run(
+                    factor=factor,
+                    universe=symbols,
+                    bulk_matrix=bulk_matrix,
+                    max_workers=workers,
+                    strict_in_memory=strict_in_memory,
+                )
                 runtime = time.perf_counter() - started
+            hpc_details = self._hpc_details(result.performance_metadata)
             rows.append(
                 {
                     "target": "factor_backtest",
@@ -227,6 +284,7 @@ class PerformanceProfiler:
                         "sharpe": result.long_short_sharpe,
                         "report_path": result.report_path,
                         "warnings": result.warnings,
+                        **hpc_details,
                     },
                 }
             )
@@ -278,7 +336,14 @@ class PerformanceProfiler:
             },
         }
 
-    def _profile_research_validation(self, max_symbols: int, tracker: RuntimeTracker) -> dict[str, Any]:
+    def _profile_research_validation(
+        self,
+        max_symbols: int,
+        tracker: RuntimeTracker,
+        bulk_matrix: bool,
+        workers: int,
+        strict_in_memory: bool,
+    ) -> dict[str, Any]:
         with tracker.track("research_validation", "quick", max_symbols=max_symbols):
             started = time.perf_counter()
             result = ResearchValidationRunner(self.context).run(
@@ -289,8 +354,12 @@ class PerformanceProfiler:
                 max_symbols=max_symbols,
                 batch_size=max(1, min(5, max_symbols)),
                 timeout_seconds=30,
+                bulk_matrix=bulk_matrix,
+                workers=workers,
+                strict_in_memory=strict_in_memory,
             )
             runtime = time.perf_counter() - started
+        hpc_details = self._hpc_details(result.get("performance_metadata") or {})
         return {
             "target": "research_validation",
             "status": result.get("status", "PASS"),
@@ -299,6 +368,7 @@ class PerformanceProfiler:
                 "partial_results": result.get("partial_results"),
                 "completed_batches": len((result.get("batching") or {}).get("completed_batches") or []),
                 "report_path": result.get("report_path"),
+                **hpc_details,
             },
         }
 
@@ -328,3 +398,16 @@ class PerformanceProfiler:
             if len(filtered) >= max_symbols:
                 break
         return filtered or ["SPY", "QQQ", "AAPL", "MSFT", "NVDA"][:max_symbols]
+
+    @staticmethod
+    def _hpc_details(metadata: dict[str, Any] | None) -> dict[str, Any]:
+        metadata = metadata or {}
+        return {
+            "provider_type": metadata.get("provider_type"),
+            "cache_strategy": metadata.get("cache_strategy"),
+            "fallback_used": metadata.get("fallback_used"),
+            "fallback_reason": metadata.get("fallback_reason"),
+            "matrix_workers": metadata.get("matrix_workers"),
+            "matrix_build_seconds": metadata.get("matrix_build_seconds"),
+            "eval_seconds": metadata.get("eval_seconds"),
+        }

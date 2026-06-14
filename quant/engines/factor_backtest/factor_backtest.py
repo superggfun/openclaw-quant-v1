@@ -114,6 +114,7 @@ class FactorBacktestResult:
     periods: list[FactorBacktestPeriod]
     warnings: list[str]
     report_path: str
+    performance_metadata: dict | None = None
 
     def to_report(self) -> dict:
         return {
@@ -195,7 +196,10 @@ class FactorBacktest:
         universe: list[str] | None = None,
         pipeline_config: dict | None = None,
         pipeline_config_path: str | None = None,
-        bulk_matrix: bool = False,
+        bulk_matrix: bool = True,
+        max_workers: int = 4,
+        prefer_in_memory: bool = True,
+        strict_in_memory: bool = False,
         write_report: bool = True,
     ) -> FactorBacktestResult:
         factor = factor.strip().lower()
@@ -209,13 +213,17 @@ class FactorBacktest:
             else None
         )
 
+        performance_metadata = None
         if bulk_matrix:
-            observations, excluded_symbols, exclusion_reasons, warnings = self._observations_bulk(
+            observations, excluded_symbols, exclusion_reasons, warnings, performance_metadata = self._observations_bulk(
                 factor=factor,
                 symbols=symbols,
                 start=start,
                 end=end,
                 holding_period=holding_period,
+                max_workers=max_workers,
+                prefer_in_memory=prefer_in_memory,
+                strict_in_memory=strict_in_memory,
             )
         else:
             observations, excluded_symbols, exclusion_reasons, warnings = self._observations(
@@ -237,7 +245,7 @@ class FactorBacktest:
         warnings.extend(self._factor_coverage_warnings(factor, factor_coverage))
 
         observations = self._assign_quantiles(observations, quantiles)
-        periods = self._periods(observations, quantiles, long_quantile, short_quantile)
+        periods = self._periods(observations, quantiles, long_quantile, short_quantile, max_workers=max_workers)
         complete_periods = [
             period
             for period in periods
@@ -331,6 +339,7 @@ class FactorBacktest:
             periods=periods,
             warnings=warnings,
             report_path="",
+            performance_metadata=performance_metadata,
         )
         report_path = self._write_report(result) if write_report else ""
         return replace(result, report_path=str(report_path))
@@ -342,13 +351,23 @@ class FactorBacktest:
         start: str | None,
         end: str | None,
         holding_period: int,
-    ) -> tuple[list[FactorBacktestObservation], list[str], dict[str, str], list[str]]:
-        matrix = FactorMatrixBuilder(self.price_store, self.factor_registry).build(
+        max_workers: int = 4,
+        prefer_in_memory: bool = True,
+        strict_in_memory: bool = False,
+    ) -> tuple[list[FactorBacktestObservation], list[str], dict[str, str], list[str], dict]:
+        workers = max_workers if max_workers > 0 else 1
+        matrix = FactorMatrixBuilder(
+            self.price_store,
+            self.factor_registry,
+            prefer_in_memory=prefer_in_memory,
+            strict_in_memory=strict_in_memory,
+        ).build(
             factor=factor,
             symbols=symbols,
             start=start,
             end=end,
             forward_days=holding_period,
+            max_workers=workers,
         )
         observations = [
             FactorBacktestObservation(
@@ -363,7 +382,7 @@ class FactorBacktest:
             if row.factor_value is not None and row.future_return is not None and row.future_date is not None
         ]
         observations.sort(key=lambda row: (row.signal_date, row.symbol))
-        return observations, matrix.excluded_symbols, matrix.exclusion_reasons, matrix.warnings
+        return observations, matrix.excluded_symbols, matrix.exclusion_reasons, matrix.warnings, matrix.to_metadata()
 
     def _observations(
         self,
@@ -415,16 +434,25 @@ class FactorBacktest:
         end: str | None,
         holding_period: int,
     ) -> list[FactorBacktestObservation]:
+        import numpy as np
+
+        # Pre-extract numpy arrays — avoids per-row Series construction overhead.
+        dates_arr = history["date"].to_numpy()
+        closes_arr = history["close"].to_numpy(dtype=float, na_value=float("nan"))
+        max_index = len(history)
+
         observations = []
-        for index in range(len(history)):
-            signal_date = str(history.iloc[index]["date"])
+        for index in range(max_index):
+            signal_date = str(dates_arr[index])
             if start and signal_date < start:
                 continue
             if end and signal_date > end:
                 continue
             future_index = index + holding_period
-            if future_index >= len(history):
+            if future_index >= max_index:
                 continue
+
+            # Factor computation still uses the growing slice (no-lookahead).
             historical = history.iloc[: index + 1]
             factor_value = FactorEvaluation._factor_value(
                 historical["close"],
@@ -435,15 +463,18 @@ class FactorBacktest:
             )
             if factor_value is None:
                 continue
-            signal_close = float(history.iloc[index]["close"])
-            future_close = float(history.iloc[future_index]["close"])
+
+            signal_close = closes_arr[index]
+            future_close = closes_arr[future_index]
+            if np.isnan(signal_close) or np.isnan(future_close):
+                continue
             observations.append(
                 FactorBacktestObservation(
                     signal_date=signal_date,
-                    future_date=str(history.iloc[future_index]["date"]),
+                    future_date=str(dates_arr[future_index]),
                     symbol=symbol,
                     factor_value=float(factor_value),
-                    future_return=(future_close / signal_close) - 1.0,
+                    future_return=(float(future_close) / float(signal_close)) - 1.0,
                     quantile=None,
                 )
             )
@@ -476,29 +507,35 @@ class FactorBacktest:
         observations: list[FactorBacktestObservation],
         quantiles: int,
     ) -> list[FactorBacktestObservation]:
-        assigned = []
         frame = pd.DataFrame([asdict(observation) for observation in observations])
-        for _, group in frame.groupby("signal_date"):
-            group = group.sort_values(["factor_value", "symbol"], ascending=[True, True]).reset_index(drop=True)
-            count = len(group)
-            if count == 1:
-                quantile_values = [quantiles]
-            else:
-                quantile_values = [
-                    int(round(index * (quantiles - 1) / (count - 1))) + 1
-                    for index in range(count)
-                ]
-            for row, quantile in zip(group.itertuples(index=False), quantile_values, strict=True):
-                assigned.append(
-                    FactorBacktestObservation(
-                        signal_date=str(row.signal_date),
-                        future_date=str(row.future_date),
-                        symbol=str(row.symbol),
-                        factor_value=float(row.factor_value),
-                        future_return=float(row.future_return),
-                        quantile=int(quantile),
-                    )
-                )
+        # Sort once across all groups — every group inherits this ordering.
+        frame = frame.sort_values(["signal_date", "factor_value", "symbol"],
+                                  ascending=[True, True, True]).reset_index(drop=True)
+        # Per-group rank (0-based within each signal_date group) via cumcount.
+        frame["_rank"] = frame.groupby("signal_date").cumcount()
+        # Per-group size for denominator.
+        frame["_grp_size"] = frame.groupby("signal_date")["_rank"].transform("max") + 1
+        # Compute quantile: evenly spaced across [1, quantiles].
+        # Single-observation groups get `quantiles`.
+        frame["_rank"] = frame["_rank"].where(frame["_grp_size"] > 1, 0)
+        frame["_denom"] = frame["_grp_size"] - 1
+        frame["_denom"] = frame["_denom"].where(frame["_denom"] > 0, 1)
+        frame["quantile"] = (
+            (frame["_rank"] * (quantiles - 1) / frame["_denom"]).round().astype(int) + 1
+        )
+        # Build result dataclasses from the frame (still per-row, but no python-level
+        # group iteration, sorting, or zip overhead).
+        assigned = [
+            FactorBacktestObservation(
+                signal_date=str(r.signal_date),
+                future_date=str(r.future_date),
+                symbol=str(r.symbol),
+                factor_value=float(r.factor_value),
+                future_return=float(r.future_return),
+                quantile=int(r.quantile),
+            )
+            for r in frame.itertuples(index=False)
+        ]
         assigned.sort(key=lambda row: (row.signal_date, row.symbol))
         return assigned
 
@@ -508,57 +545,88 @@ class FactorBacktest:
         quantiles: int,
         long_quantile: int,
         short_quantile: int,
+        max_workers: int = 0,
     ) -> list[FactorBacktestPeriod]:
-        periods = []
-        previous_weights: dict[str, float] | None = None
+        global _periods_symbols, _periods_quantile, _periods_returns, _periods_future
+        global _periods_quantiles, _periods_long_q, _periods_short_q
+
         frame = pd.DataFrame([asdict(observation) for observation in observations])
-        for signal_date, group in frame.groupby("signal_date"):
-            quantile_returns = {
-                f"q{quantile}": self._mean(group.loc[group["quantile"] == quantile, "future_return"].tolist())
-                for quantile in range(1, quantiles + 1)
-            }
-            long_group = group[group["quantile"] == long_quantile]
-            short_group = group[group["quantile"] == short_quantile]
-            long_return = self._mean(long_group["future_return"].tolist())
-            short_return = self._mean(short_group["future_return"].tolist())
-            long_short_return = (
-                long_return - short_return
-                if long_return is not None and short_return is not None
-                else None
-            )
-            weights: dict[str, float] = {}
-            long_weights: dict[str, float] = {}
-            short_weights: dict[str, float] = {}
-            if not long_group.empty:
-                long_weight = 1.0 / len(long_group)
-                long_weights = {symbol: long_weight for symbol in long_group["symbol"].tolist()}
-                weights.update(long_weights)
-            if not short_group.empty:
-                short_weight = -1.0 / len(short_group)
-                short_weights = {symbol: short_weight for symbol in short_group["symbol"].tolist()}
-                weights.update(short_weights)
-            long_weight_sum = sum(long_weights.values())
-            short_weight_sum = sum(short_weights.values())
-            net_exposure = sum(weights.values())
-            gross_exposure = sum(abs(weight) for weight in weights.values())
+
+        date_indices = list(frame.groupby("signal_date", sort=False).indices.items())
+        n_dates = len(date_indices)
+        n_workers = max(1, min(int(max_workers), n_dates)) if max_workers > 1 else 1
+        if n_workers > 1:
+            from quant.data.research_data_store import multiprocessing_start_method
+
+            if multiprocessing_start_method() != "fork":
+                n_workers = 1
+
+        # Store arrays in module globals so _compute_period_single/chunk can access them.
+        # In the multiprocess path, children inherit via COW after fork.
+        _periods_symbols = frame["symbol"].to_numpy()
+        _periods_quantile = frame["quantile"].to_numpy()
+        _periods_returns = frame["future_return"].to_numpy(dtype=float, na_value=float("nan"))
+        _periods_future = frame["future_date"].to_numpy()
+        _periods_quantiles = quantiles
+        _periods_long_q = long_quantile
+        _periods_short_q = short_quantile
+
+        if n_workers <= 1:
+            partials = _compute_periods_sequential(date_indices)
+        else:
+            from concurrent.futures import ProcessPoolExecutor, as_completed
+            import math
+
+            chunk_size = math.ceil(n_dates / n_workers)
+            chunks = [date_indices[i:i + chunk_size] for i in range(0, n_dates, chunk_size)]
+
+            worker_results: dict[int, list[dict]] = {}
+            try:
+                with ProcessPoolExecutor(max_workers=n_workers) as executor:
+                    futures = {
+                        executor.submit(_compute_periods_chunk, chunk): idx
+                        for idx, chunk in enumerate(chunks)
+                    }
+                    for future in as_completed(futures):
+                        idx = futures[future]
+                        worker_results[idx] = future.result()
+            finally:
+                _periods_symbols = None
+                _periods_quantile = None
+                _periods_returns = None
+                _periods_future = None
+
+            # Merge chunk results in order
+            partials = []
+            for idx in sorted(worker_results):
+                partials.extend(worker_results[idx])
+
+        # Sort by signal_date
+        partials.sort(key=lambda p: p["signal_date"])
+
+        # ── Sequential pass: compute turnover and build final periods ──
+        periods: list[FactorBacktestPeriod] = []
+        previous_weights: dict[str, float] | None = None
+        for p in partials:
+            weights = {**p["long_weights"], **p["short_weights"]}
             turnover = self._turnover(previous_weights, weights) if previous_weights is not None else None
             previous_weights = weights
             periods.append(
                 FactorBacktestPeriod(
-                    signal_date=str(signal_date),
-                    future_date=str(group["future_date"].max()),
-                    long_symbols=sorted(long_group["symbol"].tolist()),
-                    short_symbols=sorted(short_group["symbol"].tolist()),
-                    long_weights=dict(sorted(long_weights.items())),
-                    short_weights=dict(sorted(short_weights.items())),
-                    long_weight_sum=long_weight_sum,
-                    short_weight_sum=short_weight_sum,
-                    net_exposure=net_exposure,
-                    gross_exposure=gross_exposure,
-                    quantile_returns=quantile_returns,
-                    long_return=long_return,
-                    short_return=short_return,
-                    long_short_return=long_short_return,
+                    signal_date=p["signal_date"],
+                    future_date=p["future_date"],
+                    long_symbols=p["long_symbols"],
+                    short_symbols=p["short_symbols"],
+                    long_weights=p["long_weights"],
+                    short_weights=p["short_weights"],
+                    long_weight_sum=p["long_weight_sum"],
+                    short_weight_sum=p["short_weight_sum"],
+                    net_exposure=p["net_exposure"],
+                    gross_exposure=p["gross_exposure"],
+                    quantile_returns=p["quantile_returns"],
+                    long_return=p["long_return"],
+                    short_return=p["short_return"],
+                    long_short_return=p["long_short_return"],
                     turnover=turnover,
                 )
             )
@@ -669,3 +737,103 @@ class FactorBacktest:
 
     def _write_report(self, result: FactorBacktestResult) -> Path:
         return write_factor_report(self.report_dir, "factor_backtest", result.factor, result.to_report())
+
+
+# ── Module-level caches for parallel _periods (COW shared via fork) ──
+_periods_symbols = None
+_periods_quantile = None
+_periods_returns = None
+_periods_future = None
+_periods_quantiles: int = 5
+_periods_long_q: int = 1
+_periods_short_q: int = 1
+
+
+def _compute_period_single(
+    signal_date: str,
+    idxs,
+) -> dict:
+    """Compute per-date period data from module-level arrays (COW shared)."""
+    import numpy as np
+
+    idxs = np.asarray(idxs, dtype=int)
+    symbols_arr = _periods_symbols
+    quantile_arr = _periods_quantile
+    returns_arr = _periods_returns
+    future_arr = _periods_future
+    quantiles = _periods_quantiles
+    long_quantile = _periods_long_q
+    short_quantile = _periods_short_q
+
+    q_returns: dict[str, float | None] = {}
+    for q in range(1, quantiles + 1):
+        mask = quantile_arr[idxs] == q
+        if mask.any():
+            vals = returns_arr[idxs][mask]
+            valid = vals[~np.isnan(vals)]
+            q_returns[f"q{q}"] = float(valid.mean()) if len(valid) > 0 else None
+        else:
+            q_returns[f"q{q}"] = None
+
+    long_mask = quantile_arr[idxs] == long_quantile
+    short_mask = quantile_arr[idxs] == short_quantile
+
+    long_vals = returns_arr[idxs][long_mask]
+    long_valid = long_vals[~np.isnan(long_vals)]
+    long_return = float(long_valid.mean()) if len(long_valid) > 0 else None
+
+    short_vals = returns_arr[idxs][short_mask]
+    short_valid = short_vals[~np.isnan(short_vals)]
+    short_return = float(short_valid.mean()) if len(short_valid) > 0 else None
+
+    long_short_return = (
+        long_return - short_return
+        if long_return is not None and short_return is not None
+        else None
+    )
+
+    long_syms = sorted(symbols_arr[idxs][long_mask].tolist())
+    short_syms = sorted(symbols_arr[idxs][short_mask].tolist())
+
+    long_weight = 1.0 / len(long_syms) if long_syms else 0.0
+    short_weight = -1.0 / len(short_syms) if short_syms else 0.0
+    long_weights = {sym: long_weight for sym in long_syms}
+    short_weights = {sym: short_weight for sym in short_syms}
+
+    return {
+        "signal_date": str(signal_date),
+        "future_date": str(future_arr[idxs].max()),
+        "long_symbols": long_syms,
+        "short_symbols": short_syms,
+        "long_weights": dict(sorted(long_weights.items())),
+        "short_weights": dict(sorted(short_weights.items())),
+        "long_weight_sum": sum(long_weights.values()),
+        "short_weight_sum": sum(short_weights.values()),
+        "net_exposure": sum(long_weights.values()) + sum(short_weights.values()),
+        "gross_exposure": sum(abs(w) for w in list(long_weights.values()) + list(short_weights.values())),
+        "quantile_returns": q_returns,
+        "long_return": long_return,
+        "short_return": short_return,
+        "long_short_return": long_short_return,
+    }
+
+
+def _compute_periods_sequential(
+    date_indices: list,
+) -> list[dict]:
+    """Sequential fallback for single-worker path."""
+    results = []
+    for signal_date, idxs in date_indices:
+        results.append(_compute_period_single(signal_date, idxs))
+    return results
+
+
+def _compute_periods_chunk(
+    date_indices: list,
+) -> list[dict]:
+    """Process a chunk of dates in a subprocess.
+
+    Reads module-level _periods_* arrays inherited via COW fork.
+    Only date_indices is serialized (small).
+    """
+    return _compute_periods_sequential(date_indices)

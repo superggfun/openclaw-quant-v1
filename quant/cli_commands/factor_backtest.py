@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -18,6 +19,11 @@ def register_parser(subparsers) -> None:
     factor_backtest.add_argument("--quantiles", type=int, default=5)
     factor_backtest.add_argument("--long-quantile", type=int, default=None)
     factor_backtest.add_argument("--short-quantile", type=int, default=1)
+    factor_backtest.add_argument("--workers", type=int, default=4, help="Parallel workers for matrix build (default: 4).")
+    factor_backtest.add_argument("--bulk-matrix", action=argparse.BooleanOptionalAction, default=True,
+        help="Use bulk factor matrix (default: on).  Disable with --no-bulk-matrix for the serial reference path.")
+    factor_backtest.add_argument("--serial", action="store_true",
+        help="Force the slow serial reference path (implies --no-bulk-matrix for backward compat).")
     factor_backtest.add_argument("--pipeline", default=None, help="Optional factor pipeline config JSON.")
     factor_backtest.add_argument("--report", action="store_true", help="Write JSON report. Reports are written by default.")
     factor_backtest.add_argument("--save-factor-history", action="store_true", help="Persist factor backtest history.")
@@ -25,6 +31,9 @@ def register_parser(subparsers) -> None:
 
 
 def handle(args, context) -> int:
+    bulk = args.bulk_matrix and not args.serial
+    if not bulk:
+        print("[factor-backtest] Using serial reference path — slow; only intended for debugging.", flush=True)
     result = context.factor_backtest_engine.run(
         factor=args.factor,
         start=args.start,
@@ -35,6 +44,8 @@ def handle(args, context) -> int:
         short_quantile=args.short_quantile,
         pipeline_config=load_factor_pipeline_config(Path(args.pipeline)) if args.pipeline else None,
         pipeline_config_path=args.pipeline,
+        bulk_matrix=bulk,
+        max_workers=args.workers,
     )
     print("Factor Backtest Summary")
     print(f"factor: {result.factor}")

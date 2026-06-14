@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -19,12 +20,19 @@ def register_parser(subparsers) -> None:
     factor_eval.add_argument("--pipeline", default=None, help="Optional factor pipeline config JSON.")
     factor_eval.add_argument("--use-cache", action="store_true", help="Use the opt-in in-memory factor matrix cache.")
     factor_eval.add_argument("--cache-stats", action="store_true", help="Print factor matrix cache diagnostics.")
-    factor_eval.add_argument("--bulk-matrix", action="store_true", help="Build and consume a bulk factor matrix without enabling cache reuse.")
+    factor_eval.add_argument("--workers", type=int, default=4, help="Parallel workers for matrix build (default: 4).")
+    factor_eval.add_argument("--bulk-matrix", action=argparse.BooleanOptionalAction, default=True,
+        help="Use bulk factor matrix (default: on).  Disable with --no-bulk-matrix for the serial reference path.")
+    factor_eval.add_argument("--serial", action="store_true",
+        help="Force the slow serial reference path (implies --no-bulk-matrix for backward compat).")
     factor_eval.add_argument("--save-factor-history", action="store_true", help="Persist factor values and evaluation history.")
     factor_eval.add_argument("--save-regime-history", action="store_true", help="Persist factor diagnostics by current regime history.")
 
 
 def handle(args, context) -> int:
+    bulk = args.bulk_matrix and not args.serial
+    if not bulk:
+        print("[factor-eval] Using serial reference path — slow; only intended for debugging.", flush=True)
     result = context.factor_evaluation.evaluate(
         factor=args.factor,
         start=args.start,
@@ -33,7 +41,8 @@ def handle(args, context) -> int:
         pipeline_config=load_factor_pipeline_config(Path(args.pipeline)) if args.pipeline else None,
         use_cache=args.use_cache,
         factor_cache=FactorEvalCache() if args.use_cache else None,
-        bulk_matrix=args.bulk_matrix,
+        bulk_matrix=bulk,
+        max_workers=args.workers,
         cache_stats=args.cache_stats,
     )
     print("Factor Evaluation Summary")

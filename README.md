@@ -90,6 +90,7 @@ python -m quant.cli research-validation --mode quick
 python -m quant.cli research-validation --mode quick --max-symbols 20 --max-factors 3 --use-cache --cache-stats
 python -m quant.cli research-validation --mode quick --max-symbols 20 --max-factors 3 --bulk-matrix --parallel --workers 4 --cache-stats
 python -m quant.cli performance-profile
+python -m quant.cli hpc-benchmark --factor momentum_20d --workers 1 --workers 4
 python -m quant.cli performance-summary
 ```
 

@@ -6,9 +6,9 @@ __pycache__/
 data/quant.db
 data/*.db
 data/*.db-*
-reports/*.json
-reports/*.md
-reports/*.txt
+reports/**.json
+reports/**.md
+reports/**.txt
 reports/charts/
 reports/runs/
 reports/research_validation_batches/
@@ -16,3 +16,6 @@ reports/hpc_rolling*.txt
 reports/agent_summary.*
 reports/agent_export_*.*
 examples/portfolio_constructed_targets.json
+data/reports/
+reports/performance/
+tests/data/*.db

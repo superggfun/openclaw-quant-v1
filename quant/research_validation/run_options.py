@@ -27,6 +27,8 @@ def normalize_run_options(
     use_cache: bool,
     cache_stats: bool,
     bulk_matrix: bool,
+    prefer_in_memory: bool,
+    strict_in_memory: bool,
     parallel: bool,
     workers: int | None,
     parallel_target: str,
@@ -40,6 +42,8 @@ def normalize_run_options(
     normalized_mode = mode.strip().lower()
     if normalized_mode not in {"quick", "full"}:
         raise ValueError("mode must be quick or full")
+    if use_cache and bulk_matrix:
+        raise ValueError("--use-cache and --bulk-matrix are mutually exclusive; pass --no-bulk-matrix to use cache")
     family = factor_family.strip().lower()
     if family not in {"price", "fundamental", "all"}:
         raise ValueError("factor_family must be price, fundamental, or all")
@@ -65,9 +69,12 @@ def normalize_run_options(
         use_cache=use_cache,
         cache_stats=cache_stats,
         bulk_matrix=bulk_matrix,
+        prefer_in_memory=prefer_in_memory,
+        strict_in_memory=strict_in_memory,
         parallel=parallel,
         workers=workers,
         worker_count=scope_planner.worker_count(parallel=parallel, workers=workers),
+        matrix_workers=1 if parallel else max(1, workers or 4),
         parallel_target=normalized_parallel_target,
         charts=charts,
         write_substep_reports=write_substep_reports,

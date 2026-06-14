@@ -6,6 +6,7 @@ import pytest
 
 from quant.cli import main
 from quant.engines.strategy_eval.strategy_evaluation import StrategyEvaluation
+from quant.engines.strategy_eval.metrics import period_aggregate_returns
 
 
 def write_json(path: Path, data: dict) -> Path:
@@ -396,8 +397,8 @@ def test_period_aggregation_accepts_pandas_compatible_month_and_year_aliases() -
         index=pd.to_datetime(["2024-01-10", "2024-01-31", "2024-02-29"]),
     )
 
-    monthly = StrategyEvaluation._period_aggregate_returns(returns, "ME")
-    yearly = StrategyEvaluation._period_aggregate_returns(returns, "YE")
+    monthly = period_aggregate_returns(returns, "ME")
+    yearly = period_aggregate_returns(returns, "YE")
 
     assert monthly == pytest.approx({"2024-01": 0.045, "2024-02": 0.02})
     assert yearly == pytest.approx({"2024": 0.0659})

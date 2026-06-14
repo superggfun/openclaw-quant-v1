@@ -35,6 +35,7 @@ class ObservationMatrixResult:
     warnings: list[str]
     bulk_read_seconds: float
     matrix_build_seconds: float
+    performance_metadata: dict[str, Any] | None = None
 
     @property
     def valid_rows(self) -> list[ObservationMatrixRow]:
@@ -45,7 +46,7 @@ class ObservationMatrixResult:
         return len(self.valid_rows)
 
     def to_metadata(self) -> dict[str, Any]:
-        return {
+        metadata = {
             "factor_name": self.factor_name,
             "universe_size": len(self.universe),
             "start": self.start,
@@ -57,3 +58,6 @@ class ObservationMatrixResult:
             "excluded_symbol_count": len(self.excluded_symbols),
             "no_lookahead": True,
         }
+        if self.performance_metadata:
+            metadata.update(self.performance_metadata)
+        return metadata

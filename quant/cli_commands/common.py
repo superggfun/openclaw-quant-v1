@@ -1,4 +1,8 @@
-"""Shared CLI context and helpers."""
+"""Shared CLI context and helpers.
+
+All engine / store imports are lazy (deferred until first access via
+``cached_property``) so CLI startup stays fast even as engines multiply.
+"""
 
 from __future__ import annotations
 
@@ -10,179 +14,232 @@ from pathlib import Path
 
 import pandas as pd
 
-from quant.engines.alpha.alpha_engine import AlphaEngine
-from quant.reports.agent_export.agent_exporter import AgentExporter
-from quant.engines.backtest.backtest_engine import PortfolioBacktestEngine
-from quant.engines.execution.cost_engine import CostEngine, TradeInput
-from quant.data.layer.data_quality import DataQualityAnalyzer, DataRefreshManager
-from quant.data.layer.symbol_metadata import SymbolMetadataStore
-from quant.data.layer.universe_manager import UniverseManager
-from quant.data.providers import DataProvider, ProviderRegistry, create_default_registry
-from quant.engines.execution.execution_engine import ExecutionEngine
-from quant.engines.factor_backtest.factor_backtest import FactorBacktest
-from quant.engines.factor_eval.factor_evaluation import FactorEvaluation
-from quant.factors.store.factor_history import FactorHistory
-from quant.factors.store.factor_registry_store import FactorRegistryStore
-from quant.factors.store.factor_store import FactorStore
-from quant.data.fundamental.fundamental_service import FundamentalService
-from quant.data.fundamental.fundamental_store import FundamentalStore
-from quant.engines.portfolio.optimizer_engine import OptimizerEngine
-from quant.engines.portfolio.portfolio_construction import PortfolioConstructionEngine
-from quant.engines.portfolio.rebalance_engine import RebalanceEngine
-from quant.engines.regime.regime_analytics import RegimeAnalytics
-from quant.engines.regime.regime_detector import RegimeDetector
-from quant.engines.regime.regime_history import RegimeHistoryStore
-from quant.engines.risk.risk_engine import RiskEngine
-from quant.services.backtest_service import BacktestService
-from quant.services.portfolio_service import PortfolioService
-from quant.services.price_service import PriceService
-from quant.storage.portfolio_store import SQLitePortfolioStore
-from quant.storage.sqlite_store import SQLitePriceStore
-from quant.engines.strategy_eval.strategy_evaluation import StrategyEvaluation
-from quant.engines.trading_simulation.trading_simulator import TradingSimulator
-from quant.reports.visualization.report_visualizer import ReportVisualizer
-from quant.engines.walk_forward.walk_forward import WalkForwardEngine
-
 
 @dataclass(frozen=True)
 class CLIContext:
     db_path: Path
 
+    # ── Storage ────────────────────────────────────────────────
+
     @cached_property
-    def price_store(self) -> SQLitePriceStore:
+    def price_store(self):
+        from quant.storage.sqlite_store import SQLitePriceStore
+
         return SQLitePriceStore(self.db_path)
 
     @cached_property
-    def portfolio_store(self) -> SQLitePortfolioStore:
+    def portfolio_store(self):
+        from quant.storage.portfolio_store import SQLitePortfolioStore
+
         return SQLitePortfolioStore(self.db_path)
 
     @cached_property
-    def metadata_store(self) -> SymbolMetadataStore:
+    def metadata_store(self):
+        from quant.data.layer.symbol_metadata import SymbolMetadataStore
+
         return SymbolMetadataStore(self.db_path)
 
     @cached_property
-    def fundamental_store(self) -> FundamentalStore:
+    def fundamental_store(self):
+        from quant.data.fundamental.fundamental_store import FundamentalStore
+
         return FundamentalStore(self.db_path)
 
     @cached_property
-    def provider_registry(self) -> ProviderRegistry:
+    def factor_store(self):
+        from quant.factors.store.factor_store import FactorStore
+
+        return FactorStore(self.db_path)
+
+    # ── Providers ──────────────────────────────────────────────
+
+    @cached_property
+    def provider_registry(self):
+        from quant.data.providers import create_default_registry
+
         return create_default_registry()
 
     @cached_property
-    def data_provider(self) -> DataProvider:
+    def data_provider(self):
         return self.provider_registry.default_provider()
 
+    # ── Services ───────────────────────────────────────────────
+
     @cached_property
-    def price_service(self) -> PriceService:
+    def price_service(self):
+        from quant.services.price_service import PriceService
+
         return PriceService(self.price_store, data_source=self.data_provider)
 
     @cached_property
-    def portfolio_service(self) -> PortfolioService:
+    def portfolio_service(self):
+        from quant.services.portfolio_service import PortfolioService
+
         return PortfolioService(self.portfolio_store)
 
     @cached_property
-    def backtest_service(self) -> BacktestService:
+    def backtest_service(self):
+        from quant.services.backtest_service import BacktestService
+
         return BacktestService(self.price_store)
 
     @cached_property
-    def portfolio_backtest_engine(self) -> PortfolioBacktestEngine:
+    def fundamental_service(self):
+        from quant.data.fundamental.fundamental_service import FundamentalService
+
+        return FundamentalService(self.fundamental_store)
+
+    # ── Portfolio engines ─────────────────────────────────────
+
+    @cached_property
+    def portfolio_backtest_engine(self):
+        from quant.engines.backtest.backtest_engine import PortfolioBacktestEngine
+
         return PortfolioBacktestEngine(self.price_store)
 
     @cached_property
-    def rebalance_engine(self) -> RebalanceEngine:
+    def rebalance_engine(self):
+        from quant.engines.portfolio.rebalance_engine import RebalanceEngine
+
         return RebalanceEngine(self.portfolio_store)
 
     @cached_property
-    def risk_engine(self) -> RiskEngine:
+    def risk_engine(self):
+        from quant.engines.risk.risk_engine import RiskEngine
+
         return RiskEngine(self.portfolio_store)
 
     @cached_property
-    def optimizer_engine(self) -> OptimizerEngine:
+    def optimizer_engine(self):
+        from quant.engines.portfolio.optimizer_engine import OptimizerEngine
+
         return OptimizerEngine(self.price_store, self.portfolio_store)
 
     @cached_property
-    def portfolio_construction_engine(self) -> PortfolioConstructionEngine:
+    def portfolio_construction_engine(self):
+        from quant.engines.portfolio.portfolio_construction import PortfolioConstructionEngine
+
         return PortfolioConstructionEngine(self.price_store)
 
     @cached_property
-    def execution_engine(self) -> ExecutionEngine:
+    def execution_engine(self):
+        from quant.engines.execution.execution_engine import ExecutionEngine
+
         return ExecutionEngine(self.price_store, self.portfolio_store)
 
+    # ── Factor / Alpha ─────────────────────────────────────────
+
     @cached_property
-    def alpha_engine(self) -> AlphaEngine:
+    def alpha_engine(self):
+        from quant.engines.alpha.alpha_engine import AlphaEngine
+
         return AlphaEngine(self.price_store, self.fundamental_store)
 
     @cached_property
-    def factor_evaluation(self) -> FactorEvaluation:
+    def factor_evaluation(self):
+        from quant.engines.factor_eval.factor_evaluation import FactorEvaluation
+
         return FactorEvaluation(self.price_store, self.fundamental_store)
 
     @cached_property
-    def factor_backtest_engine(self) -> FactorBacktest:
+    def factor_backtest_engine(self):
+        from quant.engines.factor_backtest.factor_backtest import FactorBacktest
+
         return FactorBacktest(self.price_store, self.fundamental_store)
 
     @cached_property
-    def factor_store(self) -> FactorStore:
-        return FactorStore(self.db_path)
+    def factor_history(self):
+        from quant.factors.store.factor_history import FactorHistory
 
-    @cached_property
-    def factor_history(self) -> FactorHistory:
         return FactorHistory(self.factor_store)
 
     @cached_property
-    def factor_registry_store(self) -> FactorRegistryStore:
+    def factor_registry_store(self):
+        from quant.factors.store.factor_registry_store import FactorRegistryStore
+
         return FactorRegistryStore(self.factor_store)
 
+    # ── Regime ─────────────────────────────────────────────────
+
     @cached_property
-    def regime_detector(self) -> RegimeDetector:
+    def regime_detector(self):
+        from quant.engines.regime.regime_detector import RegimeDetector
+
         return RegimeDetector(self.price_store)
 
     @cached_property
-    def regime_history_store(self) -> RegimeHistoryStore:
+    def regime_history_store(self):
+        from quant.engines.regime.regime_history import RegimeHistoryStore
+
         return RegimeHistoryStore(self.db_path)
 
     @cached_property
-    def regime_analytics(self) -> RegimeAnalytics:
+    def regime_analytics(self):
+        from quant.engines.regime.regime_analytics import RegimeAnalytics
+
         return RegimeAnalytics(self.regime_detector, self.regime_history_store, self.factor_store)
 
+    # ── Strategy / Walk-Forward / Sim ──────────────────────────
+
     @cached_property
-    def strategy_evaluation(self) -> StrategyEvaluation:
+    def strategy_evaluation(self):
+        from quant.engines.strategy_eval.strategy_evaluation import StrategyEvaluation
+
         return StrategyEvaluation()
 
     @cached_property
-    def universe_manager(self) -> UniverseManager:
-        return UniverseManager(self.metadata_store, self.data_provider)
+    def walk_forward_engine(self):
+        from quant.engines.walk_forward.walk_forward import WalkForwardEngine
 
-    @cached_property
-    def data_quality_analyzer(self) -> DataQualityAnalyzer:
-        return DataQualityAnalyzer(self.price_store, self.metadata_store)
-
-    @cached_property
-    def data_refresh_manager(self) -> DataRefreshManager:
-        return DataRefreshManager(self.price_store, self.data_provider)
-
-    @cached_property
-    def fundamental_service(self) -> FundamentalService:
-        return FundamentalService(self.fundamental_store)
-
-    @cached_property
-    def agent_exporter(self) -> AgentExporter:
-        return AgentExporter()
-
-    @cached_property
-    def walk_forward_engine(self) -> WalkForwardEngine:
         return WalkForwardEngine(self.price_store, self.fundamental_store)
 
     @cached_property
-    def trading_simulator(self) -> TradingSimulator:
+    def trading_simulator(self):
+        from quant.engines.trading_simulation.trading_simulator import TradingSimulator
+
         return TradingSimulator(self.price_store, self.fundamental_store)
 
+    # ── Data / Viz / Export ────────────────────────────────────
+
     @cached_property
-    def report_visualizer(self) -> ReportVisualizer:
+    def universe_manager(self):
+        from quant.data.layer.universe_manager import UniverseManager
+
+        return UniverseManager(self.metadata_store, self.data_provider)
+
+    @cached_property
+    def data_quality_analyzer(self):
+        from quant.data.layer.data_quality import DataQualityAnalyzer
+
+        return DataQualityAnalyzer(self.price_store, self.metadata_store)
+
+    @cached_property
+    def data_refresh_manager(self):
+        from quant.data.layer.data_quality import DataRefreshManager
+
+        return DataRefreshManager(self.price_store, self.data_provider)
+
+    @cached_property
+    def agent_exporter(self):
+        from quant.reports.agent_export.agent_exporter import AgentExporter
+
+        return AgentExporter()
+
+    @cached_property
+    def report_visualizer(self):
+        from quant.reports.visualization.report_visualizer import ReportVisualizer
+
         return ReportVisualizer()
+
+
+# ── Factory ────────────────────────────────────────────────────
 
 
 def create_context(db_path: Path) -> CLIContext:
     return CLIContext(db_path=db_path)
+
+
+# ── Formatting helpers ─────────────────────────────────────────
 
 
 def format_optional_money(value: float | None) -> str:
@@ -199,6 +256,9 @@ def format_optional_pct(value: float | None) -> str:
 
 def format_optional_rank(value: int | None) -> str:
     return "N/A" if value is None else str(value)
+
+
+# ── JSON loaders ───────────────────────────────────────────────
 
 
 def load_targets(path: Path) -> dict:
@@ -261,7 +321,24 @@ def load_factor_pipeline_config(path: Path) -> dict:
         raise ValueError(f"factor pipeline config file not found: {path}") from exc
 
 
-def trades_from_rebalance_plan(plan) -> list[TradeInput]:
+def _load_json_object(path: Path, label: str) -> dict:
+    try:
+        with path.open("r", encoding="utf-8") as file:
+            config = json.load(file)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{label} is not valid JSON: {path}") from exc
+
+    if not isinstance(config, dict):
+        raise ValueError(f"{label} must contain a JSON object")
+    return config
+
+
+# ── Trade / cost helpers ───────────────────────────────────────
+
+
+def trades_from_rebalance_plan(plan) -> list:
+    from quant.engines.execution.cost_engine import TradeInput
+
     return [
         TradeInput(
             symbol=item.symbol,
@@ -272,6 +349,12 @@ def trades_from_rebalance_plan(plan) -> list[TradeInput]:
         for item in plan.items
         if item.action in {"BUY", "SELL"} and item.qty > 0 and item.price is not None
     ]
+
+
+def estimate_costs(config: dict, trades):
+    from quant.engines.execution.cost_engine import CostEngine
+
+    return CostEngine(config).estimate(trades)
 
 
 def print_cost_report(report) -> None:
@@ -297,12 +380,18 @@ def print_cost_report(report) -> None:
     print(f"cost_report: {report.report_path}")
 
 
+# ── Factor / benchmark helpers ─────────────────────────────────
+
+
 def factor_values_for_pipeline(
-    price_store: SQLitePriceStore,
+    price_store,
     factor: str,
     symbols: list[str],
     as_of_date: str | None,
 ) -> dict[str, float | None]:
+    from quant.data.fundamental.fundamental_store import FundamentalStore
+    from quant.engines.factor_eval.factor_evaluation import FactorEvaluation
+
     fundamental_store = FundamentalStore(price_store.db_path)
     factor_registry = FactorEvaluation(price_store, fundamental_store).factor_registry
     values: dict[str, float | None] = {}
@@ -326,7 +415,7 @@ def factor_values_for_pipeline(
 
 
 def benchmark_returns_for_report(
-    price_store: SQLitePriceStore,
+    price_store,
     benchmark: str,
     report_path: Path,
 ) -> dict[str, float] | None:
@@ -365,19 +454,3 @@ def report_date_window(report: dict) -> tuple[str | None, str | None]:
     if dates:
         return min(dates), max(dates)
     return None, None
-
-
-def _load_json_object(path: Path, label: str) -> dict:
-    try:
-        with path.open("r", encoding="utf-8") as file:
-            config = json.load(file)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"{label} is not valid JSON: {path}") from exc
-
-    if not isinstance(config, dict):
-        raise ValueError(f"{label} must contain a JSON object")
-    return config
-
-
-def estimate_costs(config: dict, trades: list[TradeInput]):
-    return CostEngine(config).estimate(trades)

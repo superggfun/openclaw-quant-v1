@@ -81,6 +81,8 @@ class FactorRegistry:
     def latest_fundamental_row(self, symbol: str, statement: str, as_of_date: str) -> dict | None:
         if self.fundamental_store is None:
             return None
+        if hasattr(self.fundamental_store, "latest_as_of"):
+            return self.fundamental_store.latest_as_of(symbol, statement, as_of_date)
         key = (statement, symbol.upper())
         if key not in self._fundamental_rows_cache:
             rows = self.fundamental_store.rows(statement, [symbol])

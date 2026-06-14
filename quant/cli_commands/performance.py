@@ -19,6 +19,10 @@ def register_parser(subparsers: argparse._SubParsersAction) -> None:
     profile.add_argument("--max-factors", type=int, default=2)
     profile.add_argument("--max-folds", type=int, default=1)
     profile.add_argument("--timeout-seconds", type=float, default=180.0)
+    profile.add_argument("--workers", type=int, default=1, help="Matrix workers for bulk matrix profiling.")
+    profile.add_argument("--bulk-matrix", action=argparse.BooleanOptionalAction, default=True,
+        help="Profile the bulk matrix path by default; use --no-bulk-matrix for serial reference diagnostics.")
+    profile.add_argument("--strict-in-memory", action="store_true", help="Fail instead of falling back if InMemory provider fails.")
 
     summary = subparsers.add_parser("performance-summary", help="Show latest performance profile summary.")
     summary.add_argument("--report", default=None)
@@ -36,6 +40,9 @@ def handle(args: argparse.Namespace, context: CLIContext) -> int:
             max_factors=args.max_factors,
             max_folds=args.max_folds,
             timeout_seconds=args.timeout_seconds,
+            bulk_matrix=args.bulk_matrix,
+            workers=args.workers,
+            strict_in_memory=args.strict_in_memory,
         )
         _print_profile(result)
         return 0
@@ -74,6 +81,23 @@ def _print_profile(report: dict, verbose: bool = False) -> None:
     print("recommendations:")
     for item in (report.get("recommendations") or [])[:8]:
         print(f"- {item}")
+    provider_rows = [
+        row for row in report.get("target_results") or []
+        if (row.get("details") or {}).get("provider_type") is not None
+    ]
+    if provider_rows:
+        print("hpc_provider_details:")
+        for row in provider_rows:
+            details = row.get("details") or {}
+            name = row.get("factor") or row.get("strategy") or row.get("target")
+            print(
+                f"- {row.get('target')} {name}: "
+                f"provider_type={details.get('provider_type')} "
+                f"cache_strategy={details.get('cache_strategy')} "
+                f"fallback_used={details.get('fallback_used')} "
+                f"matrix_build_seconds={format_optional_number(details.get('matrix_build_seconds'))} "
+                f"eval_seconds={format_optional_number(details.get('eval_seconds'))}"
+            )
     if verbose:
         print("target_results:")
         for row in report.get("target_results") or []:

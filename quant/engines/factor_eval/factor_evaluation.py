@@ -189,12 +189,18 @@ class FactorEvaluation:
         pipeline_config: dict | None = None,
         use_cache: bool = False,
         factor_cache: FactorEvalCache | None = None,
-        bulk_matrix: bool = False,
+        bulk_matrix: bool = True,
+        max_workers: int = 4,
+        decay_horizons: list[int] | None = None,
+        prefer_in_memory: bool = True,
+        strict_in_memory: bool = False,
         cache_stats: bool = False,
         write_report: bool = True,
     ) -> FactorEvaluationResult:
         eval_started = time.monotonic()
         factor = factor.strip().lower()
+        if use_cache and bulk_matrix:
+            raise ValueError("use_cache and bulk_matrix cannot be enabled together yet")
         self._validate(factor, start, end, forward_days)
         factor_metadata = self.factor_registry.metadata(factor)
         symbols = normalize_symbols(universe or list(DEFAULT_SYMBOLS))
@@ -214,16 +220,33 @@ class FactorEvaluation:
                 end=end,
                 forward_days=forward_days,
                 factor_cache=cache,
+                max_workers=max_workers,
             )
         elif bulk_matrix:
-            matrix = self._build_factor_matrix(factor, symbols, start, end, forward_days)
+            horizons = sorted({int(h) for h in (decay_horizons or DEFAULT_DECAY_DAYS) if int(h) > 0})
+            all_horizons = sorted({forward_days, *horizons})
+            horizon_matrices = FactorMatrixBuilder(
+                self.price_store,
+                self.factor_registry,
+                prefer_in_memory=prefer_in_memory,
+                strict_in_memory=strict_in_memory,
+            ).build_many_horizons(
+                factor=factor,
+                symbols=symbols,
+                start=start,
+                end=end,
+                horizons=all_horizons,
+                max_workers=max_workers,
+            )
+            raw_matrix = horizon_matrices[forward_days]
+            matrix = FactorEvaluation._wrap_matrix_result(raw_matrix)
             observations = matrix.observations
             excluded_symbols = matrix.excluded_symbols
             exclusion_reasons = matrix.exclusion_reasons
             warnings = matrix.warnings
-            matrix_metadata = matrix.to_metadata()
+            matrix_metadata = raw_matrix.to_metadata()
         else:
-            observations, excluded_symbols, exclusion_reasons, warnings = self._observations(
+            observations, excluded_symbols, exclusion_reasons, warnings = self._serial_reference_observations(
                 factor=factor,
                 symbols=symbols,
                 start=start,
@@ -249,16 +272,22 @@ class FactorEvaluation:
         rank_ic_mean = self._mean(rank_ic_values)
         rank_ic_std = self._std(rank_ic_values)
         if bulk_matrix:
-            decay = self._decay_bulk(factor, symbols, start, end, DEFAULT_DECAY_DAYS, normalized_pipeline_config)
+            decay = self._decay_from_matrices(
+                horizon_matrices=horizon_matrices,
+                horizons=horizons,
+                pipeline_config=normalized_pipeline_config,
+                factor=factor,
+            )
         else:
             decay = self._decay(
                 factor=factor,
                 symbols=symbols,
                 start=start,
                 end=end,
-                horizons=DEFAULT_DECAY_DAYS,
+                horizons=decay_horizons or DEFAULT_DECAY_DAYS,
                 pipeline_config=normalized_pipeline_config,
                 factor_cache=cache if use_cache else None,
+                max_workers=max_workers,
             )
         half_life_days = _estimate_half_life(decay)
         performance_metadata = self._performance_metadata(
@@ -267,6 +296,7 @@ class FactorEvaluation:
             matrix_metadata=matrix_metadata,
             cache_enabled=use_cache,
             bulk_matrix=bulk_matrix,
+            max_workers=max_workers,
             cache_stats=cache_stats,
             eval_seconds=time.monotonic() - eval_started,
             matrix_rows=len(observations),
@@ -319,11 +349,12 @@ class FactorEvaluation:
         end: str | None,
         forward_days: int,
         factor_cache: FactorEvalCache,
+        max_workers: int = 4,
     ) -> tuple[list[FactorObservation], list[str], dict[str, str], list[str], dict]:
         key = self._cache_key(factor, symbols, start, end, forward_days)
         matrix, hit = factor_cache.get_or_build(
             key,
-            lambda: self._build_factor_matrix(factor, symbols, start, end, forward_days),
+            lambda: self._build_factor_matrix(factor, symbols, start, end, forward_days, max_workers=max_workers),
         )
         warnings = list(matrix.warnings)
         return (
@@ -334,6 +365,41 @@ class FactorEvaluation:
             matrix.to_metadata() | {"cache_key": key.to_dict(), "cache_hit": hit},
         )
 
+    @staticmethod
+    def _matrix_to_observations(matrix: ObservationMatrixResult) -> list[FactorObservation]:
+        """Convert ObservationMatrixResult valid_rows into FactorObservation list."""
+        obs = []
+        for row in matrix.valid_rows:
+            if row.factor_value is None or row.future_return is None or row.future_date is None:
+                continue
+            obs.append(FactorObservation(
+                signal_date=row.signal_date,
+                future_date=str(row.future_date),
+                symbol=row.symbol,
+                factor_value=float(row.factor_value),
+                future_return=float(row.future_return),
+                forward_days=row.forward_days,
+            ))
+        return obs
+
+    @staticmethod
+    def _wrap_matrix_result(matrix: ObservationMatrixResult) -> FactorMatrixResult:
+        """Wrap an ObservationMatrixResult into a FactorMatrixResult."""
+        from quant.factor_cache.factor_matrix import FactorMatrixResult as FMR
+        return FMR(
+            factor_name=matrix.factor_name,
+            universe=list(matrix.universe),
+            start=matrix.start,
+            end=matrix.end,
+            forward_days=matrix.forward_days,
+            observations=FactorEvaluation._matrix_to_observations(matrix),
+            excluded_symbols=list(matrix.excluded_symbols),
+            exclusion_reasons=dict(matrix.exclusion_reasons),
+            warnings=list(matrix.warnings),
+            bulk_read_seconds=matrix.bulk_read_seconds,
+            matrix_build_seconds=matrix.matrix_build_seconds,
+        )
+
     def _build_factor_matrix(
         self,
         factor: str,
@@ -341,40 +407,25 @@ class FactorEvaluation:
         start: str | None,
         end: str | None,
         forward_days: int,
+        max_workers: int = 4,
+        prefer_in_memory: bool = True,
+        strict_in_memory: bool = False,
     ) -> FactorMatrixResult:
         started = time.monotonic()
-        matrix = FactorMatrixBuilder(self.price_store, self.factor_registry).build(
+        matrix = FactorMatrixBuilder(
+            self.price_store,
+            self.factor_registry,
+            prefer_in_memory=prefer_in_memory,
+            strict_in_memory=strict_in_memory,
+        ).build(
             factor=factor,
             symbols=symbols,
             start=start,
             end=end,
             forward_days=forward_days,
+            max_workers=max_workers,
         )
-        observations = [
-            FactorObservation(
-                signal_date=row.signal_date,
-                future_date=str(row.future_date),
-                symbol=row.symbol,
-                factor_value=float(row.factor_value),
-                future_return=float(row.future_return),
-                forward_days=row.forward_days,
-            )
-            for row in matrix.valid_rows
-            if row.factor_value is not None and row.future_return is not None and row.future_date is not None
-        ]
-        return FactorMatrixResult(
-            factor_name=factor,
-            universe=list(symbols),
-            start=start,
-            end=end,
-            forward_days=forward_days,
-            observations=observations,
-            excluded_symbols=matrix.excluded_symbols,
-            exclusion_reasons=matrix.exclusion_reasons,
-            warnings=matrix.warnings,
-            matrix_build_seconds=time.monotonic() - started,
-            bulk_read_seconds=matrix.bulk_read_seconds,
-        )
+        return FactorEvaluation._wrap_matrix_result(matrix)
 
     def _cache_key(
         self,
@@ -410,9 +461,10 @@ class FactorEvaluation:
         matrix_metadata: dict | None,
         cache_enabled: bool,
         bulk_matrix: bool,
-        cache_stats: bool,
-        eval_seconds: float,
-        matrix_rows: int,
+        max_workers: int = 1,
+        cache_stats: bool = False,
+        eval_seconds: float = 0.0,
+        matrix_rows: int = 0,
     ) -> dict | None:
         if not (cache_enabled or bulk_matrix or cache_stats):
             return None
@@ -433,12 +485,22 @@ class FactorEvaluation:
         delta["cached_matrices"] = int(after.get("cached_matrices", 0))
         matrix_build_seconds = (matrix_metadata or {}).get("matrix_build_seconds")
         bulk_read_seconds = (matrix_metadata or {}).get("bulk_read_seconds")
+        provider_defaults = matrix_metadata or {}
         return {
             "cache_enabled": cache_enabled,
             "bulk_matrix": bulk_matrix,
             "bulk_matrix_enabled": bulk_matrix,
-            "parallel_enabled": False,
-            "workers": 1,
+            "parallel_enabled": int(provider_defaults.get("matrix_workers", max_workers) or 1) > 1,
+            "workers": max_workers,
+            "provider_type": provider_defaults.get("provider_type") or ("sqlite" if bulk_matrix else None),
+            "platform": provider_defaults.get("platform"),
+            "multiprocessing_start_method": provider_defaults.get("multiprocessing_start_method"),
+            "memory_preload_enabled": provider_defaults.get("memory_preload_enabled", False),
+            "memory_preload_seconds": provider_defaults.get("memory_preload_seconds", 0.0),
+            "estimated_matrix_memory_mb": provider_defaults.get("estimated_matrix_memory_mb"),
+            "requested_workers": max_workers,
+            "matrix_workers": provider_defaults.get("matrix_workers", max_workers),
+            "outer_workers": 1,
             "bulk_read_seconds": bulk_read_seconds,
             "cache_hits": delta.get("matrix_hits", 0),
             "cache_misses": delta.get("matrix_misses", 0),
@@ -446,12 +508,15 @@ class FactorEvaluation:
             "matrix_build_seconds": matrix_build_seconds,
             "eval_seconds": round(eval_seconds, 6),
             "speedup_estimate": None,
+            "fallback_used": provider_defaults.get("fallback_used", False),
+            "fallback_reason": provider_defaults.get("fallback_reason"),
+            "cache_strategy": provider_defaults.get("cache_strategy"),
             "cache_stats": delta,
             "matrix": matrix_metadata,
             "no_lookahead": True,
         }
 
-    def _observations(
+    def _serial_reference_observations(
         self,
         factor: str,
         symbols: list[str],
@@ -459,10 +524,44 @@ class FactorEvaluation:
         end: str | None,
         forward_days: int,
     ) -> tuple[list[FactorObservation], list[str], dict[str, str], list[str]]:
+        """Build observations the slow per-symbol way.
+
+        **This is a reference / debugging path only.**  It exists for
+        correctness verification against the accelerated bulk-matrix path
+        and for one-off interactive exploration on tiny universes.
+
+        Production runs should use ``bulk_matrix=True`` (or the equivalent
+        ``--bulk-matrix`` CLI flag), which delegates to ``FactorMatrixBuilder``
+        and is typically 3–10× faster on realistic workloads.
+
+        A warning is emitted when ``symbols`` exceeds 50 or the date span
+        exceeds 500 calendar days — the serial path does not scale.
+        """
         observations: list[FactorObservation] = []
         excluded_symbols = []
         exclusion_reasons = {}
         warnings = []
+
+        # Warn when the serial path is used at any scale — it exists for
+        # debugging, not production.
+        if len(symbols) > 50:
+            warnings.append(
+                f"_serial_reference_observations used with {len(symbols)} symbols — "
+                "this is O(N·symbols) and will be slow; use bulk_matrix=True for production"
+            )
+        if start and end:
+            try:
+                from datetime import date, timedelta
+                s = date.fromisoformat(start)
+                e = date.fromisoformat(end)
+                if (e - s).days > 500:
+                    warnings.append(
+                        f"_serial_reference_observations used over {(e-s).days} days — "
+                        "the serial path does not scale; use bulk_matrix=True for production"
+                    )
+            except (ValueError, TypeError):
+                pass
+
         histories = self._price_histories(symbols)
 
         for symbol in symbols:
@@ -607,13 +706,14 @@ class FactorEvaluation:
         horizons: list[int],
         pipeline_config: dict | None,
         factor_cache: FactorEvalCache | None = None,
+        max_workers: int = 4,
     ) -> dict[str, dict[str, float | int | None]]:
         decay = {}
         for horizon in horizons:
             if factor_cache is not None:
-                observations, _, _, _, _ = self._observations_with_cache(factor, symbols, start, end, horizon, factor_cache)
+                observations, _, _, _, _ = self._observations_with_cache(factor, symbols, start, end, horizon, factor_cache, max_workers=max_workers)
             else:
-                observations, _, _, _ = self._observations(factor, symbols, start, end, horizon)
+                observations, _, _, _ = self._serial_reference_observations(factor, symbols, start, end, horizon)
             observations, _ = self._apply_pipeline(
                 observations,
                 factor=factor,
@@ -628,37 +728,20 @@ class FactorEvaluation:
             }
         return decay
 
-    def _decay_bulk(
+    def _decay_from_matrices(
         self,
-        factor: str,
-        symbols: list[str],
-        start: str | None,
-        end: str | None,
+        horizon_matrices: dict[int, ObservationMatrixResult],
         horizons: list[int],
         pipeline_config: dict | None,
+        factor: str,
     ) -> dict[str, dict[str, float | int | None]]:
-        matrices = FactorMatrixBuilder(self.price_store, self.factor_registry).build_many_horizons(
-            factor=factor,
-            symbols=symbols,
-            start=start,
-            end=end,
-            horizons=horizons,
-        )
+        """Compute decay ICs from pre-built multi-horizon matrices (no redundant rebuilds)."""
         decay = {}
         for horizon in horizons:
-            matrix = matrices[int(horizon)]
-            observations = [
-                FactorObservation(
-                    signal_date=row.signal_date,
-                    future_date=str(row.future_date),
-                    symbol=row.symbol,
-                    factor_value=float(row.factor_value),
-                    future_return=float(row.future_return),
-                    forward_days=row.forward_days,
-                )
-                for row in matrix.valid_rows
-                if row.factor_value is not None and row.future_return is not None and row.future_date is not None
-            ]
+            if horizon not in horizon_matrices:
+                continue
+            matrix = horizon_matrices[horizon]
+            observations = FactorEvaluation._matrix_to_observations(matrix)
             observations, _ = self._apply_pipeline(
                 observations,
                 factor=factor,

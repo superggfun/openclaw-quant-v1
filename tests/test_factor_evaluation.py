@@ -108,7 +108,7 @@ def test_observations_use_bulk_price_history(tmp_path: Path) -> None:
     store = BulkHistoryOnlyStore(tmp_path / "unused.db")
     engine = FactorEvaluation(store, report_dir=tmp_path / "reports")
 
-    observations, excluded, reasons, warnings = engine._observations(
+    observations, excluded, reasons, warnings = engine._serial_reference_observations(
         "momentum_20d",
         ["aaa", "BBB"],
         start="2024-01-25",

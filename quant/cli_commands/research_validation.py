@@ -23,9 +23,13 @@ def register_parser(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--skip-existing", action="store_true")
     parser.add_argument("--use-cache", action="store_true", help="Use the opt-in in-memory factor matrix cache for factor-eval steps.")
-    parser.add_argument("--bulk-matrix", action="store_true", help="Use semantic-preserving bulk factor observation matrices.")
+    parser.add_argument("--bulk-matrix", action=argparse.BooleanOptionalAction, default=True, help="Use semantic-preserving bulk factor observation matrices.")
     parser.add_argument("--parallel", action="store_true", help="Parallelize independent factor batch computations.")
-    parser.add_argument("--workers", type=int, default=None, help="Worker process count for --parallel.")
+    parser.add_argument(
+        "--workers", type=int, default=None,
+        help="When --parallel: outer factor-batch workers. "
+             "Otherwise: inner matrix-build workers (default: 4)."
+    )
     parser.add_argument("--parallel-target", choices=["factor_batch"], default="factor_batch")
     parser.add_argument("--cache-stats", action="store_true", help="Include factor matrix cache diagnostics in the report and CLI output.")
     parser.add_argument("--write-substep-reports", action="store_true", help="Write sub-step reports under the run-specific substeps directory.")
@@ -37,6 +41,8 @@ def register_parser(subparsers: argparse._SubParsersAction) -> None:
 
 
 def handle(args: argparse.Namespace, context: CLIContext) -> int:
+    if args.use_cache and args.bulk_matrix:
+        raise ValueError("--use-cache and --bulk-matrix are mutually exclusive; pass --no-bulk-matrix to use cache")
     runner = ResearchValidationRunner(context)
     preview = runner.preview(
         mode=args.mode,

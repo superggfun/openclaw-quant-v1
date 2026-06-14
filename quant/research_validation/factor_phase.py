@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -12,50 +13,52 @@ from quant.research_validation.models import ResearchValidationPhaseState, Valid
 from quant.research_validation.phase_common import budget_exhausted, record_skip
 
 
+@dataclass(frozen=True)
+class FactorPhaseConfig:
+    """Immutable snapshot of every knob that controls factor eval/backtest execution.
+
+    Centralised so that ``run_factor_validation_phase`` and its helpers never
+    grow parameter lists when new flags (memmap, benchmark, …) are added.
+    """
+
+    started: float
+    reserve_seconds: float
+    timeout: float
+    parallel: bool
+    worker_count: int
+    matrix_workers: int
+    skip_existing: bool
+    resume: bool
+    bulk_matrix: bool
+    prefer_in_memory: bool
+    strict_in_memory: bool
+    effective_start: str | None
+    effective_end: str | None
+    write_substep_reports: bool
+    write_batch_artifacts: bool
+    substep_dir: Path
+    batch_artifact_dir: Path
+
+
 def run_factor_validation_phase(
     runner,
     *,
     state: ResearchValidationPhaseState,
     factors: list[str],
     batches: list[list[str]],
-    started: float,
-    reserve_seconds: float,
-    timeout: float,
-    parallel: bool,
-    worker_count: int,
-    skip_existing: bool,
-    resume: bool,
-    bulk_matrix: bool,
-    effective_start: str | None,
-    effective_end: str | None,
-    write_substep_reports: bool,
-    write_batch_artifacts: bool,
-    substep_dir: Path,
-    batch_artifact_dir: Path,
+    config: FactorPhaseConfig,
 ) -> None:
     pending_factor_evals: list[Any] = []
     pending_factor_backtests: list[Any] = []
     pending_regime_items: list[tuple[str, list[dict], str | None]] = []
 
-    if parallel:
+    if config.parallel:
         _run_parallel_factor_phase(
             runner,
             state=state,
             factors=factors,
             batches=batches,
-            started=started,
-            reserve_seconds=reserve_seconds,
-            timeout=timeout,
-            worker_count=worker_count,
-            skip_existing=skip_existing,
-            resume=resume,
-            bulk_matrix=bulk_matrix,
-            effective_start=effective_start,
-            effective_end=effective_end,
-            write_substep_reports=write_substep_reports,
-            write_batch_artifacts=write_batch_artifacts,
-            substep_dir=substep_dir,
-            batch_artifact_dir=batch_artifact_dir,
+            config=config,
             pending_factor_evals=pending_factor_evals,
             pending_factor_backtests=pending_factor_backtests,
             pending_regime_items=pending_regime_items,
@@ -75,38 +78,8 @@ def run_factor_validation_phase(
             "sqlite_write_mode": "batched_main_process",
         }
 
-    _run_serial_factor_eval_phase(
-        runner,
-        state=state,
-        factors=factors,
-        batches=batches,
-        started=started,
-        reserve_seconds=reserve_seconds,
-        timeout=timeout,
-        skip_existing=skip_existing,
-        resume=resume,
-        bulk_matrix=bulk_matrix,
-        effective_start=effective_start,
-        effective_end=effective_end,
-        write_substep_reports=write_substep_reports,
-        substep_dir=substep_dir,
-    )
-    _run_serial_factor_backtest_phase(
-        runner,
-        state=state,
-        factors=factors,
-        batches=batches,
-        started=started,
-        reserve_seconds=reserve_seconds,
-        timeout=timeout,
-        bulk_matrix=bulk_matrix,
-        effective_start=effective_start,
-        effective_end=effective_end,
-        write_substep_reports=write_substep_reports,
-        write_batch_artifacts=write_batch_artifacts,
-        substep_dir=substep_dir,
-        batch_artifact_dir=batch_artifact_dir,
-    )
+    _run_serial_factor_eval_phase(runner, state=state, factors=factors, batches=batches, config=config)
+    _run_serial_factor_backtest_phase(runner, state=state, factors=factors, batches=batches, config=config)
 
 
 def _run_parallel_factor_phase(
@@ -115,19 +88,7 @@ def _run_parallel_factor_phase(
     state: ResearchValidationPhaseState,
     factors: list[str],
     batches: list[list[str]],
-    started: float,
-    reserve_seconds: float,
-    timeout: float,
-    worker_count: int,
-    skip_existing: bool,
-    resume: bool,
-    bulk_matrix: bool,
-    effective_start: str | None,
-    effective_end: str | None,
-    write_substep_reports: bool,
-    write_batch_artifacts: bool,
-    substep_dir: Path,
-    batch_artifact_dir: Path,
+    config: FactorPhaseConfig,
     pending_factor_evals: list[Any],
     pending_factor_backtests: list[Any],
     pending_regime_items: list[tuple[str, list[dict], str | None]],
@@ -136,10 +97,10 @@ def _run_parallel_factor_phase(
     for factor in factors:
         for batch_index, batch in enumerate(batches, start=1):
             target = f"{factor} batch {batch_index}/{len(batches)}"
-            if budget_exhausted(started, reserve_seconds, timeout):
+            if budget_exhausted(config.started, config.reserve_seconds, config.timeout):
                 record_skip(state, "factor_eval", "factor", target, "TIMEOUT")
                 continue
-            if (skip_existing or resume) and runner._has_existing_factor_values(factor, batch):
+            if (config.skip_existing or config.resume) and runner._has_existing_factor_values(factor, batch):
                 state.skipped_batches.append(
                     {
                         "step": "factor_eval",
@@ -159,18 +120,21 @@ def _run_parallel_factor_phase(
                     batch_count=len(batches),
                     symbols=batch,
                     db_path=str(runner.context.db_path),
-                    report_dir=str(substep_dir if write_substep_reports else runner.report_dir),
-                    bulk_matrix=bulk_matrix,
-                    start=effective_start,
-                    end=effective_end,
+                    report_dir=str(config.substep_dir if config.write_substep_reports else runner.report_dir),
+                    bulk_matrix=config.bulk_matrix,
+                    max_workers=config.matrix_workers,
+                    prefer_in_memory=config.prefer_in_memory,
+                    strict_in_memory=config.strict_in_memory,
+                    start=config.effective_start,
+                    end=config.effective_end,
                     forward_days=DEFAULT_FORWARD_DAYS,
                     holding_period=DEFAULT_HOLDING_PERIOD,
-                    write_report=write_substep_reports,
+                    write_report=config.write_substep_reports,
                 )
             )
     for factor in factors:
         for batch_index, batch in enumerate(batches, start=1):
-            if budget_exhausted(started, reserve_seconds, timeout):
+            if budget_exhausted(config.started, config.reserve_seconds, config.timeout):
                 record_skip(state, "factor_backtest", "factor", f"{factor} batch {batch_index}/{len(batches)}", "TIMEOUT")
                 continue
             parallel_tasks.append(
@@ -181,17 +145,20 @@ def _run_parallel_factor_phase(
                     batch_count=len(batches),
                     symbols=batch,
                     db_path=str(runner.context.db_path),
-                    report_dir=str(substep_dir if write_substep_reports else runner.report_dir),
-                    bulk_matrix=bulk_matrix,
-                    start=effective_start,
-                    end=effective_end,
+                    report_dir=str(config.substep_dir if config.write_substep_reports else runner.report_dir),
+                    bulk_matrix=config.bulk_matrix,
+                    max_workers=config.matrix_workers,
+                    prefer_in_memory=config.prefer_in_memory,
+                    strict_in_memory=config.strict_in_memory,
+                    start=config.effective_start,
+                    end=config.effective_end,
                     forward_days=DEFAULT_FORWARD_DAYS,
                     holding_period=DEFAULT_HOLDING_PERIOD,
-                    write_report=write_substep_reports,
+                    write_report=config.write_substep_reports,
                 )
             )
     try:
-        parallel_budget = max(timeout - (time.monotonic() - started) - reserve_seconds, 0.0)
+        parallel_budget = max(config.timeout - (time.monotonic() - config.started) - config.reserve_seconds, 0.0)
         state.factor_eval_serial = False
         state.factor_backtest_serial = False
 
@@ -200,15 +167,15 @@ def _run_parallel_factor_phase(
                 runner,
                 state=state,
                 item=item,
-                write_batch_artifacts=write_batch_artifacts,
-                batch_artifact_dir=batch_artifact_dir,
+                write_batch_artifacts=config.write_batch_artifacts,
+                batch_artifact_dir=config.batch_artifact_dir,
                 pending_factor_evals=pending_factor_evals,
                 pending_factor_backtests=pending_factor_backtests,
                 pending_regime_items=pending_regime_items,
             )
 
         parallel_compute_started = time.monotonic()
-        run_factor_batch_tasks(parallel_tasks, worker_count, timeout_seconds=parallel_budget, on_result=handle_parallel_result)
+        run_factor_batch_tasks(parallel_tasks, config.worker_count, timeout_seconds=parallel_budget, on_result=handle_parallel_result)
         state.parallel_compute_seconds = time.monotonic() - parallel_compute_started
     except Exception as exc:
         state.factor_eval_serial = True
@@ -226,7 +193,7 @@ def _run_parallel_factor_phase(
                 0.0,
                 warnings=["PARALLEL_FALLBACK_SERIAL"],
                 error=str(exc),
-                details={"workers": worker_count},
+                details={"workers": config.worker_count},
             )
         )
 
@@ -324,24 +291,15 @@ def _run_serial_factor_eval_phase(
     state: ResearchValidationPhaseState,
     factors: list[str],
     batches: list[list[str]],
-    started: float,
-    reserve_seconds: float,
-    timeout: float,
-    skip_existing: bool,
-    resume: bool,
-    bulk_matrix: bool,
-    effective_start: str | None,
-    effective_end: str | None,
-    write_substep_reports: bool,
-    substep_dir: Path,
+    config: FactorPhaseConfig,
 ) -> None:
     for factor in ([] if not state.factor_eval_serial else factors):
         for batch_index, batch in enumerate(batches, start=1):
             target = f"{factor} batch {batch_index}/{len(batches)}"
-            if budget_exhausted(started, reserve_seconds, timeout):
+            if budget_exhausted(config.started, config.reserve_seconds, config.timeout):
                 record_skip(state, "factor_eval", "factor", target, "TIMEOUT")
                 continue
-            if (skip_existing or resume) and runner._has_existing_factor_values(factor, batch):
+            if (config.skip_existing or config.resume) and runner._has_existing_factor_values(factor, batch):
                 state.skipped_batches.append(
                     {
                         "step": "factor_eval",
@@ -360,11 +318,14 @@ def _run_serial_factor_eval_phase(
                 lambda f=factor, symbols=batch: runner._run_factor_eval(
                     f,
                     symbols,
-                    start=effective_start,
-                    end=effective_end,
-                    bulk_matrix=bulk_matrix,
-                    write_report=write_substep_reports,
-                    report_dir=substep_dir,
+                    start=config.effective_start,
+                    end=config.effective_end,
+                    bulk_matrix=config.bulk_matrix,
+                    max_workers=config.matrix_workers,
+                    prefer_in_memory=config.prefer_in_memory,
+                    strict_in_memory=config.strict_in_memory,
+                    write_report=config.write_substep_reports,
+                    report_dir=config.substep_dir,
                 ),
                 details={"factor": factor, "batch_index": batch_index, "symbols_evaluated": batch},
             )
@@ -396,21 +357,12 @@ def _run_serial_factor_backtest_phase(
     state: ResearchValidationPhaseState,
     factors: list[str],
     batches: list[list[str]],
-    started: float,
-    reserve_seconds: float,
-    timeout: float,
-    bulk_matrix: bool,
-    effective_start: str | None,
-    effective_end: str | None,
-    write_substep_reports: bool,
-    write_batch_artifacts: bool,
-    substep_dir: Path,
-    batch_artifact_dir: Path,
+    config: FactorPhaseConfig,
 ) -> None:
     for factor in ([] if not state.factor_backtest_serial else factors):
         for batch_index, batch in enumerate(batches, start=1):
             target = f"{factor} batch {batch_index}/{len(batches)}"
-            if budget_exhausted(started, reserve_seconds, timeout):
+            if budget_exhausted(config.started, config.reserve_seconds, config.timeout):
                 record_skip(state, "factor_backtest", "factor", target, "TIMEOUT")
                 continue
             step, result = runner._timed_step(
@@ -420,13 +372,16 @@ def _run_serial_factor_backtest_phase(
                 lambda f=factor, symbols=batch: runner._run_factor_backtest(
                     f,
                     symbols,
-                    start=effective_start,
-                    end=effective_end,
-                    bulk_matrix=bulk_matrix,
-                    write_report=write_substep_reports,
-                    write_batch_artifact=write_batch_artifacts,
-                    report_dir=substep_dir,
-                    artifact_dir=batch_artifact_dir,
+                    start=config.effective_start,
+                    end=config.effective_end,
+                    bulk_matrix=config.bulk_matrix,
+                    max_workers=config.matrix_workers,
+                    prefer_in_memory=config.prefer_in_memory,
+                    strict_in_memory=config.strict_in_memory,
+                    write_report=config.write_substep_reports,
+                    write_batch_artifact=config.write_batch_artifacts,
+                    report_dir=config.substep_dir,
+                    artifact_dir=config.batch_artifact_dir,
                 ),
                 details={"factor": factor, "batch_index": batch_index, "symbols_evaluated": batch},
             )

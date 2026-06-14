@@ -36,6 +36,7 @@ class ResearchValidationReportInput:
     bulk_matrix: bool
     parallel: bool
     worker_count: int
+    matrix_workers: int
     parallel_target: str
     write_substep_reports: bool
     write_batch_artifacts: bool

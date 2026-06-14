@@ -2,22 +2,60 @@
 
 from __future__ import annotations
 
+import math
 import time
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
+import numpy as np
 import pandas as pd
 
+from quant.data.research_data_store import InMemoryResearchDataStore, multiprocessing_start_method, platform_label
 from quant.factor_acceleration.bulk_price_loader import BulkPriceLoader
+from quant.factor_acceleration.in_memory_provider import InMemoryPriceMatrixProvider
 from quant.factor_acceleration.observation_matrix import ObservationMatrixResult, ObservationMatrixRow
+from quant.factor_acceleration.price_factor_kernels import price_factor_series
 from quant.factors.price.factor_registry import FactorRegistry
 from quant.storage.sqlite_store import SQLitePriceStore
+
+# ── Module-level price cache ──
+#   Loaded by parent process before ProcessPoolExecutor fork;
+#   child processes inherit it via COW shared memory, avoiding
+#   per-worker SQLite reads.
+_price_cache: dict[str, pd.DataFrame] | None = None
+
+
+def preload_price_cache(histories: dict[str, pd.DataFrame]) -> None:
+    """Pre-load price histories into module cache before forking workers.
+
+    Call this in the parent process before ProcessPoolExecutor.
+    Child processes inherit the cache via COW shared memory.
+    """
+    global _price_cache
+    _price_cache = dict(histories)  # shallow copy — DataFrames are COW
+
+
+def release_price_cache() -> None:
+    """Release the module-level price cache to free memory."""
+    global _price_cache
+    _price_cache = None
 
 
 class FactorMatrixBuilder:
     """Build factor values once, then attach one or more future-return horizons."""
 
-    def __init__(self, price_store: SQLitePriceStore, factor_registry: FactorRegistry) -> None:
+    def __init__(
+        self,
+        price_store: SQLitePriceStore,
+        factor_registry: FactorRegistry,
+        research_data_store: InMemoryResearchDataStore | None = None,
+        prefer_in_memory: bool = True,
+        strict_in_memory: bool = False,
+    ) -> None:
         self.price_store = price_store
         self.factor_registry = factor_registry
+        self.research_data_store = research_data_store
+        self.prefer_in_memory = prefer_in_memory
+        self.strict_in_memory = strict_in_memory
 
     def build(
         self,
@@ -26,8 +64,11 @@ class FactorMatrixBuilder:
         start: str | None,
         end: str | None,
         forward_days: int,
+        max_workers: int = 1,
     ) -> ObservationMatrixResult:
-        return self.build_many_horizons(factor, symbols, start, end, [forward_days])[forward_days]
+        return self.build_many_horizons(
+            factor, symbols, start, end, [forward_days], max_workers=max_workers,
+        )[forward_days]
 
     def build_many_horizons(
         self,
@@ -36,42 +77,195 @@ class FactorMatrixBuilder:
         start: str | None,
         end: str | None,
         horizons: list[int],
+        max_workers: int = 1,
     ) -> dict[int, ObservationMatrixResult]:
-        normalized_horizons = sorted({int(horizon) for horizon in horizons if int(horizon) > 0})
+        normalized_horizons = sorted({int(h) for h in horizons if int(h) > 0})
         if not normalized_horizons:
             raise ValueError("at least one positive horizon is required")
         started = time.monotonic()
+        fallback_reason = None
+        if self.prefer_in_memory:
+            try:
+                data_store = self.research_data_store
+                if data_store is None:
+                    data_store = InMemoryResearchDataStore.from_stores(
+                        self.price_store,
+                        getattr(self.factor_registry, "fundamental_store", None),
+                        symbols=symbols,
+                        horizons=normalized_horizons,
+                    )
+                return InMemoryPriceMatrixProvider(data_store, self.factor_registry).build_many_horizons(
+                    factor=factor,
+                    symbols=symbols,
+                    start=start,
+                    end=end,
+                    horizons=normalized_horizons,
+                    max_workers=max_workers,
+                )
+            except Exception as exc:
+                if self.strict_in_memory:
+                    raise
+                fallback_reason = repr(exc)
         histories = BulkPriceLoader(self.price_store).load(symbols)
-        rows_by_horizon: dict[int, list[ObservationMatrixRow]] = {horizon: [] for horizon in normalized_horizons}
-        excluded: dict[int, list[str]] = {horizon: [] for horizon in normalized_horizons}
-        exclusion_reasons: dict[int, dict[str, str]] = {horizon: {} for horizon in normalized_horizons}
-        warnings: dict[int, list[str]] = {horizon: [] for horizon in normalized_horizons}
+
+        n_workers = max(1, min(int(max_workers), len(symbols)))
+        if n_workers <= 1:
+            return self._build_sequential(
+                factor, symbols, start, end, normalized_horizons, histories, started,
+                fallback_used=fallback_reason is not None,
+                fallback_reason=fallback_reason,
+                requested_workers=max_workers,
+            )
+
+        # ── Pre-load price cache before fork so children inherit it via COW ──
+        start_method = multiprocessing_start_method()
+        if start_method == "fork":
+            preload_price_cache(histories.histories)
+
+        # ── Parallel: split symbols into chunks, each worker processes their chunk ──
+        chunk_size = math.ceil(len(symbols) / n_workers)
+        chunks = [symbols[i:i + chunk_size] for i in range(0, len(symbols), chunk_size)]
+        db_path = self.price_store.db_path
+
+        rows_by_horizon: dict[int, list[ObservationMatrixRow]] = {h: [] for h in normalized_horizons}
+        excluded: dict[int, list[str]] = {h: [] for h in normalized_horizons}
+        exclusion_reasons: dict[int, dict[str, str]] = {h: {} for h in normalized_horizons}
+        warnings: dict[int, list[str]] = {h: [] for h in normalized_horizons}
+
+        try:
+            with ProcessPoolExecutor(max_workers=n_workers) as executor:
+                futures = {
+                    executor.submit(
+                        _build_symbol_chunk,
+                        db_path, factor, chunk, start, end, list(normalized_horizons),
+                    ): chunk
+                    for chunk in chunks
+                }
+                for future in as_completed(futures):
+                    chunk_result = future.result()
+                    for h in normalized_horizons:
+                        rows_by_horizon[h].extend(chunk_result["rows"][h])
+                        excluded[h].extend(chunk_result["excluded"][h])
+                        exclusion_reasons[h].update(chunk_result["reasons"][h])
+                        warnings[h].extend(chunk_result["warnings"][h])
+        finally:
+            release_price_cache()
+
+        return self._assemble_result(factor, symbols, start, end, normalized_horizons,
+                                     rows_by_horizon, excluded, exclusion_reasons, warnings,
+                                     histories.read_seconds, started,
+                                     provider_type="sqlite",
+                                     cache_strategy="sqlite_bulk_with_fork_cow" if start_method == "fork" else "sqlite_bulk_spawn_workers",
+                                     matrix_workers=n_workers,
+                                     fallback_used=fallback_reason is not None,
+                                     fallback_reason=fallback_reason,
+                                     requested_workers=max_workers)
+
+    def _build_sequential(
+        self,
+        factor: str,
+        symbols: list[str],
+        start: str | None,
+        end: str | None,
+        normalized_horizons: list[int],
+        histories,
+        started: float,
+        fallback_used: bool = False,
+        fallback_reason: str | None = None,
+        requested_workers: int = 1,
+    ) -> dict[int, ObservationMatrixResult]:
+        rows_by_horizon: dict[int, list[ObservationMatrixRow]] = {h: [] for h in normalized_horizons}
+        excluded: dict[int, list[str]] = {h: [] for h in normalized_horizons}
+        exclusion_reasons: dict[int, dict[str, str]] = {h: {} for h in normalized_horizons}
+        warnings: dict[int, list[str]] = {h: [] for h in normalized_horizons}
 
         for symbol in symbols:
-            history = histories.histories.get(symbol)
-            if history is None or history.empty:
-                self._exclude_all(symbol, "no price data", normalized_horizons, excluded, exclusion_reasons, warnings)
+            local = self._process_one_symbol(factor, symbol, start, end, normalized_horizons, histories)
+            for h in normalized_horizons:
+                rows_by_horizon[h].extend(local["rows"][h])
+                excluded[h].extend(local["excluded"][h])
+                exclusion_reasons[h].update(local["reasons"][h])
+                warnings[h].extend(local["warnings"][h])
+
+        return self._assemble_result(factor, symbols, start, end, normalized_horizons,
+                                     rows_by_horizon, excluded, exclusion_reasons, warnings,
+                                     histories.read_seconds, started,
+                                     provider_type="sqlite",
+                                     cache_strategy="sqlite_bulk_single_process",
+                                     matrix_workers=1,
+                                     fallback_used=fallback_used,
+                                     fallback_reason=fallback_reason,
+                                     requested_workers=requested_workers)
+
+    def _process_one_symbol(
+        self,
+        factor: str,
+        symbol: str,
+        start: str | None,
+        end: str | None,
+        normalized_horizons: list[int],
+        histories,
+    ) -> dict:
+        """Process a single symbol: normalize → factor_values → rows.  Thread-safe (read-only on self)."""
+        local_rows: dict[int, list[ObservationMatrixRow]] = {h: [] for h in normalized_horizons}
+        local_excluded: dict[int, list[str]] = {h: [] for h in normalized_horizons}
+        local_reasons: dict[int, dict[str, str]] = {h: {} for h in normalized_horizons}
+        local_warnings: dict[int, list[str]] = {h: [] for h in normalized_horizons}
+
+        history = histories.histories.get(symbol)
+        if history is None or history.empty:
+            self._exclude_all(symbol, "no price data", normalized_horizons,
+                              local_excluded, local_reasons, local_warnings)
+            return {"rows": local_rows, "excluded": local_excluded,
+                    "reasons": local_reasons, "warnings": local_warnings}
+
+        history = self._normalize_history(history)
+        if history.empty:
+            self._exclude_all(symbol, "no valid close prices", normalized_horizons,
+                              local_excluded, local_reasons, local_warnings)
+            return {"rows": local_rows, "excluded": local_excluded,
+                    "reasons": local_reasons, "warnings": local_warnings}
+
+        factor_values = self._factor_values(factor, symbol, history, start, end)
+        for horizon in normalized_horizons:
+            symbol_rows = self._rows_for_horizon(factor, symbol, history, factor_values, horizon)
+            if not symbol_rows:
+                local_excluded[horizon].append(symbol)
+                local_reasons[horizon][symbol] = "no valid factor and future-return pairs"
+                local_warnings[horizon].append(f"excluded {symbol}: no valid factor and future-return pairs")
                 continue
+            local_rows[horizon].extend(symbol_rows)
 
-            history = self._normalize_history(history)
-            if history.empty:
-                self._exclude_all(symbol, "no valid close prices", normalized_horizons, excluded, exclusion_reasons, warnings)
-                continue
+        return {"rows": local_rows, "excluded": local_excluded,
+                "reasons": local_reasons, "warnings": local_warnings}
 
-            factor_values = self._factor_values(factor, symbol, history, start, end)
-            for horizon in normalized_horizons:
-                symbol_rows = self._rows_for_horizon(factor, symbol, history, factor_values, horizon)
-                if not symbol_rows:
-                    excluded[horizon].append(symbol)
-                    exclusion_reasons[horizon][symbol] = "no valid factor and future-return pairs"
-                    warnings[horizon].append(f"excluded {symbol}: no valid factor and future-return pairs")
-                    continue
-                rows_by_horizon[horizon].extend(symbol_rows)
-
+    def _assemble_result(
+        self,
+        factor: str,
+        symbols: list[str],
+        start: str | None,
+        end: str | None,
+        normalized_horizons: list[int],
+        rows_by_horizon: dict[int, list[ObservationMatrixRow]],
+        excluded: dict[int, list[str]],
+        exclusion_reasons: dict[int, dict[str, str]],
+        warnings: dict[int, list[str]],
+        read_seconds: float,
+        started: float,
+        provider_type: str = "sqlite",
+        cache_strategy: str = "sqlite_bulk",
+        matrix_workers: int = 1,
+        fallback_used: bool = False,
+        fallback_reason: str | None = None,
+        requested_workers: int = 1,
+    ) -> dict[int, ObservationMatrixResult]:
         build_seconds = time.monotonic() - started
         output = {}
         for horizon in normalized_horizons:
             rows = sorted(rows_by_horizon[horizon], key=lambda row: (row.signal_date, row.symbol, row.forward_days))
+            matrix_warnings = list(warnings[horizon])
+            if fallback_reason:
+                matrix_warnings.append(f"IN_MEMORY_FALLBACK: {fallback_reason}")
             output[horizon] = ObservationMatrixResult(
                 factor_name=factor,
                 universe=list(symbols),
@@ -81,11 +275,60 @@ class FactorMatrixBuilder:
                 rows=rows,
                 excluded_symbols=excluded[horizon],
                 exclusion_reasons=exclusion_reasons[horizon],
-                warnings=warnings[horizon],
-                bulk_read_seconds=histories.read_seconds,
+                warnings=matrix_warnings,
+                bulk_read_seconds=read_seconds,
                 matrix_build_seconds=build_seconds,
+                performance_metadata={
+                    "provider_type": provider_type,
+                    "platform": platform_label(),
+                    "multiprocessing_start_method": multiprocessing_start_method(),
+                    "memory_preload_enabled": False,
+                    "memory_preload_seconds": 0.0,
+                    "estimated_matrix_memory_mb": None,
+                    "requested_workers": requested_workers,
+                    "matrix_workers": matrix_workers,
+                    "matrix_build_seconds": round(build_seconds, 6),
+                    "bulk_read_seconds": round(read_seconds, 6),
+                    "cache_strategy": cache_strategy,
+                    "fallback_used": fallback_used,
+                    "fallback_reason": fallback_reason,
+                    "no_lookahead": True,
+                },
             )
         return output
+
+    # ── static helpers ──
+
+    @staticmethod
+    def _fundamental_factor_values(
+        registry,
+        factor: str,
+        symbol: str,
+        history: pd.DataFrame,
+        start: str | None,
+        end: str | None,
+    ) -> dict[int, float]:
+        """Per-row factor computation for fundamental factors.
+
+        Fundamental factors only need ``symbol + as_of_date`` to look up
+        financial data — the close series is purely diagnostic.  This method
+        avoids constructing a growing close series per iteration.
+        """
+        closes_dummy = history["close"].iloc[:0]
+        dates = history["date"].values
+        values: dict[int, float] = {}
+        for index in range(len(history)):
+            signal_date = str(dates[index])
+            if start and signal_date < start:
+                continue
+            if end and signal_date > end:
+                continue
+            value = registry.factor_value(
+                closes_dummy, factor, symbol=symbol, as_of_date=signal_date
+            )
+            if value is not None and not pd.isna(value):
+                values[index] = float(value)
+        return values
 
     @staticmethod
     def _normalize_history(history: pd.DataFrame) -> pd.DataFrame:
@@ -101,11 +344,17 @@ class FactorMatrixBuilder:
         start: str | None,
         end: str | None,
     ) -> dict[int, float]:
-        price_series = self._price_factor_series(factor, history)
+        price_series = price_factor_series(factor, history)
         if price_series is not None:
             return self._valid_series_values(price_series, history, start, end)
 
         values: dict[int, float] = {}
+        is_fundamental = self.factor_registry.is_fundamental(factor)
+        if is_fundamental:
+            return FactorMatrixBuilder._fundamental_factor_values(
+                self.factor_registry, factor, symbol, history, start, end
+            )
+
         for index in range(len(history)):
             signal_date = str(history.iloc[index]["date"])
             if start and signal_date < start:
@@ -130,75 +379,14 @@ class FactorMatrixBuilder:
         start: str | None,
         end: str | None,
     ) -> dict[int, float]:
-        output: dict[int, float] = {}
-        for index, value in values.items():
-            signal_date = str(history.iloc[int(index)]["date"])
-            if start and signal_date < start:
-                continue
-            if end and signal_date > end:
-                continue
-            if value is None or pd.isna(value):
-                continue
-            output[int(index)] = float(value)
-        return output
-
-    @staticmethod
-    def _price_factor_series(factor: str, history: pd.DataFrame) -> pd.Series | None:
-        closes = pd.to_numeric(history["close"], errors="coerce")
-        returns = closes.pct_change()
-
-        if factor == "momentum_20d":
-            return (closes / closes.shift(20)) - 1.0
-        if factor == "momentum_60d":
-            return (closes / closes.shift(60)) - 1.0
-        if factor == "volatility_20d":
-            volatility = FactorMatrixBuilder._rolling_std_exact(returns, 20)
-            return volatility.where(volatility > 0)
-        if factor == "risk_adjusted_momentum":
-            momentum = (closes / closes.shift(60)) - 1.0
-            volatility = FactorMatrixBuilder._rolling_std_exact(returns, 20)
-            return (momentum / volatility).where(volatility > 0)
-        if factor == "reversal_5d":
-            return -((closes / closes.shift(5)) - 1.0)
-        if factor == "reversal_20d":
-            return -((closes / closes.shift(20)) - 1.0)
-        if factor == "low_volatility_score":
-            volatility = FactorMatrixBuilder._rolling_std_exact(returns, 20)
-            return (-volatility).where(volatility > 0)
-        if factor == "growth_score":
-            momentum_20d = (closes / closes.shift(20)) - 1.0
-            momentum_60d = (closes / closes.shift(60)) - 1.0
-            consistency = (closes.diff() > 0).rolling(20).mean()
-            return 0.35 * momentum_20d + 0.45 * momentum_60d + 0.20 * consistency
-        if factor == "value_score":
-            long_return = (closes / closes.shift(120)) - 1.0
-            volatility = FactorMatrixBuilder._rolling_std_exact(returns, 60)
-            return (-long_return / volatility).where(volatility > 0)
-        if factor == "quality_score":
-            return closes.rolling(61).apply(FactorMatrixBuilder._quality_window_score, raw=True)
-        return None
-
-    @staticmethod
-    def _rolling_std_exact(values: pd.Series, window: int) -> pd.Series:
-        return values.rolling(window).apply(
-            lambda rows: float(pd.Series(rows, dtype="float64").std()),
-            raw=True,
-        )
-
-    @staticmethod
-    def _quality_window_score(values) -> float:
-        series = pd.Series(values, dtype="float64")
-        returns = series.pct_change().dropna()
-        if len(returns) < 60:
-            return float("nan")
-        volatility = float(returns.std())
-        if volatility <= 0 or pd.isna(volatility):
-            return float("nan")
-        positive_rate = float((returns > 0).mean())
-        cumulative = (1.0 + returns).cumprod()
-        max_drawdown = float((cumulative / cumulative.cummax() - 1.0).min())
-        mean_return = float(returns.mean())
-        return (mean_return / volatility) + positive_rate + max_drawdown
+        mask = values.notna()
+        dates = history["date"].astype(str)
+        if start:
+            mask &= dates >= start
+        if end:
+            mask &= dates <= end
+        valid = values[mask]
+        return {int(i): float(v) for i, v in valid.items()}
 
     @staticmethod
     def _rows_for_horizon(
@@ -208,21 +396,26 @@ class FactorMatrixBuilder:
         factor_values: dict[int, float],
         horizon: int,
     ) -> list[ObservationMatrixRow]:
+        dates_arr = history["date"].to_numpy()
+        closes_arr = history["close"].to_numpy(dtype=float, na_value=float("nan"))
+        max_index = len(history)
         rows = []
         for index, factor_value in factor_values.items():
             future_index = index + horizon
-            if future_index >= len(history):
+            if future_index >= max_index:
                 continue
-            signal_close = float(history.iloc[index]["close"])
-            future_close = float(history.iloc[future_index]["close"])
+            signal_close = closes_arr[index]
+            future_close = closes_arr[future_index]
+            if np.isnan(signal_close) or np.isnan(future_close):
+                continue
             rows.append(
                 ObservationMatrixRow(
                     factor_name=factor,
                     symbol=symbol,
-                    signal_date=str(history.iloc[index]["date"]),
-                    future_date=str(history.iloc[future_index]["date"]),
+                    signal_date=str(dates_arr[index]),
+                    future_date=str(dates_arr[future_index]),
                     factor_value=factor_value,
-                    future_return=(future_close / signal_close) - 1.0,
+                    future_return=(float(future_close) / float(signal_close)) - 1.0,
                     forward_days=horizon,
                     valid=True,
                     exclusion_reason=None,
@@ -243,3 +436,126 @@ class FactorMatrixBuilder:
             excluded[horizon].append(symbol)
             exclusion_reasons[horizon][symbol] = reason
             warnings[horizon].append(f"excluded {symbol}: {reason}")
+
+
+def _build_symbol_chunk(
+    db_path: str,
+    factor: str,
+    symbols: list[str],
+    start: str | None,
+    end: str | None,
+    horizons: list[int],
+) -> dict:
+    """Process a chunk of symbols in a subprocess.  Returns picklable dict.
+
+    If the parent loaded _price_cache before fork, child processes inherit it
+    via COW shared memory and skip SQLite reads entirely.
+    """
+    from quant.data.fundamental.fundamental_store import FundamentalStore
+    from quant.factors.price.factor_registry import FactorRegistry
+
+    # ── Use COW cache if parent pre-loaded it ──
+    if _price_cache is not None:
+        return _build_from_cache(factor, symbols, start, end, horizons, db_path)
+
+    price_store = SQLitePriceStore(db_path)
+    fundamental_store = FundamentalStore(db_path)
+    registry = FactorRegistry(fundamental_store)
+    builder = FactorMatrixBuilder(price_store, registry)
+
+    result = builder.build_many_horizons(factor, symbols, start, end, horizons, max_workers=1)
+
+    return {
+        "rows": {h: result[h].rows for h in horizons},
+        "excluded": {h: result[h].excluded_symbols for h in horizons},
+        "reasons": {h: result[h].exclusion_reasons for h in horizons},
+        "warnings": {h: result[h].warnings for h in horizons},
+    }
+
+
+def _build_from_cache(
+    factor: str,
+    symbols: list[str],
+    start: str | None,
+    end: str | None,
+    horizons: list[int],
+    db_path: str,
+) -> dict:
+    """Build observations from the pre-loaded COW cache — no SQLite price reads.
+
+    Fundamental factors still need FundamentalStore (cheap metadata lookups
+    via SQLite, not bulk price reads).  db_path is provided so the worker can
+    open its own FundamentalStore connection.
+    """
+    from quant.data.fundamental.fundamental_store import FundamentalStore
+    from quant.factors.price.factor_registry import FactorRegistry
+
+    fundamental_store = FundamentalStore(db_path)
+    registry = FactorRegistry(fundamental_store)
+    normalized_horizons = sorted({int(h) for h in horizons if int(h) > 0})
+
+    rows_by_horizon: dict[int, list[ObservationMatrixRow]] = {h: [] for h in normalized_horizons}
+    excluded: dict[int, list[str]] = {h: [] for h in normalized_horizons}
+    reasons: dict[int, dict[str, str]] = {h: {} for h in normalized_horizons}
+    warnings_list: dict[int, list[str]] = {h: [] for h in normalized_horizons}
+
+    for symbol in symbols:
+        history = _price_cache.get(symbol) if _price_cache else None
+        if history is None or history.empty:
+            for h in normalized_horizons:
+                excluded[h].append(symbol)
+                reasons[h][symbol] = "no price data"
+                warnings_list[h].append(f"excluded {symbol}: no price data")
+            continue
+
+        history = history.copy()
+        history = FactorMatrixBuilder._normalize_history(history)
+        if history.empty:
+            for h in normalized_horizons:
+                excluded[h].append(symbol)
+                reasons[h][symbol] = "no valid close prices"
+                warnings_list[h].append(f"excluded {symbol}: no valid close prices")
+            continue
+
+        factor_values = price_factor_series(factor, history)
+        if factor_values is not None:
+            factor_dict = FactorMatrixBuilder._valid_series_values(factor_values, history, start, end)
+        else:
+            # Slow path: per-row factor computation for non-price factors
+            is_fundamental = registry.is_fundamental(factor)
+            if is_fundamental:
+                factor_dict = FactorMatrixBuilder._fundamental_factor_values(
+                    registry, factor, symbol, history, start, end
+                )
+            else:
+                factor_dict = {}
+                for index in range(len(history)):
+                    signal_date = str(history.iloc[index]["date"])
+                    if start and signal_date < start:
+                        continue
+                    if end and signal_date > end:
+                        continue
+                    value = registry.factor_value(
+                        history.iloc[: index + 1]["close"],
+                        factor,
+                        symbol=symbol,
+                        as_of_date=signal_date,
+                    )
+                    if value is not None and not pd.isna(value):
+                        factor_dict[index] = float(value)
+
+        for horizon in normalized_horizons:
+            symbol_rows = FactorMatrixBuilder._rows_for_horizon(factor, symbol, history, factor_dict, horizon)
+            if not symbol_rows:
+                excluded[horizon].append(symbol)
+                reasons[horizon][symbol] = "no valid factor and future-return pairs"
+                warnings_list[horizon].append(f"excluded {symbol}: no valid factor and future-return pairs")
+                continue
+            rows_by_horizon[horizon].extend(symbol_rows)
+
+    return {
+        "rows": rows_by_horizon,
+        "excluded": excluded,
+        "reasons": reasons,
+        "warnings": warnings_list,
+    }

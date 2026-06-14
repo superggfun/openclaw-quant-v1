@@ -23,6 +23,8 @@ class WalkForwardFoldTask:
     pipeline_config: dict | None
     db_path: str
     report_dir: str
+    purge_days: int = 0
+    embargo_days: int = 0
 
 
 @dataclass(frozen=True)
@@ -48,6 +50,12 @@ class WalkForwardFold:
     test_report: str | None
     no_lookahead: bool
     fold_warnings: list[dict[str, str]]
+    purge_days: int = 0
+    embargo_days: int = 0
+    removed_by_purge: int = 0
+    removed_by_embargo: int = 0
+    effective_train_rows: int = 0
+    effective_test_rows: int = 0
 
 
 @dataclass(frozen=True)

@@ -197,6 +197,7 @@ def build_research_validation_report(report_input: ResearchValidationReportInput
             "bulk_matrix": report_input.bulk_matrix,
             "parallel": report_input.parallel,
             "workers": report_input.worker_count,
+            "matrix_workers": report_input.matrix_workers,
             "parallel_target": report_input.parallel_target,
             "write_substep_reports": report_input.write_substep_reports,
             "write_batch_artifacts": report_input.write_batch_artifacts,

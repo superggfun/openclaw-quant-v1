@@ -17,6 +17,7 @@ class FactorDefinition:
     description: str
     required_inputs: list[str]
     lookback_days: int
+    forward_return_horizon: int
     factor_type: str
     higher_is_better: bool
     no_lookahead: bool
@@ -37,6 +38,7 @@ def price_factor_spec(
     *,
     higher_is_better: bool = True,
     required_inputs: list[str] | None = None,
+    forward_return_horizon: int | None = None,
 ) -> FactorDefinition:
     return FactorDefinition(
         name=name,
@@ -44,6 +46,7 @@ def price_factor_spec(
         description=description,
         required_inputs=required_inputs or ["close"],
         lookback_days=lookback_days,
+        forward_return_horizon=forward_return_horizon if forward_return_horizon is not None else lookback_days,
         factor_type=factor_type,
         higher_is_better=higher_is_better,
         no_lookahead=True,
@@ -67,6 +70,7 @@ def fundamental_factor_spec(
         description=description,
         required_inputs=[f"{statement}.report_date"] + [f"{statement}.{field}" for field in metrics_used],
         lookback_days=0,
+        forward_return_horizon=0,
         factor_type="fundamental_accounting",
         higher_is_better=higher_is_better,
         no_lookahead=True,

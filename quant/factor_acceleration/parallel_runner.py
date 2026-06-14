@@ -19,10 +19,13 @@ class FactorBatchTask:
     db_path: str
     report_dir: str
     bulk_matrix: bool = False
+    max_workers: int = 1
     start: str | None = None
     end: str | None = None
     forward_days: int = 20
     holding_period: int = 20
+    prefer_in_memory: bool = True
+    strict_in_memory: bool = False
     write_report: bool = False
 
     @property
@@ -163,6 +166,9 @@ def _factor_eval(task: FactorBatchTask):
         forward_days=task.forward_days,
         universe=task.symbols,
         bulk_matrix=task.bulk_matrix,
+        max_workers=task.max_workers,
+        prefer_in_memory=task.prefer_in_memory,
+        strict_in_memory=task.strict_in_memory,
         cache_stats=task.bulk_matrix,
         write_report=task.write_report,
     )
@@ -185,6 +191,9 @@ def _factor_backtest(task: FactorBatchTask):
         holding_period=task.holding_period,
         universe=task.symbols,
         bulk_matrix=task.bulk_matrix,
+        max_workers=task.max_workers,
+        prefer_in_memory=task.prefer_in_memory,
+        strict_in_memory=task.strict_in_memory,
         write_report=task.write_report,
     )
 

@@ -52,9 +52,12 @@ class ResearchValidationRunOptions:
     use_cache: bool
     cache_stats: bool
     bulk_matrix: bool
+    prefer_in_memory: bool
+    strict_in_memory: bool
     parallel: bool
     workers: int | None
     worker_count: int
+    matrix_workers: int
     parallel_target: str
     charts: bool
     write_substep_reports: bool

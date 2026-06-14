@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
+import numpy as np
 import pandas as pd
 
 
@@ -70,9 +71,11 @@ def max_drawdown(values: Iterable[float | None]) -> float | None:
     clean = _clean(values)
     if not clean:
         return None
-    equity = pd.Series([(1.0 + pd.Series(clean[: index + 1], dtype="float64")).prod() for index in range(len(clean))])
-    drawdowns = equity / equity.cummax() - 1.0
-    return float(drawdowns.min())
+    arr = np.asarray(clean, dtype="float64")
+    equity = np.cumprod(1.0 + arr)
+    peak = np.maximum.accumulate(equity)
+    drawdown = equity / peak - 1.0
+    return float(np.min(drawdown))
 
 
 def hit_rate(values: Iterable[float | None]) -> float | None:

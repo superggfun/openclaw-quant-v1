@@ -269,11 +269,12 @@ python -m quant.cli research-validation --mode full --max-folds 5 --timeout-seco
 ```bash
 python -m quant.cli performance-profile
 python -m quant.cli performance-profile --target factor_eval --factor momentum_20d --max-symbols 5
+python -m quant.cli hpc-benchmark --factor momentum_20d --workers 1 --workers 4
 python -m quant.cli performance-summary
 python -m quant.cli performance-report
 ```
 
-`performance-profile` runs the v0.40 measurement-only profiler and writes `reports/performance_profile_*.json` plus `reports/performance_profile_summary.md`. It measures runtime, store/query calls, slowest modules, slowest functions, and recommendations without changing factor evaluation, backtest, walk-forward, strategy, validation, or report semantics.
+`performance-profile` runs the measurement-only profiler and writes `reports/performance_profile_*.json` plus `reports/performance_profile_summary.md`. It measures runtime, store/query calls, slowest modules, slowest functions, provider metadata, fallback diagnostics, and recommendations without changing factor evaluation, backtest, walk-forward, strategy, validation, or report semantics. `hpc-benchmark` compares serial reference, SQLite bulk, and strict InMemory bulk factor evaluation legs for focused HPC timing.
 
 ## Strategy Evaluation
 
