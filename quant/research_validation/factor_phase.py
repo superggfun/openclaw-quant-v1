@@ -175,7 +175,7 @@ def _run_parallel_factor_phase(
             )
 
         parallel_compute_started = time.monotonic()
-        run_factor_batch_tasks(parallel_tasks, config.worker_count, timeout_seconds=parallel_budget, on_result=handle_parallel_result)
+        run_factor_batch_tasks(parallel_tasks, config.worker_count, soft_timeout_seconds=parallel_budget, on_result=handle_parallel_result)
         state.parallel_compute_seconds = time.monotonic() - parallel_compute_started
     except Exception as exc:
         state.factor_eval_serial = True

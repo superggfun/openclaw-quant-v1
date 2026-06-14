@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import pandas as pd
 
+from quant.factors.price._utils import clean_price_series
 from quant.factors.specs import price_factor_spec
 
 
-def value_score(closes: pd.Series) -> float | None:
+def value_price_proxy(closes: pd.Series) -> float | None:
     """Price-only value proxy: lower long-term relative performance ranks higher."""
-    closes = pd.to_numeric(closes, errors="coerce").dropna()
+    closes = clean_price_series(closes)
     if len(closes) <= 120:
         return None
     long_return = float((closes.iloc[-1] / closes.iloc[-121]) - 1.0)
@@ -23,5 +24,5 @@ def value_score(closes: pd.Series) -> float | None:
 
 
 FACTOR_SPECS = (
-    price_factor_spec("value_score", "value", "Price-only value proxy that favors long-term relative underperformance.", 120, "price_proxy", value_score),
+    price_factor_spec("value_price_proxy", "price_proxy_value", "PRICE-ONLY PROXY — NOT a fundamental value factor. Favors stocks with poor long-term relative performance adjusted for volatility. This is a pure price-history computation; use fundamental_value_score for accounting-based value.", 120, "price_proxy", value_price_proxy),
 )

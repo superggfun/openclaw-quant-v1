@@ -322,7 +322,10 @@ def test_factor_backtest_warns_when_spread_compounds_to_minus_100(tmp_path: Path
         universe=["LOSER", "WINNER"],
     )
 
-    assert any("reached -100%" in warning for warning in result.warnings)
+    assert any(
+        "rounded to -100%" in warning or "period return was <= -100%" in warning
+        for warning in result.warnings
+    )
 
 
 def test_unknown_factor_is_rejected() -> None:

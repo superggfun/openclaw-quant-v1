@@ -14,6 +14,16 @@ Strategy files live under `strategies/`:
 - `quality_growth.yaml`
 - `regime_aware_momentum.yaml`
 
+The built-in YAML reader intentionally supports a small deterministic subset: nested mappings, indentation-based lists, booleans, nulls, finite numbers, and quoted/plain strings. It is not a full YAML implementation. Unsupported inline collections such as `symbols: [AAPL, MSFT]` or `{top_n: 2}` raise `ValueError` instead of being silently interpreted as strings. Use indentation-based lists:
+
+```yaml
+universe:
+  type: custom
+  symbols:
+    - AAPL
+    - MSFT
+```
+
 ## Sections
 
 - `name`, `description`, `version`, `author`, `created_at`, `tags`
@@ -39,7 +49,9 @@ python -m quant.cli strategy-run --strategy momentum_fundamental --with-gates
 
 `--with-gates` runs v0.37 Strategy Evaluation Gates after the offline strategy run and attaches the `strategy_gate` report path and summary. The gates are quality-control diagnostics only; they do not change trading simulation results or authorize live trading.
 
-Factor weights are checked as supplied. When their sum is positive but not exactly `1.0`, validation emits `WARN_FACTOR_WEIGHTS_NORMALIZED` and reports the normalized weights used by downstream alpha configuration. Negative weights are invalid.
+Factor weights are checked as supplied. When their sum is positive but not exactly `1.0`, validation emits `WARN_FACTOR_WEIGHTS_NORMALIZED` and reports the normalized weights used by downstream alpha configuration. Negative, `NaN`, and infinite weights are invalid. Duplicate factor names are rejected because downstream alpha configuration stores factor weights by name.
+
+Numeric validation fields such as cash buffer, max position weight, minimum IC, minimum coverage, slippage bps, and max ADV participation must be finite numbers.
 
 The sample strategies are small deterministic examples for testing and documentation. They are not recommendations.
 

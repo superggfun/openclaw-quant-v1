@@ -81,6 +81,16 @@ Reports are written by default.
 - `quantile_returns`
 - `top_quantile_return`
 - `bottom_quantile_return`
+- `return_type`
+- `investable_equity`
+- `cumulative_method`
+- `mean_forward_spread`
+- `median_forward_spread`
+- `cumulative_forward_spread`
+- `annualized_mean_forward_spread`
+- `spread_sharpe_like`
+- `spread_max_drawdown`
+- `forward_spread_hit_rate`
 - `long_short_return`
 - `long_short_annual_return`
 - `long_short_volatility`
@@ -100,9 +110,9 @@ Reports are written by default.
 - `long_symbols_by_date`
 - `short_symbols_by_date`
 
-`long_short_return` is a compounded return over the period return stream.
+Factor backtest returns are overlapping forward-spread diagnostics, not an investable equity curve. Reports include `return_type: overlapping_forward_spread`, `investable_equity: false`, and `cumulative_method: additive_diagnostic`.
 
-`long_short_sharpe` uses the arithmetic mean and standard deviation of period long-short returns, annualized with `sqrt(252)`. Because compounded return and arithmetic mean are different statistics, they can differ in sign in high-volatility samples. This is possible without a sign bug.
+Prefer `mean_forward_spread`, `cumulative_forward_spread`, `annualized_mean_forward_spread`, `spread_sharpe_like`, and `spread_max_drawdown` for interpretation. Legacy fields such as `long_short_return`, `annual_return`, `sharpe`, and `max_drawdown` are backward-compatible aliases for spread diagnostics, not account-level performance metrics.
 
 Long-short factor returns may also disagree with IC direction because of sample filtering, quantile boundaries, equal-weight portfolio construction, overlapping holding windows, pipeline transformations, missing symbols, and costs not being modeled in v0.13.
 

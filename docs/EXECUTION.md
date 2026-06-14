@@ -65,4 +65,6 @@ The simulator is side-effect free for portfolio state. It reads account and pric
 
 `v0.30.0` adds additive market realism fields for slippage, ADV liquidity, market impact, rejected quantities, and execution reasons. The engine remains side-effect free.
 
+Use `--cost-profile realistic` with `execute-sim` when the simulation should include non-zero square-root ADV participation market impact. The default conservative profile preserves backward-compatible zero market impact.
+
 Future OpenClaw Execution Agent work should consume this report shape before any real execution API is designed.

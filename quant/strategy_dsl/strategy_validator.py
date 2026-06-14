@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -62,15 +64,19 @@ class StrategyValidator:
             errors.append("MISSING_FACTORS")
         factor_names = set(self.factor_registry.factor_names())
         total_weight = 0.0
+        seen_factors: set[str] = set()
         for factor in definition.factors:
             name = str(factor.get("name") or "").strip().lower()
             if not name:
                 errors.append("FACTOR_MISSING_NAME")
                 continue
+            if name in seen_factors:
+                errors.append(f"DUPLICATE_FACTOR: {name}")
+            seen_factors.add(name)
             if name not in factor_names:
                 errors.append(f"UNSUPPORTED_FACTOR: {name}")
             weight = _float(factor.get("weight"), default=1.0)
-            if weight is None or weight < 0:
+            if weight is None or not math.isfinite(weight) or weight < 0:
                 errors.append(f"INVALID_FACTOR_WEIGHT: {name}")
             else:
                 total_weight += weight
@@ -82,25 +88,47 @@ class StrategyValidator:
             errors.append(f"UNSUPPORTED_UNIVERSE_TYPE: {definition.universe.get('type')}")
         if definition.universe.get("type") == "custom" and not definition.symbols:
             errors.append("CUSTOM_UNIVERSE_REQUIRES_SYMBOLS")
+        for symbol in definition.symbols:
+            if not _valid_symbol(symbol):
+                errors.append(f"INVALID_SYMBOL: {symbol}")
         if not definition.symbols and definition.universe.get("type") in {None, "default"}:
             warnings.append(f"WARN_DEFAULT_UNIVERSE_USED: {len(DEFAULT_SYMBOLS)} symbols")
         if definition.portfolio_method not in SUPPORTED_METHODS:
             errors.append(f"UNSUPPORTED_PORTFOLIO_METHOD: {definition.portfolio_method}")
         max_position = _float(definition.portfolio.get("max_position_weight"), default=0.20)
         cash_buffer = _float(definition.portfolio.get("cash_buffer"), default=0.10)
-        if max_position is None or not 0 < max_position <= 1:
+        if max_position is None or not math.isfinite(max_position) or not 0 < max_position <= 1:
             errors.append("INVALID_MAX_POSITION_WEIGHT")
-        if cash_buffer is None or not 0 <= cash_buffer < 1:
+        if cash_buffer is None or not math.isfinite(cash_buffer) or not 0 <= cash_buffer < 1:
             errors.append("INVALID_CASH_BUFFER")
         if bool(definition.regime.get("enabled")) and not definition.regime.get("preferred_regimes"):
             warnings.append("WARN_REGIME_ENABLED_WITHOUT_PREFERRED_REGIMES")
         if definition.execution.get("live_trading") or definition.execution.get("broker"):
             errors.append("LIVE_TRADING_NOT_SUPPORTED")
+        minimum_ic = _float(definition.validation.get("minimum_ic"), default=None)
+        minimum_coverage = _float(definition.validation.get("minimum_coverage"), default=None)
+        minimum_regime_sample = _int(definition.validation.get("minimum_regime_sample"), default=0)
+        slippage_bps = _float(definition.execution.get("slippage_bps"), default=5.0)
+        max_adv_participation = _float(definition.execution.get("max_adv_participation"), default=0.05)
+        if minimum_ic is not None and not math.isfinite(minimum_ic):
+            errors.append("INVALID_MINIMUM_IC")
+        if minimum_coverage is not None and (not math.isfinite(minimum_coverage) or not 0 <= minimum_coverage <= 1):
+            errors.append("INVALID_MINIMUM_COVERAGE")
+        if minimum_regime_sample is None or minimum_regime_sample < 0:
+            errors.append("INVALID_MINIMUM_REGIME_SAMPLE")
+        if slippage_bps is None or not math.isfinite(slippage_bps) or slippage_bps < 0:
+            errors.append("INVALID_SLIPPAGE_BPS")
+        if (
+            max_adv_participation is None
+            or not math.isfinite(max_adv_participation)
+            or not 0 < max_adv_participation <= 1
+        ):
+            errors.append("INVALID_MAX_ADV_PARTICIPATION")
         gates = {
             "require_walk_forward": bool(definition.validation.get("require_walk_forward", False)),
-            "minimum_ic": _float(definition.validation.get("minimum_ic"), default=None),
-            "minimum_coverage": _float(definition.validation.get("minimum_coverage"), default=None),
-            "minimum_regime_sample": int(definition.validation.get("minimum_regime_sample", 0) or 0),
+            "minimum_ic": minimum_ic,
+            "minimum_coverage": minimum_coverage,
+            "minimum_regime_sample": minimum_regime_sample,
             "factor_weight_sum": round(total_weight, 10),
             "normalized_factor_weights": _normalized_weights(definition.factors, total_weight),
         }
@@ -121,6 +149,22 @@ def _float(value: Any, default: float | None) -> float | None:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def _int(value: Any, default: int | None) -> int | None:
+    if value is None:
+        return default
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(number) or not number.is_integer():
+        return None
+    return int(number)
+
+
+def _valid_symbol(symbol: str) -> bool:
+    return bool(re.fullmatch(r"[A-Z0-9][A-Z0-9.\-]{0,14}", str(symbol).strip().upper()))
 
 
 ALLOWED_TOP_LEVEL = {
@@ -190,6 +234,6 @@ def _normalized_weights(factors: list[dict[str, Any]], total_weight: float) -> d
     for factor in factors:
         name = str(factor.get("name") or "").strip().lower()
         weight = _float(factor.get("weight"), default=1.0)
-        if name and weight is not None and weight >= 0:
+        if name and weight is not None and math.isfinite(weight) and weight >= 0:
             output[name] = round(weight / total_weight, 10)
     return output

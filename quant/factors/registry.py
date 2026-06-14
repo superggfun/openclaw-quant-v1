@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import pkgutil
 from pathlib import Path
+from types import ModuleType
 
 from quant.factors.specs import FactorDefinition
 

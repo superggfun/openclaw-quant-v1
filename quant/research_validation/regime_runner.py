@@ -29,6 +29,7 @@ def factor_regime_rows_from_evaluation(runner, result) -> list[dict]:
         observations.append(
             {
                 "regime": regime,
+                "signal_date": obs.signal_date,
                 "factor_value": obs.factor_value,
                 "future_return": obs.future_return,
             }

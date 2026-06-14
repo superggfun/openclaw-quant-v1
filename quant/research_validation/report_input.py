@@ -29,6 +29,7 @@ class ResearchValidationReportInput:
     effective_batch_size: int
     max_symbols: int | None
     family: str
+    cost_profile: str
     resume: bool
     skip_existing: bool
     use_cache: bool

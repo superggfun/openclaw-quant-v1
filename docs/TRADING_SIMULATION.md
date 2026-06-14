@@ -12,7 +12,7 @@ The simulator unifies signal generation, portfolio construction, rebalance plann
 
 `v0.37.0` Strategy Evaluation Gates may inspect strategy-run and trade-sim summaries for drawdown, turnover, and cost-drag diagnostics. Gate checks do not change simulated fills, cash accounting, report schemas, or no-lookahead execution dates.
 
-The execution model is simulated. By default it fills on the next available historical close after a signal date. Results can differ from live trading, paper trading, broker fills, opening auction behavior, intraday execution, delayed data, liquidity limits, and real slippage.
+The execution model is simulated. By default it fills on the next scheduled execution date using that date's real stored close, or real stored open when `--execution-price open` is specified. Mark-to-market prices may be forward-filled for valuation continuity, but execution prices are not forward-filled; missing execution-date prices create skipped/rejected trades. Results can differ from live trading, paper trading, broker fills, opening auction behavior, intraday execution, delayed data, liquidity limits, and real slippage.
 
 It is different from the existing backtest engine:
 
@@ -26,7 +26,7 @@ It is different from the existing backtest engine:
 ```bash
 python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --portfolio-method equal_weight
 python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --portfolio-method risk_parity
-python -m quant.cli trade-sim --strategy alpha --portfolio-method equal_weight --market-realism-config examples/market_realism_config.json
+python -m quant.cli trade-sim --strategy alpha --portfolio-method equal_weight --market-realism-config examples/market_realism_config.json --cost-profile realistic
 ```
 
 Supported strategy:
@@ -54,12 +54,14 @@ For every trading date:
 2. On rebalance signal dates, Alpha Engine reads only data available on or before the signal date.
 3. Portfolio Construction uses only prices up to the signal date.
 4. Execution is scheduled for the next available trading date by default.
-5. Execution uses the next available close price unless `--execution-price open` is specified.
+5. Execution uses the real stored close on the execution date unless `--execution-price open` is specified.
 6. Cost Engine estimates cost for each simulated fill.
 7. PortfolioAccount updates cash, positions, costs, and realized PnL.
 8. Non-rebalance dates mark positions to market.
 
 Every trade records `signal_date` and `execution_date`.
+
+Mark prices and execution prices are intentionally separate. Mark prices may use prior valid prices for valuation, while execution prices require an actual stored price on the execution date. If a symbol has no real execution price on that date, the simulator does not trade it and records a `SKIPPED_NO_PRICE` rejected trade.
 
 ## Report
 
@@ -72,6 +74,8 @@ reports/trade_sim_YYYYMMDD_HHMMSS.json
 Schema includes `metadata`, `parameters`, `strategy`, `portfolio_method`, `initial_cash`, `final_equity`, `total_return`, `annual_return`, `volatility`, `sharpe`, `max_drawdown`, `total_cost`, `turnover`, `trade_count`, `equity_curve`, `cash_curve`, `positions_by_date`, `trades`, `rebalance_events`, `warnings`, and `no_lookahead`.
 
 `v0.30.0` adds additive fields: `market_realism`, `rejected_trades`, per-trade requested/executed/rejected quantities, execution reasons, slippage cost, market impact cost, liquidity cost, ADV, and ADV participation.
+
+The default conservative cost profile keeps market impact at zero. Pass `--cost-profile realistic` to enable non-zero square-root ADV participation impact and volatility-scaled impact when volatility is available.
 
 ## Agent Export
 

@@ -271,7 +271,9 @@ def _valid_series_values(
     data_store: InMemoryResearchDataStore,
 ) -> dict[int, float]:
     output: dict[int, float] = {}
-    for row_index, value in values.dropna().items():
+    finite_vals = values.dropna()
+    finite_vals = finite_vals[np.isfinite(finite_vals.to_numpy(dtype=float, na_value=float("nan")))]
+    for row_index, value in finite_vals.items():
         row = int(row_index)
         signal_date = data_store.dates[row]
         if start and signal_date < start:

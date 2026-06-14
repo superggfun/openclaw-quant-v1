@@ -5,6 +5,7 @@ import sqlite3
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from quant.cli import COMMAND_HANDLERS, build_parser, main
 from quant.cli_commands.common import create_context
@@ -98,6 +99,53 @@ def test_yaml_and_json_parsing(tmp_path: Path) -> None:
     assert json_payload["portfolio"]["method"] == "equal_weight"
 
 
+def test_yaml_parser_rejects_unsupported_inline_collections() -> None:
+    parser = StrategyParser()
+
+    with pytest.raises(ValueError, match="inline collections"):
+        parser.parse_yaml(
+            """
+name: bad
+universe:
+  symbols: [AAPL, MSFT]
+"""
+        )
+
+    with pytest.raises(ValueError, match="inline collections"):
+        parser.parse_yaml(
+            """
+name: bad
+metadata: {top_n: 2}
+"""
+        )
+
+
+def test_yaml_parser_preserves_hash_inside_quoted_string() -> None:
+    payload = StrategyParser().parse_yaml(
+        """
+name: quoted
+description: "alpha # not a comment"
+"""
+    )
+
+    assert payload["description"] == "alpha # not a comment"
+
+
+def test_yaml_parser_rejects_unclosed_quote_and_plain_colon_list_item() -> None:
+    parser = StrategyParser()
+
+    with pytest.raises(ValueError, match="unterminated quote"):
+        parser.parse_yaml('description: "alpha # not a comment')
+
+    with pytest.raises(ValueError, match="unsupported ':' scalar"):
+        parser.parse_yaml(
+            """
+tags:
+  - alpha: beta
+"""
+        )
+
+
 def test_strategy_definition_and_validation() -> None:
     definition = StrategyDefinition.from_mapping(StrategyParser().parse_yaml(_strategy_yaml()))
     result = StrategyValidator().validate(definition)
@@ -106,6 +154,59 @@ def test_strategy_definition_and_validation() -> None:
     assert definition.symbols == ["SPY", "AAPL"]
     assert result.valid is True
     assert result.gates["factor_weight_sum"] == 1.0
+
+
+def test_validator_rejects_nan_inf_and_duplicate_factors() -> None:
+    payload = StrategyParser().parse_yaml(_strategy_yaml())
+    payload["factors"] = [
+        {"name": "momentum_20d", "weight": "nan"},
+        {"name": "momentum_20d", "weight": 0.5},
+        {"name": "low_volatility_score", "weight": "inf"},
+    ]
+    payload["portfolio"]["cash_buffer"] = "nan"
+    payload["portfolio"]["max_position_weight"] = "inf"
+    payload["validation"]["minimum_ic"] = "nan"
+    payload["validation"]["minimum_coverage"] = "inf"
+    payload["validation"]["minimum_regime_sample"] = "nan"
+    payload["execution"]["slippage_bps"] = "nan"
+    payload["execution"]["max_adv_participation"] = "inf"
+
+    result = StrategyValidator().validate(StrategyDefinition.from_mapping(payload))
+
+    assert result.valid is False
+    assert "INVALID_FACTOR_WEIGHT: momentum_20d" in result.errors
+    assert "INVALID_FACTOR_WEIGHT: low_volatility_score" in result.errors
+    assert "DUPLICATE_FACTOR: momentum_20d" in result.errors
+    assert "INVALID_CASH_BUFFER" in result.errors
+    assert "INVALID_MAX_POSITION_WEIGHT" in result.errors
+    assert "INVALID_MINIMUM_IC" in result.errors
+    assert "INVALID_MINIMUM_COVERAGE" in result.errors
+    assert "INVALID_MINIMUM_REGIME_SAMPLE" in result.errors
+    assert "INVALID_SLIPPAGE_BPS" in result.errors
+    assert "INVALID_MAX_ADV_PARTICIPATION" in result.errors
+
+
+def test_validator_rejects_malformed_custom_universe_symbol() -> None:
+    payload = StrategyParser().parse_yaml(_strategy_yaml())
+    payload["universe"]["symbols"] = ["[AAPL, MSFT]"]
+
+    result = StrategyValidator().validate(StrategyDefinition.from_mapping(payload))
+
+    assert result.valid is False
+    assert "INVALID_SYMBOL: [AAPL, MSFT]" in result.errors
+
+
+def test_strategy_execution_config_can_use_realistic_cost_profile() -> None:
+    definition = StrategyDefinition.from_mapping(StrategyParser().parse_yaml(_strategy_yaml()))
+
+    cost_config, market_realism_config = StrategyRegistry._execution_configs(definition, cost_profile="realistic")
+
+    assert cost_config["cost_profile"] == "realistic"
+    assert cost_config["commission_rate"] == 0.0005
+    assert cost_config["market_impact_bps"] == 2.0
+    assert cost_config["market_impact_model"] == "sqrt_participation"
+    assert cost_config["market_impact_volatility_factor"] == 0.05
+    assert market_realism_config["max_adv_participation"] == 0.05
 
 
 def test_invalid_strategy_rejected() -> None:

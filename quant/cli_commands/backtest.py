@@ -22,6 +22,16 @@ def register_parser(subparsers) -> None:
     backtest.add_argument("--rebalance-frequency", choices=["monthly", "weekly", "daily"], default="monthly")
     backtest.add_argument("--execution-price", choices=["close", "open"], default="close")
     backtest.add_argument("--alpha-config", default="examples/alpha_config.json")
+    backtest.add_argument(
+        "--allow-same-day-close-simple-mode",
+        action="store_true",
+        help="Allow research-only portfolio smoke mode with same-day close signal and execution.",
+    )
+    backtest.add_argument(
+        "--allow-alpha-failures",
+        action="store_true",
+        help="Continue alpha backtests when alpha generation fails, recording warnings instead of raising.",
+    )
     backtest.add_argument("--short-window", type=int, default=20)
     backtest.add_argument("--long-window", type=int, default=50)
     backtest.add_argument("--commission", type=float, default=0.0)
@@ -41,6 +51,8 @@ def handle(args, context) -> int:
             execution_price=args.execution_price,
             alpha_config=alpha_config,
             alpha_pipeline_config=None,
+            allow_same_day_close_simple_mode=args.allow_same_day_close_simple_mode,
+            allow_alpha_failures=args.allow_alpha_failures,
         )
         metrics = result.metrics
         logger.info("Portfolio Backtest Summary")
@@ -50,6 +62,10 @@ def handle(args, context) -> int:
         logger.info("rebalance_frequency: %s", result.rebalance_frequency)
         logger.info("no_lookahead: %s", str(result.no_lookahead).lower())
         logger.info("signal_execution_lag: %s", result.signal_execution_lag)
+        if result.tradability_label:
+            logger.warning("tradability: %s", result.tradability_label)
+        for warning in result.warnings or []:
+            logger.warning("warning: %s: %s", warning["code"], warning["reason"])
         logger.info("initial_cash: %.2f", result.initial_cash)
         logger.info("final_value: %.2f", metrics.final_value)
         logger.info("total_return: %.4f", metrics.total_return)
@@ -86,4 +102,3 @@ def handle(args, context) -> int:
     logger.info("win_rate_pct: %.2f", metrics.win_rate_pct)
     logger.info("report: %s", result.report_path)
     return 0
-

@@ -27,6 +27,7 @@ def register_parser(subparsers) -> None:
         help="Force the slow serial reference path (implies --no-bulk-matrix for backward compat).")
     factor_eval.add_argument("--save-factor-history", action="store_true", help="Persist factor values and evaluation history.")
     factor_eval.add_argument("--save-regime-history", action="store_true", help="Persist factor diagnostics by current regime history.")
+    factor_eval.add_argument("--write-report", action="store_true", default=False, help="Write JSON report to reports/ directory.")
 
 
 def handle(args, context) -> int:
@@ -44,6 +45,7 @@ def handle(args, context) -> int:
         bulk_matrix=bulk,
         max_workers=args.workers,
         cache_stats=args.cache_stats,
+        write_report=args.write_report,
     )
     print("Factor Evaluation Summary")
     print(f"factor: {result.factor}")

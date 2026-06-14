@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import pandas as pd
 
+from quant.factors.price._utils import clean_price_series
 from quant.factors.specs import price_factor_spec
 
 
 def low_volatility_score(closes: pd.Series) -> float | None:
     """Higher scores indicate lower recent realized volatility."""
-    closes = pd.to_numeric(closes, errors="coerce").dropna()
+    closes = clean_price_series(closes)
     returns = closes.pct_change().dropna().tail(20)
     if len(returns) < 20:
         return None

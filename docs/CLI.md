@@ -48,6 +48,8 @@ python -m quant.cli factor-eval --factor momentum_20d --pipeline examples/factor
 python -m quant.cli factor-backtest --factor momentum_20d
 python -m quant.cli factor-backtest --factor momentum_20d --save-factor-history
 python -m quant.cli factor-backtest --factor momentum_20d --pipeline examples/factor_pipeline_config.json
+python -m quant.cli factor-test --factor momentum_20d --pretty
+python -m quant.cli factor-test --factors momentum_20d,momentum_60d --pretty
 python -m quant.cli factor-store-summary
 python -m quant.cli factor-history --factor momentum_20d
 python -m quant.cli factor-rank
@@ -67,7 +69,7 @@ python -m quant.cli rebalance --targets examples/optimized_targets.json --with-c
 python -m quant.cli execute-sim --targets examples/optimized_targets.json
 python -m quant.cli trade-sim --strategy alpha --portfolio-method equal_weight --market-realism-config examples/market_realism_config.json
 python -m quant.cli backtest --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --alpha-config examples/alpha_config.json --execution-price close
-python -m quant.cli backtest --start 2023-01-01 --end 2024-12-31 --initial-cash 100000 --mode equal_weight --rebalance-frequency monthly
+python -m quant.cli backtest --start 2023-01-01 --end 2024-12-31 --initial-cash 100000 --mode equal_weight --rebalance-frequency monthly --allow-same-day-close-simple-mode
 ```
 
 ## Factor Library
@@ -118,10 +120,12 @@ Use `--train-years`, `--test-years`, `--start`, `--end`, `--symbols`, and `--max
 
 ```bash
 python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --portfolio-method equal_weight
-python -m quant.cli trade-sim --strategy alpha --portfolio-method risk_parity --market-realism-config examples/market_realism_config.json
+python -m quant.cli trade-sim --strategy alpha --portfolio-method risk_parity --market-realism-config examples/market_realism_config.json --cost-profile realistic
 ```
 
 `trade-sim` is an offline historical account simulation. It records signal dates and next execution dates, updates in-memory cash and positions, applies deterministic market realism constraints when configured, and writes `reports/trade_sim_*.json`.
+
+The default conservative cost profile leaves market impact at zero for backward compatibility. Use `--cost-profile realistic` when trade simulation or research validation should include non-zero square-root ADV participation impact.
 
 If `--start` and `--end` are omitted, `trade-sim` uses the default smoke window `2024-01-01` to `2025-01-01`.
 
@@ -142,6 +146,7 @@ python -m quant.cli research-status
 python -m quant.cli research-history
 python -m quant.cli research-report
 python -m quant.cli research-validation --mode quick
+python -m quant.cli research-validation --mode quick --cost-profile realistic
 python -m quant.cli research-validation --mode quick --start 2024-01-01 --end 2026-06-11
 python -m quant.cli research-validation --mode quick --max-symbols 20 --max-factors 3 --use-cache --cache-stats
 python -m quant.cli research-validation --mode quick --max-symbols 20 --max-factors 3 --bulk-matrix --parallel --workers 4 --cache-stats

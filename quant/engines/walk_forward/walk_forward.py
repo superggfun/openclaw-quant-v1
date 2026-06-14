@@ -27,10 +27,10 @@ from quant.engines.factor_backtest.factor_backtest import FactorBacktest
 DEFAULT_STABILITY_FACTORS = [
     "momentum_20d",
     "momentum_60d",
-    "quality_score",
-    "growth_score",
+    "quality_price_proxy",
+    "growth_price_proxy",
     "low_volatility_score",
-    "value_score",
+    "value_price_proxy",
     "reversal_5d",
     "reversal_20d",
     "risk_adjusted_momentum",
@@ -51,238 +51,6 @@ def _count_price_rows(price_store, symbols: list[str], start: str, end: str) -> 
         if not history.empty and "date" in history.columns:
             dates.update(str(d) for d in history["date"])
     return len(dates)
-
-
-# Module-level worker for ProcessPoolExecutor (must be picklable)
-def _run_fold_worker(task):
-    from pathlib import Path
-    from quant.storage.sqlite_store import SQLitePriceStore
-    from quant.data.fundamental.fundamental_store import FundamentalStore
-    from quant.factors.price.factor_registry import FactorRegistry
-    from quant.engines.backtest.backtest_engine import PortfolioBacktestEngine
-    from quant.engines.factor_backtest.factor_backtest import FactorBacktest
-
-    db_path = Path(task.db_path)
-    report_dir = Path(task.report_dir)
-    price_store = SQLitePriceStore(db_path)
-    fundamental_store = FundamentalStore(db_path)
-    factor_registry = FactorRegistry(fundamental_store)
-
-    if task.strategy == "alpha":
-        config = dict(task.alpha_config or {})
-        config["universe"] = task.symbols
-        if task.factor and not config.get("factor_weights") and not config.get("multi_factor"):
-            config["factor_weights"] = {task.factor: 1.0}
-        engine = PortfolioBacktestEngine(price_store, report_dir=report_dir)
-        train = engine.run(
-            start=task.train_start,
-            end=task.train_end,
-            initial_cash=task.initial_cash,
-            strategy="alpha",
-            rebalance_frequency=task.rebalance_frequency,
-            alpha_config=config,
-            alpha_pipeline_config=task.pipeline_config,
-        )
-        test = engine.run(
-            start=task.test_start,
-            end=task.test_end,
-            initial_cash=task.initial_cash,
-            strategy="alpha",
-            rebalance_frequency=task.rebalance_frequency,
-            alpha_config=config,
-            alpha_pipeline_config=task.pipeline_config,
-        )
-        # Compute purge/embargo row counts
-        purge_days = task.purge_days
-        embargo_days = task.embargo_days
-        effective_train_rows = _count_price_rows(price_store, task.symbols, task.train_start, task.train_end)
-        effective_test_rows = _count_price_rows(price_store, task.symbols, task.test_start, task.test_end)
-        import pandas as _pd
-        raw_train_end = _pd.Timestamp(task.train_end) + _pd.Timedelta(days=purge_days)
-        removed_by_purge = 0
-        if purge_days > 0:
-            purge_start = (_pd.Timestamp(task.train_end) + _pd.Timedelta(days=1)).strftime("%Y-%m-%d")
-            removed_by_purge = _count_price_rows(price_store, task.symbols, purge_start, raw_train_end.strftime("%Y-%m-%d"))
-        removed_by_embargo = 0
-        if embargo_days > 0:
-            embargo_start = (raw_train_end + _pd.Timedelta(days=1)).strftime("%Y-%m-%d")
-            embargo_end = (_pd.Timestamp(task.test_start) - _pd.Timedelta(days=1)).strftime("%Y-%m-%d")
-            removed_by_embargo = _count_price_rows(price_store, task.symbols, embargo_start, embargo_end)
-        fold = WalkForwardFold(
-            fold=task.index,
-            fold_id=f"fold_{task.index:03d}",
-            train_start=task.train_start,
-            train_end=task.train_end,
-            test_start=task.test_start,
-            test_end=task.test_end,
-            train_return=train.metrics.total_return,
-            test_return=test.metrics.total_return,
-            train_sharpe=train.metrics.sharpe_ratio,
-            test_sharpe=test.metrics.sharpe_ratio,
-            train_max_drawdown=-abs(train.metrics.max_drawdown),
-            test_max_drawdown=-abs(test.metrics.max_drawdown),
-            ic=None,
-            rank_ic=None,
-            icir=None,
-            turnover=test.metrics.turnover,
-            cost=test.metrics.total_cost,
-            train_report=train.report_path,
-            test_report=test.report_path,
-            no_lookahead=bool(train.no_lookahead and test.no_lookahead),
-            fold_warnings=[],
-        )
-        return _with_fold_warnings_worker(fold, strategy="alpha")
-    else:
-        backtest = FactorBacktest(price_store, fundamental_store, report_dir=report_dir)
-        train = backtest.run(
-            factor=task.factor,
-            start=task.train_start,
-            end=task.train_end,
-            holding_period=20,
-            universe=task.symbols,
-            pipeline_config=task.pipeline_config,
-        )
-        test = backtest.run(
-            factor=task.factor,
-            start=task.test_start,
-            end=task.test_end,
-            holding_period=20,
-            universe=task.symbols,
-            pipeline_config=task.pipeline_config,
-        )
-        # Compute purge/embargo row counts
-        import pandas as _pd
-        purge_days = task.purge_days
-        embargo_days = task.embargo_days
-        effective_train_rows = _count_price_rows(price_store, task.symbols, task.train_start, task.train_end)
-        effective_test_rows = _count_price_rows(price_store, task.symbols, task.test_start, task.test_end)
-        raw_train_end = _pd.Timestamp(task.train_end) + _pd.Timedelta(days=purge_days)
-        removed_by_purge = 0
-        if purge_days > 0:
-            purge_start = (_pd.Timestamp(task.train_end) + _pd.Timedelta(days=1)).strftime("%Y-%m-%d")
-            removed_by_purge = _count_price_rows(price_store, task.symbols, purge_start, raw_train_end.strftime("%Y-%m-%d"))
-        removed_by_embargo = 0
-        if embargo_days > 0:
-            embargo_start = (raw_train_end + _pd.Timedelta(days=1)).strftime("%Y-%m-%d")
-            embargo_end = (_pd.Timestamp(task.test_start) - _pd.Timedelta(days=1)).strftime("%Y-%m-%d")
-            removed_by_embargo = _count_price_rows(price_store, task.symbols, embargo_start, embargo_end)
-        fold = WalkForwardFold(
-            fold=task.index,
-            fold_id=f"fold_{task.index:03d}",
-            train_start=task.train_start,
-            train_end=task.train_end,
-            test_start=task.test_start,
-            test_end=task.test_end,
-            train_return=train.long_short_return,
-            test_return=test.long_short_return,
-            train_sharpe=train.long_short_sharpe,
-            test_sharpe=test.long_short_sharpe,
-            train_max_drawdown=train.max_drawdown,
-            test_max_drawdown=test.max_drawdown,
-            ic=test.ic_mean,
-            rank_ic=test.rank_ic_mean,
-            icir=test.icir,
-            turnover=test.turnover,
-            cost=0.0,
-            train_report=train.report_path,
-            test_report=test.report_path,
-            no_lookahead=bool(train.no_lookahead and test.no_lookahead),
-            fold_warnings=[],
-            purge_days=purge_days,
-            embargo_days=embargo_days,
-            removed_by_purge=removed_by_purge,
-            removed_by_embargo=removed_by_embargo,
-            effective_train_rows=effective_train_rows,
-            effective_test_rows=effective_test_rows,
-        )
-        return _with_fold_warnings_worker(fold, strategy="factor_long_short")
-
-
-def _with_fold_warnings_worker(fold, strategy):
-    import pandas as pd
-    warnings_list = list(fold.fold_warnings)
-    if (
-        fold.test_return is not None
-        and fold.test_sharpe is not None
-        and fold.test_return > 1.0
-        and fold.test_sharpe < 0.5
-    ):
-        warnings_list.append({
-            "code": "WARN_COMPOUNDED_RETURN_WEAK_SHARPE",
-            "reason": (
-                f"{fold.fold_id} has high compounded test return but weak arithmetic Sharpe; "
-                "inspect return path stability"
-            ),
-        })
-    if strategy == "factor_long_short" and fold.test_return is not None and fold.test_return <= -0.999999:
-        warnings_list.append({
-            "code": "WARN_SPREAD_RETURN_WIPEOUT",
-            "reason": (
-                f"{fold.fold_id} factor long-short spread compounded to about -100%; "
-                "research spread returns are not cash-account equity curves"
-            ),
-        })
-    if pd.to_datetime(fold.train_end) >= pd.to_datetime(fold.test_start):
-        warnings_list.append({
-            "code": "WARN_TRAIN_TEST_OVERLAP",
-            "reason": f"{fold.fold_id} train_end is not before test_start",
-        })
-    return WalkForwardFold(
-        fold=fold.fold,
-        fold_id=fold.fold_id,
-        train_start=fold.train_start,
-        train_end=fold.train_end,
-        test_start=fold.test_start,
-        test_end=fold.test_end,
-        train_return=fold.train_return,
-        test_return=fold.test_return,
-        train_sharpe=fold.train_sharpe,
-        test_sharpe=fold.test_sharpe,
-        train_max_drawdown=fold.train_max_drawdown,
-        test_max_drawdown=fold.test_max_drawdown,
-        ic=fold.ic,
-        rank_ic=fold.rank_ic,
-        icir=fold.icir,
-        turnover=fold.turnover,
-        cost=fold.cost,
-        train_report=fold.train_report,
-        test_report=fold.test_report,
-        no_lookahead=fold.no_lookahead,
-        fold_warnings=warnings_list,
-        purge_days=getattr(fold, "purge_days", 0),
-        embargo_days=getattr(fold, "embargo_days", 0),
-        removed_by_purge=getattr(fold, "removed_by_purge", 0),
-        removed_by_embargo=getattr(fold, "removed_by_embargo", 0),
-        effective_train_rows=getattr(fold, "effective_train_rows", 0),
-        effective_test_rows=getattr(fold, "effective_test_rows", 0),
-    )
-
-@dataclass(frozen=True)
-class WalkForwardResult:
-    metadata: dict[str, Any]
-    strategy: str
-    parameters: dict[str, Any]
-    folds: list[WalkForwardFold]
-    summary: dict[str, Any]
-    rolling_validation: dict[str, Any]
-    stability_analysis: dict[str, Any]
-    warnings: list[dict[str, str]]
-    recommendations: list[str]
-    report_path: str
-
-    def to_report(self) -> dict[str, Any]:
-        return {
-            "metadata": self.metadata,
-            "strategy": self.strategy,
-            "parameters": self.parameters,
-            "folds": [asdict(fold) for fold in self.folds],
-            "summary": self.summary,
-            "rolling_validation": self.rolling_validation,
-            "stability_analysis": self.stability_analysis,
-            "warnings": self.warnings,
-            "recommendations": self.recommendations,
-        }
-
 
 # Module-level worker for factor stability IC computation
 def _factor_stability_worker(task):
@@ -481,6 +249,7 @@ class WalkForwardEngine:
         fold_windows: list[dict[str, str]] | None = None,
         parallel: bool = False,
         workers: int | None = None,
+        forward_days: int = 20,
     ) -> dict[str, Any]:
         windows = fold_windows or self.generate_windows(start, end, 3.0, 1.0)
         if max_folds is not None and max_folds > 0 and len(windows) > max_folds:
@@ -492,9 +261,11 @@ class WalkForwardEngine:
             for factor in factors:
                 if factor not in self.factor_registry.factor_names():
                     continue
+                higher_is_better = self.factor_registry.describe(factor).higher_is_better
                 for wi, window in enumerate(windows):
                     tasks.append({
                         "factor": factor,
+                        "higher_is_better": higher_is_better,
                         "window_idx": wi,
                         "symbols": list(symbols),
                         "start": window["test_start"],
@@ -540,41 +311,31 @@ class WalkForwardEngine:
                     continue
                 ic_values = factor_ic.get(factor, [])
                 rank_ic_values = factor_rank_ic.get(factor, [])
-                score = self._stability_score(ic_values, rank_ic_values)
-                ranking[factor] = {
-                    "classification": self._stability_label(score),
-                    "score": score,
-                    "average_ic": self._mean(ic_values),
-                    "average_rank_ic": self._mean(rank_ic_values),
-                    "fold_count": len(ic_values),
-                }
+                ranking[factor] = self._stability_metrics(ic_values, rank_ic_values)
+                ranking[factor]["fold_count"] = len(ic_values)
         else:
             ranking = {}
             for factor in factors:
                 if factor not in self.factor_registry.factor_names():
                     continue
+                higher_is_better = self.factor_registry.describe(factor).higher_is_better
                 ic_values = []
                 rank_ic_values = []
                 for window in windows:
                     ic, rank_ic = self._lightweight_factor_ic(
                         factor=factor,
+                        higher_is_better=higher_is_better,
                         symbols=symbols,
                         start=window["test_start"],
                         end=window["test_end"],
-                        forward_days=20,
+                        forward_days=forward_days,
                     )
                     if ic is not None:
                         ic_values.append(ic)
                     if rank_ic is not None:
                         rank_ic_values.append(rank_ic)
-                score = self._stability_score(ic_values, rank_ic_values)
-                ranking[factor] = {
-                    "classification": self._stability_label(score),
-                    "score": score,
-                    "average_ic": self._mean(ic_values),
-                    "average_rank_ic": self._mean(rank_ic_values),
-                    "fold_count": len(ic_values),
-                }
+                ranking[factor] = self._stability_metrics(ic_values, rank_ic_values)
+                ranking[factor]["fold_count"] = len(ic_values)
         ordered = sorted(
             ranking.items(),
             key=lambda item: (item[1]["score"] if item[1]["score"] is not None else -999),
@@ -585,12 +346,16 @@ class WalkForwardEngine:
                 {"factor": factor, **metrics}
                 for factor, metrics in ordered
             ],
-            "methodology": "classification uses average absolute IC adjusted for cross-fold variability",
+            "methodology": (
+                "ranking and classification use direction-adjusted IC. "
+                "absolute_stability_score is retained only as a signal-strength diagnostic."
+            ),
         }
 
     def _lightweight_factor_ic(
         self,
         factor: str,
+        higher_is_better: bool,
         symbols: list[str],
         start: str,
         end: str,
@@ -609,7 +374,7 @@ class WalkForwardEngine:
             {
                 "signal_date": row.signal_date,
                 "symbol": row.symbol,
-                "factor_value": row.factor_value,
+                "factor_value": self._directional_factor_value(row.factor_value, higher_is_better),
                 "future_return": row.future_return,
             }
             for row in matrix.valid_rows
@@ -660,10 +425,10 @@ class WalkForwardEngine:
         results = []
         if worker_count == 1:
             for task in tasks:
-                results.append(_run_fold_worker(task))
+                results.append(run_fold_worker(task))
         else:
             with ProcessPoolExecutor(max_workers=worker_count) as executor:
-                futures = {executor.submit(_run_fold_worker, t): t.index for t in tasks}
+                futures = {executor.submit(run_fold_worker, t): t.index for t in tasks}
                 for future in as_completed(futures):
                     results.append(future.result())
             results.sort(key=lambda f: f.fold)
@@ -782,7 +547,7 @@ class WalkForwardEngine:
             factor=factor,
             start=window["train_start"],
             end=window["train_end"],
-            holding_period=20,
+            holding_period=forward_days,
             universe=symbols,
             pipeline_config=pipeline_config,
         )
@@ -790,7 +555,7 @@ class WalkForwardEngine:
             factor=factor,
             start=window["test_start"],
             end=window["test_end"],
-            holding_period=20,
+            holding_period=forward_days,
             universe=symbols,
             pipeline_config=pipeline_config,
         )
@@ -992,13 +757,44 @@ class WalkForwardEngine:
         return mean_ic, mean_rank_ic
 
     @staticmethod
-    def _stability_score(ic_values: list[float], rank_ic_values: list[float]) -> float | None:
-        values = [abs(value) for value in ic_values + rank_ic_values if value is not None]
+    def _directional_factor_value(value: float, higher_is_better: bool) -> float:
+        return float(value) if higher_is_better else -float(value)
+
+    @staticmethod
+    def _directional_stability_score(ic_values: list[float], rank_ic_values: list[float]) -> float | None:
+        values = [float(value) for value in ic_values + rank_ic_values if value is not None and pd.notna(value)]
         if not values:
             return None
         mean = float(pd.Series(values, dtype="float64").mean())
         penalty = float(pd.Series(values, dtype="float64").std()) if len(values) > 1 else 0.0
         return mean - penalty
+
+    @staticmethod
+    def _absolute_stability_score(ic_values: list[float], rank_ic_values: list[float]) -> float | None:
+        values = [abs(float(value)) for value in ic_values + rank_ic_values if value is not None and pd.notna(value)]
+        if not values:
+            return None
+        mean = float(pd.Series(values, dtype="float64").mean())
+        penalty = float(pd.Series(values, dtype="float64").std()) if len(values) > 1 else 0.0
+        return mean - penalty
+
+    @staticmethod
+    def _stability_metrics(ic_values: list[float], rank_ic_values: list[float]) -> dict[str, Any]:
+        directional_score = WalkForwardEngine._directional_stability_score(ic_values, rank_ic_values)
+        absolute_score = WalkForwardEngine._absolute_stability_score(ic_values, rank_ic_values)
+        return {
+            "classification": WalkForwardEngine._stability_label(directional_score),
+            "score": directional_score,
+            "directional_stability_score": directional_score,
+            "absolute_stability_score": absolute_score,
+            "average_ic": WalkForwardEngine._mean(ic_values),
+            "average_rank_ic": WalkForwardEngine._mean(rank_ic_values),
+            "mean_directional_ic": WalkForwardEngine._mean(ic_values),
+            "mean_directional_rank_ic": WalkForwardEngine._mean(rank_ic_values),
+            "mean_abs_ic": WalkForwardEngine._mean_abs(ic_values),
+            "mean_abs_rank_ic": WalkForwardEngine._mean_abs(rank_ic_values),
+            "direction_consistency": WalkForwardEngine._direction_consistency(ic_values + rank_ic_values),
+        }
 
     @staticmethod
     def _stability_label(score: float | None) -> str:
@@ -1018,6 +814,20 @@ class WalkForwardEngine:
         return float(sum(clean) / len(clean))
 
     @staticmethod
+    def _mean_abs(values: list[float]) -> float | None:
+        clean = [abs(float(value)) for value in values if value is not None and pd.notna(value)]
+        if not clean:
+            return None
+        return float(sum(clean) / len(clean))
+
+    @staticmethod
+    def _direction_consistency(values: list[float]) -> float | None:
+        clean = [float(value) for value in values if value is not None and pd.notna(value)]
+        if not clean:
+            return None
+        return float(sum(1 for value in clean if value > 0.0) / len(clean))
+
+    @staticmethod
     def _dedupe_warnings(warnings: list[dict[str, str]]) -> list[dict[str, str]]:
         return dedupe_by(warnings, ("code", "reason"))
 
@@ -1026,7 +836,7 @@ class WalkForwardEngine:
         return normalize_symbols(symbols)
 
     def _write_report(self, result: WalkForwardResult) -> Path:
-        strategy = str((result.parameters or {}).get("strategy") or "walk_forward")
+        strategy = str(result.strategy or "walk_forward")
         json_path = write_json_report(
             generate_report_path(self.report_dir, f"walk_forward_{strategy}", unique=True),
             result.to_report(),
@@ -1046,7 +856,7 @@ class WalkForwardEngine:
         lines = [
             f"# Walk-Forward Report: {params.get('factor', 'unknown')}",
             "",
-            f"- **Strategy**: {params.get('strategy', 'unknown')}",
+            f"- **Strategy**: {result.strategy or 'unknown'}",
             f"- **Period**: {params.get('start', '?')} → {params.get('end', '?')}",
             f"- **Train/Test**: {params.get('train_years', '?')}y / {params.get('test_years', '?')}y",
             f"- **Folds**: {len(folds)}",

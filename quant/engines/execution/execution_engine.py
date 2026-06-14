@@ -127,6 +127,7 @@ class ExecutionEngine:
         cost_config: dict | None = None,
         twap_slices: int = 4,
         fill_ratio: float = 0.5,
+        allow_execution_price_fallback: bool = False,
     ) -> ExecutionResult:
         mode = mode.lower()
         self._validate(mode, twap_slices, fill_ratio)
@@ -135,15 +136,18 @@ class ExecutionEngine:
         account = self._require_account()
         positions = self._current_positions(account["id"])
         cash = float(account["cash"])
+        equity = self._portfolio_equity(positions, cash, execution_date)
         cost_engine = CostEngine(cost_config or {}, report_dir=self.report_dir)
         realism_config = dict(DEFAULT_MARKET_REALISM_CONFIG)
         if isinstance((cost_config or {}).get("market_realism"), dict):
             realism_config.update((cost_config or {})["market_realism"])
         constraints = ExecutionConstraints(realism_config)
         liquidity_model = LiquidityModel(self.price_store, lookback_days=int(realism_config["adv_lookback_days"]))
-        plan = self.rebalance_engine.plan(normalized_targets)
+        plan = self.rebalance_engine.plan(normalized_targets, pricing_date=execution_date, price_store=self.price_store)
 
         intended_trades = self._intended_trades(plan)
+        # Execute SELL before BUY so cash is freed up for buys
+        intended_trades.sort(key=lambda t: 0 if t.side == "SELL" else 1)
         executed_trades: list[ExecutedTrade] = []
         unfilled_trades: list[UnfilledTrade] = []
         warnings = list(plan.warnings)
@@ -151,7 +155,13 @@ class ExecutionEngine:
         protocol_fills: list[Fill] = []
 
         for intended in intended_trades:
-            price, executed_at = self._execution_details(intended, mode, execution_date, warnings)
+            exec_detail = self._execution_details(intended, mode, execution_date, allow_execution_price_fallback, warnings)
+            if exec_detail is None:
+                unfilled_trades.append(
+                    UnfilledTrade(intended.symbol, intended.side, intended.shares, intended.price, "SKIPPED_NO_PRICE")
+                )
+                continue
+            price, executed_at = exec_detail
             for batch, shares in enumerate(self._fill_batches(intended.shares, mode, twap_slices, fill_ratio), start=1):
                 if shares <= 0:
                     continue
@@ -165,25 +175,12 @@ class ExecutionEngine:
                         )
                         warnings.append(f"{intended.symbol} sell was not fully filled because position is insufficient")
                         continue
-                else:
-                    fillable_shares = self._affordable_shares(
-                        intended.symbol,
-                        intended.side,
-                        fillable_shares,
-                        price,
-                        cash,
-                        cost_engine,
-                    )
-                    if fillable_shares <= 0:
-                        unfilled_trades.append(
-                            UnfilledTrade(intended.symbol, intended.side, shares, price, "insufficient cash")
-                        )
-                        warnings.append(f"{intended.symbol} buy was not filled because cash is insufficient")
-                        continue
 
+                # Fetch liquidity BEFORE affordability so the full cost model is used
+                liquidity_date = executed_at if executed_at != "latest" else self._fallback_executed_at(intended.symbol, execution_date)
                 liquidity = liquidity_model.snapshot(
                     intended.symbol,
-                    executed_at if executed_at != "latest" else self._fallback_executed_at(intended.symbol, execution_date),
+                    liquidity_date,
                     lookback_days=int(realism_config["adv_lookback_days"]),
                     include_as_of=False,
                 )
@@ -194,7 +191,7 @@ class ExecutionEngine:
                     price=price,
                     average_daily_volume=liquidity.average_daily_volume,
                     current_shares=math.floor(positions.get(intended.symbol, 0.0)),
-                    current_equity=max(cash, 0.0),
+                    current_equity=equity,
                 )
                 warnings.extend(liquidity.warnings + constrained.warnings)
                 if not constrained.allowed or constrained.adjusted_quantity <= 0:
@@ -203,6 +200,25 @@ class ExecutionEngine:
                     )
                     continue
                 fillable_shares = constrained.adjusted_quantity
+
+                # BUY affordability check with FULL cost (ADV + volatility from liquidity snapshot)
+                if intended.side == "BUY":
+                    fillable_shares = self._affordable_shares(
+                        intended.symbol,
+                        intended.side,
+                        fillable_shares,
+                        price,
+                        cash,
+                        cost_engine,
+                        average_daily_volume=liquidity.average_daily_volume,
+                        volatility=liquidity.volatility,
+                    )
+                    if fillable_shares <= 0:
+                        unfilled_trades.append(
+                            UnfilledTrade(intended.symbol, intended.side, shares, price, "insufficient cash")
+                        )
+                        warnings.append(f"{intended.symbol} buy was not filled because cash is insufficient")
+                        continue
 
                 if fillable_shares < shares:
                     unfilled_trades.append(
@@ -369,17 +385,45 @@ class ExecutionEngine:
             )
         return trades
 
+    def _portfolio_equity(
+        self,
+        positions: dict[str, float],
+        cash: float,
+        execution_date: str | None,
+    ) -> float:
+        """Compute total portfolio equity = cash + market value of all positions."""
+        position_value = 0.0
+        for symbol, qty in positions.items():
+            if qty <= 0:
+                continue
+            history = self.price_store.get_price_history(symbol, end=execution_date)
+            if history.empty:
+                continue
+            close = float(history.iloc[-1]["close"])
+            position_value += qty * close
+        return max(cash + position_value, 0.0)
+
     def _execution_details(
         self,
         intended: IntendedTrade,
         mode: str,
         execution_date: str | None,
+        allow_fallback: bool,
         warnings: list[str],
-    ) -> tuple[float, str]:
+    ) -> tuple[float, str] | None:
+        """Resolve the execution price and timestamp for one intended trade.
+
+        Returns ``None`` when the real execution price is unavailable and
+        ``allow_fallback`` is False — the caller should record this as
+        ``SKIPPED_NO_PRICE`` rather than fabricating a fill.
+        """
         if mode == "next_day_open":
             next_open = self._next_day_open(intended.symbol, execution_date)
             if next_open is not None:
                 return next_open
+            if not allow_fallback:
+                warnings.append(f"next-day open price is missing for {intended.symbol}; skipped (SKIPPED_NO_PRICE)")
+                return None
             warnings.append(f"next-day open price is missing for {intended.symbol}; using rebalance price")
             return intended.price, self._fallback_executed_at(intended.symbol, execution_date)
 
@@ -387,7 +431,15 @@ class ExecutionEngine:
             price = self._price_on_date(intended.symbol, execution_date, "close")
             if price is not None:
                 return price, execution_date
+            if not allow_fallback:
+                warnings.append(f"close price on {execution_date} is missing for {intended.symbol}; skipped (SKIPPED_NO_PRICE)")
+                return None
             warnings.append(f"close price on {execution_date} is missing for {intended.symbol}; using rebalance price")
+
+        # execution_date is None — no price benchmark available at all
+        if not allow_fallback:
+            warnings.append(f"no execution date for {intended.symbol}; skipped (SKIPPED_NO_PRICE)")
+            return None
         return intended.price, self._fallback_executed_at(intended.symbol, execution_date)
 
     def _price_on_date(self, symbol: str, date_text: str, field: str) -> float | None:
@@ -427,6 +479,8 @@ class ExecutionEngine:
         price: float,
         cash: float,
         cost_engine: CostEngine,
+        average_daily_volume: float | None = None,
+        volatility: float | None = None,
     ) -> int:
         low = 0
         high = shares
@@ -436,7 +490,10 @@ class ExecutionEngine:
             if mid == 0:
                 low = mid + 1
                 continue
-            estimate = cost_engine.estimate([TradeInput(symbol, side, mid, price)], write_report=False)
+            estimate = cost_engine.estimate(
+                [TradeInput(symbol, side, mid, price, average_daily_volume=average_daily_volume, volatility=volatility)],
+                write_report=False,
+            )
             required_cash = estimate.trades[0].notional + estimate.trades[0].total_cost
             if required_cash <= cash + 1e-9:
                 affordable = mid

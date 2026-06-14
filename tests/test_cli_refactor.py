@@ -70,6 +70,7 @@ EXPECTED_COMMANDS = {
     "mcp-tool-info",
     "mcp-smoke",
     "factor-backtest",
+    "factor-test",
     "strategy-eval",
     "walk-forward",
     "trade-sim",

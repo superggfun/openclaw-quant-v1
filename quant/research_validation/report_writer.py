@@ -190,6 +190,7 @@ def build_research_validation_report(report_input: ResearchValidationReportInput
             "batch_size": report_input.effective_batch_size,
             "max_symbols": report_input.max_symbols,
             "factor_family": report_input.family,
+            "cost_profile": report_input.cost_profile,
             "resume": report_input.resume,
             "skip_existing": report_input.skip_existing,
             "use_cache": report_input.use_cache,

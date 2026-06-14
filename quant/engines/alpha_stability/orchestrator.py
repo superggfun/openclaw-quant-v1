@@ -228,6 +228,7 @@ class AlphaStabilityAudit:
             cost_result=modules.get("cost_sensitivity"),
             turnover_result=modules.get("turnover_audit"),
             ic_decay_result=modules.get("ic_decay"),
+            decile_result=modules.get("decile_analysis"),
             fold_consistency_score=fold_consistency_score,
         )
         modules["stability_score"] = stability

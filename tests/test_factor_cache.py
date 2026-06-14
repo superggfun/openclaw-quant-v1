@@ -133,6 +133,7 @@ def test_cached_factor_eval_matches_uncached_metrics(tmp_path: Path) -> None:
         forward_days=10,
         universe=symbols,
         use_cache=True,
+        bulk_matrix=False,
         factor_cache=cache,
         cache_stats=True,
     )
@@ -149,8 +150,8 @@ def test_repeated_cached_factor_eval_records_hits(tmp_path: Path) -> None:
     engine = FactorEvaluation(SQLitePriceStore(db_path), report_dir=tmp_path / "reports")
     cache = FactorEvalCache()
 
-    engine.evaluate("momentum_20d", forward_days=5, universe=symbols, use_cache=True, factor_cache=cache, cache_stats=True)
-    second = engine.evaluate("momentum_20d", forward_days=5, universe=symbols, use_cache=True, factor_cache=cache, cache_stats=True)
+    engine.evaluate("momentum_20d", forward_days=5, universe=symbols, use_cache=True, bulk_matrix=False, factor_cache=cache, cache_stats=True)
+    second = engine.evaluate("momentum_20d", forward_days=5, universe=symbols, use_cache=True, bulk_matrix=False, factor_cache=cache, cache_stats=True)
 
     assert second.performance_metadata is not None
     assert second.performance_metadata["cache_hits"] >= 1
@@ -183,6 +184,7 @@ def test_fundamental_cache_preserves_report_date_no_lookahead(tmp_path: Path) ->
         forward_days=5,
         universe=symbols,
         use_cache=True,
+        bulk_matrix=False,
         factor_cache=cache,
         cache_stats=True,
     )
@@ -195,7 +197,7 @@ def test_fundamental_cache_preserves_report_date_no_lookahead(tmp_path: Path) ->
         assert row["report_date"] == "2024-01-15"
 
 
-def test_cache_disabled_behavior_has_no_performance_metadata(tmp_path: Path) -> None:
+def test_cache_disabled_behavior_has_performance_metadata(tmp_path: Path) -> None:
     db_path = tmp_path / "quant.db"
     seed_prices(db_path, ["AAA", "BBB", "CCC"])
     result = FactorEvaluation(SQLitePriceStore(db_path), report_dir=tmp_path / "reports").evaluate(
@@ -204,8 +206,10 @@ def test_cache_disabled_behavior_has_no_performance_metadata(tmp_path: Path) -> 
         universe=["AAA", "BBB", "CCC"],
     )
 
-    assert result.performance_metadata is None
-    assert "performance_metadata" not in result.to_report()
+    # Performance metadata is now populated for all runs (bulk_matrix default)
+    assert result.performance_metadata is not None
+    assert result.performance_metadata.get("cache_enabled") is False
+    assert result.performance_metadata.get("bulk_matrix_enabled") is True
 
 
 def test_research_validation_cache_stats(tmp_path: Path) -> None:
@@ -222,6 +226,7 @@ def test_research_validation_cache_stats(tmp_path: Path) -> None:
         max_symbols=5,
         factor_family="price",
         use_cache=True,
+        bulk_matrix=False,
         cache_stats=True,
     )
 

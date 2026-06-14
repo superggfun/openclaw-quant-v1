@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import replace
 from typing import Mapping
 
@@ -32,8 +33,8 @@ def row_factor_value(row: AlphaFactorRow, factor: str) -> float | None:
         return row.composite_alpha_score
     if row.factor_values and factor in row.factor_values:
         return row.factor_values[factor]
-    valid = sorted(FactorRegistry().factor_names() + ["composite_alpha_score", "multi_factor_alpha"])
-    raise ValueError(f"pipeline factor must be one of: {', '.join(valid)}")
+    # Factor name is valid but not available for this row (e.g. excluded symbol)
+    return None
 
 
 def apply_composite_scores(
@@ -67,10 +68,13 @@ def apply_composite_scores(
         if len(series) == 1 or float(series.std()) == 0:
             normalized_scores_by_factor[factor] = {symbol: 1.0 for symbol in series.index}
         else:
-            ranks = series.rank(method="average", pct=True)
+            ascending = not FactorRegistry().metadata(factor).get("higher_is_better", True)
+            ranks = series.rank(method="average", ascending=ascending)
+            n = len(series)
+            scores = 1.0 - (ranks - 1.0) / max(n - 1, 1)
             normalized_scores_by_factor[factor] = {
                 str(symbol): float(value)
-                for symbol, value in ranks.items()
+                for symbol, value in scores.items()
             }
 
     updated_rows: list[AlphaFactorRow] = []
@@ -109,21 +113,43 @@ def apply_composite_scores(
     return updated_rows, composite_score_by_symbol
 
 
+def is_valid_score(value) -> bool:
+    """Return True if value is a finite, non-NaN number."""
+    if value is None:
+        return False
+    try:
+        f = float(value)
+        return pd.notna(f) and math.isfinite(f)
+    except (TypeError, ValueError):
+        return False
+
+
 def rank_alpha_rows(
     rows: list[AlphaFactorRow],
     ranking_factor: str = "risk_adjusted_momentum",
     score_by_symbol: dict[str, float] | None = None,
 ) -> list[AlphaFactorRow]:
     """Rank rows by factor score descending."""
+    # Respect factor direction for raw values. Pipeline, composite, and
+    # multi-factor outputs are already direction-corrected by their respective layers.
+    ranking_direction = True
+    if score_by_symbol is None and ranking_factor not in ("composite_alpha_score", "multi_factor_alpha"):
+        ranking_direction = FactorRegistry().metadata(ranking_factor).get("higher_is_better", True)
+
+    # Stable two-pass sort: symbol ascending (for tie-break), then score direction
     valid = sorted(
         [
             row
             for row in rows
             if not row.excluded
-            and get_ranking_score(row, ranking_factor, score_by_symbol) is not None
+            and is_valid_score(get_ranking_score(row, ranking_factor, score_by_symbol))
         ],
-        key=lambda r: (get_ranking_score(r, ranking_factor, score_by_symbol), r.symbol),
-        reverse=True,
+        key=lambda r: r.symbol,
+    )
+    valid = sorted(
+        valid,
+        key=lambda r: get_ranking_score(r, ranking_factor, score_by_symbol),
+        reverse=ranking_direction,
     )
     rank_by_symbol = {row.symbol: rank for rank, row in enumerate(valid, start=1)}
     return [
@@ -190,11 +216,8 @@ def compute_target_weights(
         }
         total_score = sum(positive_scores.values())
         if total_score <= 0:
-            warnings.append("score_weighted fallback to equal_weight because selected scores are not positive")
-            raw_weights = {
-                row.symbol: investable_weight / len(selected_rows)
-                for row in selected_rows
-            }
+            warnings.append("all selected scores are non-positive; allocating full weight to cash")
+            return {"cash": 1.0}
         else:
             raw_weights = {
                 symbol: (score / total_score) * investable_weight
@@ -207,6 +230,16 @@ def compute_target_weights(
         if capped < weight:
             warnings.append(f"capped {symbol} to max_position_weight {max_position_weight:.4f}")
         capped_weights[symbol] = capped
+
+    max_deployable = len(selected_rows) * max_position_weight
+    target_deployable = 1.0 - min_cash_weight
+    if max_deployable < target_deployable:
+        warnings.append(
+            f"position caps prevent full deployment: "
+            f"max_deployable={max_deployable:.4f}, "
+            f"target_deployable={target_deployable:.4f}; "
+            f"excess allocated to cash"
+        )
 
     targets = round_targets(capped_weights, min_cash_weight)
     return targets

@@ -12,6 +12,7 @@ Warning-heavy output is expected and meaningful in this release. The point of v0
 
 ```bash
 python -m quant.cli research-validation --mode quick
+python -m quant.cli research-validation --mode quick --cost-profile realistic
 python -m quant.cli research-validation --mode quick --start 2024-01-01 --end 2026-06-11
 python -m quant.cli research-validation --mode quick --max-factors 5 --max-strategies 2 --max-folds 1 --timeout-seconds 180
 python -m quant.cli research-validation --mode quick --max-symbols 50 --factor-family price --batch-size 10
@@ -29,6 +30,8 @@ python -m quant.cli research-validation --mode full --max-folds 5 --timeout-seco
 Every research-validation report records `start_date`, `end_date`, `effective_start_date`, `effective_end_date`, `trading_day_count`, `frequency`, `forward_days`, `holding_period`, `symbol_count`, `factor_count`, and `estimated_observation_count`. CLI runs print the plan before execution: symbols, factors, date range, batch size, workers, and expected factor task count.
 
 Quick research-validation runs are compact by default. They write the aggregate JSON, `reports/research_validation_summary.md`, and `reports/agent_export_research_validation.md` when agent export is enabled. Sub-step reports, detailed batch artifacts, charts, and debug logs are disabled unless requested.
+
+`--cost-profile` controls the cost assumptions used by strategy/trade-simulation substeps. The default `conservative` profile preserves backward-compatible zero market impact. Use `--cost-profile realistic` to apply non-zero square-root ADV participation impact in those substeps.
 
 Every run also has a run-specific artifact directory at `reports/runs/<run_id>/` with `manifest.json`, `substeps/`, `artifacts/`, `charts/`, and `logs/`. The manifest records generated artifact paths, warnings, and compaction status. Top-level `reports/` is reserved for compact user-facing outputs; optional detailed artifacts live under the run directory.
 

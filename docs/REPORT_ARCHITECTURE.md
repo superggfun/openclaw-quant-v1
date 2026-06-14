@@ -59,7 +59,7 @@ These outputs are disabled by default and opt-in only: sub-step reports, batch a
 
 `factor_eval` compact JSON keeps factor name, date range, observation count, IC, Rank IC, ICIR, quintile returns, coverage, warnings, no-lookahead notes, and artifact paths. Observations belong in artifacts.
 
-`factor_backtest` compact JSON keeps factor name, long-short return, annual return, Sharpe, drawdown, turnover, hit rate, IC, Rank IC, coverage, warnings, and artifact paths. Periods and symbol-by-date maps belong in artifacts.
+`factor_backtest` compact JSON keeps factor name, spread semantics (`return_type`, `investable_equity`, `cumulative_method`), additive forward-spread diagnostics, legacy alias metadata, turnover, exposure, IC, Rank IC, coverage, warnings, performance metadata, and artifact paths. Periods and symbol-by-date maps belong in artifacts. Legacy names such as `annual_return`, `sharpe`, and `long_short_return` are compatibility aliases for spread diagnostics, not account equity metrics.
 
 `regime_detection` compact JSON keeps current regime, confidence, volatility, trend strength, drawdown, regime counts, warnings, and artifact paths. Daily observations belong in artifacts.
 

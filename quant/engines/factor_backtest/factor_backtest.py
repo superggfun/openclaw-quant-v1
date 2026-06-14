@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from quant.config import DEFAULT_SYMBOLS
@@ -15,6 +17,7 @@ from quant.engines.factor_common import (
     apply_factor_pipeline,
     compound_return,
     cross_section_correlations,
+    cumulative_spread_return,
     exclude_symbol,
     factor_coverage,
     factor_coverage_warnings,
@@ -23,6 +26,7 @@ from quant.engines.factor_common import (
     mean,
     normalize_symbols,
     sharpe,
+    spread_max_drawdown,
     std,
     write_factor_report,
 )
@@ -64,6 +68,7 @@ class FactorBacktestPeriod:
 
 @dataclass(frozen=True)
 class FactorBacktestResult:
+    # ── Required fields (no defaults) ──
     factor: str
     start_date: str | None
     end_date: str | None
@@ -114,7 +119,135 @@ class FactorBacktestResult:
     periods: list[FactorBacktestPeriod]
     warnings: list[str]
     report_path: str
+
+    # ── Optional fields (all have defaults) ──
+    # Spread-semantics metadata
+    return_type: str = "overlapping_forward_spread"
+    investable_equity: bool = False
+    cumulative_method: str = "additive_diagnostic"
+
+    # Correct spread metrics (additive, non-compounding)
+    mean_forward_spread: float | None = None
+    median_forward_spread: float | None = None
+    cumulative_forward_spread: float | None = None
+    forward_spread_hit_rate: float | None = None
+    forward_spread_volatility: float | None = None
+    spread_sharpe_like: float | None = None
+    spread_max_drawdown: float | None = None
+    average_top_quantile_forward_return: float | None = None
+    average_bottom_quantile_forward_return: float | None = None
+    top_bottom_forward_spread: float | None = None
+
+    # Long / short leg additive metrics
+    long_leg_mean_forward_return: float | None = None
+    short_leg_mean_forward_return: float | None = None
+    long_leg_cumulative_forward_spread: float | None = None
+    short_leg_cumulative_forward_spread: float | None = None
+
+    # Deprecated compound fields (kept for .to_report() backward compat)
+    long_short_compounded_return_deprecated: float | None = None
+    long_leg_compounded_return_deprecated: float | None = None
+    short_leg_compounded_return_deprecated: float | None = None
+    annualized_compound_return_deprecated: float | None = None
+    compound_max_drawdown_deprecated: float | None = None
+
     performance_metadata: dict | None = None
+
+    def to_summary(self, include_observations: bool = False) -> dict:
+        """Return compact spread metrics for MCP / factor-test.
+
+        Metrics use additively accumulated forward-spread returns (not
+        multiply-compounded).  These are research diagnostics, NOT an
+        investable equity curve.
+        """
+        warnings = list(self.warnings)
+        warnings.append(
+            "FactorBacktest uses overlapping T+holding_period forward spread returns; "
+            "these are research spread metrics, not an investable equity curve. "
+            "Use portfolio/trade simulation for true account return."
+        )
+        summary = {
+            "factor": self.factor,
+            "start_date": self.start_date,
+            "end_date": self.end_date,
+            "holding_period": self.holding_period,
+            "return_type": "overlapping_forward_spread",
+            "investable_equity": False,
+            "cumulative_method": "additive_diagnostic",
+            "observations": self.observations,
+            # Core spread metrics (correct additive semantics)
+            "mean_forward_spread": self.mean_forward_spread,
+            "median_forward_spread": self.median_forward_spread,
+            "cumulative_forward_spread": self.cumulative_forward_spread,
+            "annualized_mean_forward_spread": self.annual_return,
+            "spread_max_drawdown": self.spread_max_drawdown,
+            "spread_sharpe_like": self.spread_sharpe_like,
+            "forward_spread_hit_rate": self.forward_spread_hit_rate,
+            "forward_spread_volatility": self.forward_spread_volatility,
+            "top_quantile_mean_forward_return": self.average_top_quantile_forward_return,
+            "bottom_quantile_mean_forward_return": self.average_bottom_quantile_forward_return,
+            "top_bottom_forward_spread": self.top_bottom_forward_spread,
+            # Long/short leg additive metrics
+            "long_leg_mean_forward_return": self.long_leg_mean_forward_return,
+            "short_leg_mean_forward_return": self.short_leg_mean_forward_return,
+            "long_leg_cumulative_forward_spread": self.long_leg_cumulative_forward_spread,
+            "short_leg_cumulative_forward_spread": self.short_leg_cumulative_forward_spread,
+            # IC / ranking
+            "ic_mean": self.ic_mean,
+            "rank_ic_mean": self.rank_ic_mean,
+            "icir": self.icir,
+            # Turnover / exposure
+            "turnover": self.turnover,
+            "gross_exposure": self.gross_exposure,
+            "net_exposure": self.net_exposure,
+            # Backward-compat aliases (additive, not compound)
+            "total_return": self.long_short_return,
+            "annualized_return": self.annual_return,
+            "sharpe": self.spread_sharpe_like,
+            "max_drawdown": self.spread_max_drawdown,
+            "hit_rate": self.forward_spread_hit_rate,
+            "long_leg_return": self.long_leg_mean_forward_return,
+            "short_leg_return": self.short_leg_mean_forward_return,
+            "long_short_return": self.long_short_return,
+            # Deprecated compound fields (not investable)
+            "long_short_compounded_return_deprecated": self.long_short_compounded_return_deprecated,
+            "annualized_compound_return_deprecated": self.annualized_compound_return_deprecated,
+            "compound_max_drawdown_deprecated": self.compound_max_drawdown_deprecated,
+            "long_leg_compounded_return_deprecated": self.long_leg_compounded_return_deprecated,
+            "short_leg_compounded_return_deprecated": self.short_leg_compounded_return_deprecated,
+            # Metadata
+            "rebalance_count": len(self.rebalance_dates),
+            "factor_family": self.factor_family,
+            "factor_type": self.factor_type,
+            "no_lookahead": self.no_lookahead,
+            "warnings": warnings,
+        }
+        if self.factor_coverage:
+            summary["factor_coverage"] = self.factor_coverage
+        if self.performance_metadata:
+            summary["performance_metadata"] = {
+                "bulk_matrix_enabled": self.performance_metadata.get("bulk_matrix_enabled"),
+                "serial_reference": False,
+                "provider_type": self.performance_metadata.get("provider_type"),
+                "cache_strategy": self.performance_metadata.get("cache_strategy"),
+                "fallback_used": self.performance_metadata.get("fallback_used"),
+                "matrix_workers": self.performance_metadata.get("matrix_workers"),
+                "eval_seconds": self.performance_metadata.get("eval_seconds"),
+            }
+        if include_observations:
+            summary["periods"] = [asdict(p) for p in self.periods]
+        return summary
+
+    def to_mcp_response(self, include_observations: bool = False) -> dict:
+        """Return compact MCP response (alias for to_summary)."""
+        return self.to_summary(include_observations=include_observations)
+
+    def to_json(self, include_observations: bool = False, pretty: bool = False) -> str:
+        return json.dumps(
+            self.to_summary(include_observations=include_observations),
+            indent=2 if pretty else None,
+            default=str,
+        )
 
     def to_report(self) -> dict:
         return {
@@ -122,6 +255,11 @@ class FactorBacktestResult:
             "start_date": self.start_date,
             "end_date": self.end_date,
             "holding_period": self.holding_period,
+            "return_type": self.return_type,
+            "investable_equity": self.investable_equity,
+            "cumulative_method": self.cumulative_method,
+            "metric_semantics": self._metric_semantics(),
+            "legacy_metric_aliases": self._legacy_metric_aliases(),
             "quantiles": self.quantiles,
             "long_quantile": self.long_quantile,
             "short_quantile": self.short_quantile,
@@ -130,19 +268,45 @@ class FactorBacktestResult:
             "quantile_returns": self.quantile_returns,
             "top_quantile_return": self.top_quantile_return,
             "bottom_quantile_return": self.bottom_quantile_return,
+            "average_top_quantile_forward_return": self.average_top_quantile_forward_return,
+            "average_bottom_quantile_forward_return": self.average_bottom_quantile_forward_return,
+            "top_bottom_forward_spread": self.top_bottom_forward_spread,
             "long_symbols_by_date": self.long_symbols_by_date,
             "short_symbols_by_date": self.short_symbols_by_date,
+            # ── Primary spread-semantics metrics ──
+            "mean_forward_spread": self.mean_forward_spread,
+            "median_forward_spread": self.median_forward_spread,
+            "cumulative_forward_spread": self.cumulative_forward_spread,
+            "annualized_mean_forward_spread": self.annual_return,
+            "forward_spread_hit_rate": self.forward_spread_hit_rate,
+            "forward_spread_volatility": self.forward_spread_volatility,
+            "spread_sharpe_like": self.spread_sharpe_like,
+            "spread_max_drawdown": self.spread_max_drawdown,
+            "long_leg_mean_forward_return": self.long_leg_mean_forward_return,
+            "short_leg_mean_forward_return": self.short_leg_mean_forward_return,
+            "long_leg_cumulative_forward_spread": self.long_leg_cumulative_forward_spread,
+            "short_leg_cumulative_forward_spread": self.short_leg_cumulative_forward_spread,
             "long_leg_return": self.long_leg_return,
             "short_leg_return": self.short_leg_return,
-            "long_short_return": self.long_short_return,
-            "annual_return": self.annual_return,
-            "long_short_annual_return": self.long_short_annual_return,
-            "volatility": self.volatility,
-            "long_short_volatility": self.long_short_volatility,
-            "sharpe": self.sharpe,
-            "long_short_sharpe": self.long_short_sharpe,
-            "max_drawdown": self.max_drawdown,
-            "hit_rate": self.hit_rate,
+            # ── Legacy metric aliases (nested to keep primary surface clean) ──
+            "legacy_metrics": {
+                "long_short_return": self.long_short_return,
+                "annual_return": self.annual_return,
+                "long_short_annual_return": self.long_short_annual_return,
+                "volatility": self.volatility,
+                "long_short_volatility": self.long_short_volatility,
+                "sharpe": self.sharpe,
+                "long_short_sharpe": self.long_short_sharpe,
+                "max_drawdown": self.max_drawdown,
+                "hit_rate": self.hit_rate,
+                "deprecated_compound": {
+                    "long_short_compounded_return": self.long_short_compounded_return_deprecated,
+                    "long_leg_compounded_return": self.long_leg_compounded_return_deprecated,
+                    "short_leg_compounded_return": self.short_leg_compounded_return_deprecated,
+                    "annualized_compound_return": self.annualized_compound_return_deprecated,
+                    "compound_max_drawdown": self.compound_max_drawdown_deprecated,
+                },
+            },
             "turnover": self.turnover,
             "gross_exposure": self.gross_exposure,
             "net_exposure": self.net_exposure,
@@ -166,8 +330,49 @@ class FactorBacktestResult:
             "pipeline_config_path": self.pipeline_config_path,
             "pipeline_config": self.pipeline_config,
             "periods": [asdict(period) for period in self.periods],
-            "warnings": self.warnings,
+            "warnings": self._warnings_with_semantics(),
+            "performance_metadata": self.performance_metadata,
         }
+
+    @staticmethod
+    def _legacy_metric_aliases() -> dict[str, str]:
+        return {
+            "long_short_return": "cumulative_forward_spread",
+            "annual_return": "annualized_mean_forward_spread",
+            "long_short_annual_return": "annualized_mean_forward_spread",
+            "sharpe": "spread_sharpe_like",
+            "long_short_sharpe": "spread_sharpe_like",
+            "max_drawdown": "spread_max_drawdown",
+            "hit_rate": "forward_spread_hit_rate",
+            "long_leg_return": "long_leg_mean_forward_return",
+            "short_leg_return": "short_leg_mean_forward_return",
+        }
+
+    @staticmethod
+    def _metric_semantics() -> dict[str, str | bool]:
+        return {
+            "return_type": "overlapping_forward_spread",
+            "investable_equity": False,
+            "cumulative_method": "additive_diagnostic",
+            "description": (
+                "FactorBacktest reports overlapping forward-spread diagnostics. "
+                "These metrics are not an investable account equity curve; use portfolio or trade simulation for account returns."
+            ),
+            "legacy_fields": (
+                "annual_return, sharpe, max_drawdown, and long_short_return are backward-compatible aliases "
+                "for spread diagnostics, not live or simulated account performance metrics."
+            ),
+        }
+
+    def _warnings_with_semantics(self) -> list[str]:
+        semantic_warning = (
+            "FactorBacktest reports research-only overlapping forward-spread diagnostics; "
+            "annual_return, sharpe, max_drawdown, and long_short_return are not account-level performance metrics."
+        )
+        warnings = list(self.warnings)
+        if semantic_warning not in warnings:
+            warnings.append(semantic_warning)
+        return warnings
 
 
 class FactorBacktest:
@@ -200,7 +405,7 @@ class FactorBacktest:
         max_workers: int = 4,
         prefer_in_memory: bool = True,
         strict_in_memory: bool = False,
-        write_report: bool = True,
+        write_report: bool = False,
     ) -> FactorBacktestResult:
         factor = factor.strip().lower()
         long_quantile = long_quantile or quantiles
@@ -244,8 +449,10 @@ class FactorBacktest:
         factor_coverage = self._factor_coverage(factor, symbols, observations)
         warnings.extend(self._factor_coverage_warnings(factor, factor_coverage))
 
-        observations = self._assign_quantiles(observations, quantiles)
-        periods = self._periods(observations, quantiles, long_quantile, short_quantile, max_workers=max_workers)
+        higher_is_better = bool(factor_metadata["higher_is_better"])
+        ranking_observations = self._directional_observations(observations, higher_is_better)
+        ranking_observations = self._assign_quantiles(ranking_observations, quantiles)
+        periods = self._periods(ranking_observations, quantiles, long_quantile, short_quantile, max_workers=max_workers)
         complete_periods = [
             period
             for period in periods
@@ -263,30 +470,74 @@ class FactorBacktest:
         ]
         long_returns = [period.long_return for period in complete_periods if period.long_return is not None]
         short_returns = [period.short_return for period in complete_periods if period.short_return is not None]
-        ic_values, rank_ic_values = self._correlations(observations)
-        quantile_returns = self._quantile_returns(observations, quantiles)
+
+        # ── Correct spread metrics (additive, non-compounding) ──
+        mean_forward_spread = self._mean(long_short_returns)
+        median_forward_spread = (
+            float(np.median([r for r in long_short_returns if r is not None]))
+            if long_short_returns else None
+        )
+        cumulative_forward_spread = cumulative_spread_return(long_short_returns)
+        spread_max_dd = spread_max_drawdown(long_short_returns)
+        forward_spread_volatility = self._annual_volatility(long_short_returns)
+        forward_spread_hit_rate = self._hit_rate(long_short_returns)
+        spread_sharpe_val = self._sharpe(long_short_returns)
+
+        # IC / rank IC
+        ic_values, rank_ic_values = self._correlations(ranking_observations)
+        quantile_returns = self._quantile_returns(ranking_observations, quantiles)
         ic_mean = self._mean(ic_values)
         ic_std = self._std(ic_values)
-        long_short_return = self._compound_return(long_short_returns)
-        annual_return = self._annual_return(long_short_returns)
-        volatility = self._annual_volatility(long_short_returns)
-        sharpe = self._sharpe(long_short_returns)
+
+        # Quantile-level average forward returns
+        top_quantile_return = quantile_returns.get(f"q{long_quantile}")
+        bottom_quantile_return = quantile_returns.get(f"q{short_quantile}")
+        top_bottom_forward_spread = (
+            top_quantile_return - bottom_quantile_return
+            if top_quantile_return is not None and bottom_quantile_return is not None
+            else None
+        )
+
+        # Long / short leg additive metrics
+        long_leg_mean_forward_return = self._mean(long_returns)
+        short_leg_mean_forward_return = self._mean(short_returns)
+        long_leg_cumulative_forward_spread = cumulative_spread_return(long_returns)
+        short_leg_cumulative_forward_spread = cumulative_spread_return(short_returns)
+
+        # ── Old compound values (deprecated, kept for backward compat) ──
+        compound_ls = self._compound_return(long_short_returns)
+        compound_annual = self._annual_return(long_short_returns)
+        compound_max_dd = self._max_drawdown(long_short_returns)
+        compound_long_leg = self._compound_return(long_returns)
+        compound_short_leg = self._compound_return(short_returns)
+
+        # ── Redirect old field names to additive values ──
+        long_short_return_val = cumulative_forward_spread  # was compound
+        annual_return_val = (
+            mean_forward_spread * (252.0 / holding_period)
+            if mean_forward_spread is not None else None
+        )
+        volatility_val = forward_spread_volatility
+        sharpe_val = spread_sharpe_val
+        long_leg_return_val = long_leg_mean_forward_return  # was compound
+        short_leg_return_val = short_leg_mean_forward_return  # was compound
         if any(value <= -1.0 for value in long_short_returns):
             warnings.append(
-                "long_short_return reached -100% because at least one leveraged long-short "
-                "spread period return was <= -100%; inspect period returns before treating "
-                "the compounded spread as an investable equity curve"
+                "at least one long-short spread period return was <= -100%; "
+                "check for extreme period returns"
             )
-        elif long_short_return is not None and long_short_return <= -0.999999:
+        elif compound_ls is not None and compound_ls <= -0.999999:
             warnings.append(
-                "long_short_return rounded to -100% after compounding many overlapping "
-                "long-short spread returns"
+                "long_short_compounded_return_deprecated rounded to -100% after "
+                "compounding overlapping spread returns (this field is deprecated; "
+                "use cumulative_forward_spread for additive spread metrics)"
             )
-        if long_short_return is not None and sharpe is not None and long_short_return * sharpe < 0:
-            warnings.append(
-                "long_short_return and sharpe differ in sign because long_short_return is compounded "
-                "while sharpe uses arithmetic period mean over overlapping forward-return observations"
-            )
+        if cumulative_forward_spread is not None and spread_sharpe_val is not None:
+            if cumulative_forward_spread * spread_sharpe_val < 0:
+                warnings.append(
+                    "cumulative_forward_spread and spread_sharpe_like differ in sign; "
+                    "the spread mean may be near zero"
+                )
 
         result = FactorBacktestResult(
             factor=factor,
@@ -299,21 +550,43 @@ class FactorBacktest:
             observations=len(observations),
             rebalance_dates=[period.signal_date for period in periods],
             quantile_returns=quantile_returns,
-            top_quantile_return=quantile_returns.get(f"q{long_quantile}"),
-            bottom_quantile_return=quantile_returns.get(f"q{short_quantile}"),
+            top_quantile_return=top_quantile_return,
+            bottom_quantile_return=bottom_quantile_return,
             long_symbols_by_date={period.signal_date: period.long_symbols for period in periods},
             short_symbols_by_date={period.signal_date: period.short_symbols for period in periods},
-            long_leg_return=self._compound_return(long_returns),
-            short_leg_return=self._compound_return(short_returns),
-            long_short_return=long_short_return,
-            annual_return=annual_return,
-            long_short_annual_return=annual_return,
-            volatility=volatility,
-            long_short_volatility=volatility,
-            sharpe=sharpe,
-            long_short_sharpe=sharpe,
-            max_drawdown=self._max_drawdown(long_short_returns),
-            hit_rate=self._hit_rate(long_short_returns),
+            # Redirected fields (now additive values)
+            long_leg_return=long_leg_return_val,
+            short_leg_return=short_leg_return_val,
+            long_short_return=long_short_return_val,
+            annual_return=annual_return_val,
+            long_short_annual_return=annual_return_val,
+            volatility=volatility_val,
+            long_short_volatility=volatility_val,
+            sharpe=sharpe_val,
+            long_short_sharpe=sharpe_val,
+            max_drawdown=spread_max_dd,
+            hit_rate=forward_spread_hit_rate,
+            # New spread-specific metrics
+            mean_forward_spread=mean_forward_spread,
+            median_forward_spread=median_forward_spread,
+            cumulative_forward_spread=cumulative_forward_spread,
+            forward_spread_hit_rate=forward_spread_hit_rate,
+            forward_spread_volatility=forward_spread_volatility,
+            spread_sharpe_like=spread_sharpe_val,
+            spread_max_drawdown=spread_max_dd,
+            average_top_quantile_forward_return=top_quantile_return,
+            average_bottom_quantile_forward_return=bottom_quantile_return,
+            top_bottom_forward_spread=top_bottom_forward_spread,
+            long_leg_mean_forward_return=long_leg_mean_forward_return,
+            short_leg_mean_forward_return=short_leg_mean_forward_return,
+            long_leg_cumulative_forward_spread=long_leg_cumulative_forward_spread,
+            short_leg_cumulative_forward_spread=short_leg_cumulative_forward_spread,
+            # Deprecated compound fields
+            long_short_compounded_return_deprecated=compound_ls,
+            long_leg_compounded_return_deprecated=compound_long_leg,
+            short_leg_compounded_return_deprecated=compound_short_leg,
+            annualized_compound_return_deprecated=compound_annual,
+            compound_max_drawdown_deprecated=compound_max_dd,
             turnover=self._mean([period.turnover for period in complete_periods if period.turnover is not None]),
             gross_exposure=self._mean([period.gross_exposure for period in complete_periods]),
             net_exposure=self._mean([period.net_exposure for period in complete_periods]),
@@ -326,7 +599,7 @@ class FactorBacktest:
             factor_category=str(factor_metadata["factor_category"]),
             factor_description=str(factor_metadata["factor_description"]),
             factor_inputs=list(factor_metadata["factor_inputs"]),
-            factor_higher_is_better=bool(factor_metadata["higher_is_better"]),
+            factor_higher_is_better=higher_is_better,
             factor_no_lookahead=bool(factor_metadata["no_lookahead"]),
             factor_coverage=factor_coverage,
             excluded_symbols=excluded_symbols,
@@ -501,6 +774,18 @@ class FactorBacktest:
             ),
             sort_key=lambda row: (row.signal_date, row.symbol),
         )
+
+    @staticmethod
+    def _directional_observations(
+        observations: list[FactorBacktestObservation],
+        higher_is_better: bool,
+    ) -> list[FactorBacktestObservation]:
+        if higher_is_better:
+            return observations
+        return [
+            replace(observation, factor_value=-float(observation.factor_value))
+            for observation in observations
+        ]
 
     @staticmethod
     def _assign_quantiles(

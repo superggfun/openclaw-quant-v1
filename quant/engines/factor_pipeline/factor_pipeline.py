@@ -102,6 +102,7 @@ class FactorPipeline:
         cleaned = self._zscore(cleaned, steps)
         cleaned, sector_result = self._sector_neutralize(cleaned, warnings, steps)
         cleaned = self._rank_normalize(cleaned, steps)
+        cleaned = self._apply_factor_direction(cleaned, factor, steps)
 
         if self.config["market_beta_neutralization"]["enabled"]:
             steps.append("market_beta_neutralization_placeholder")
@@ -228,6 +229,21 @@ class FactorPipeline:
             symbol: float((rank - 0.5) * 2.0)
             for symbol, rank in ranks.items()
         }
+
+    @staticmethod
+    def _apply_factor_direction(
+        values: dict[str, float],
+        factor: str,
+        steps: list[str],
+    ) -> dict[str, float]:
+        """Flip sign for factors where higher raw value is worse (e.g. volatility)."""
+        from quant.factors.price.factor_registry import FactorRegistry
+
+        meta = FactorRegistry().metadata(factor)
+        if meta.get("higher_is_better", True):
+            return values
+        steps.append("direction_adjusted")
+        return {symbol: -value for symbol, value in values.items()}
 
     @staticmethod
     def _summary(values: Mapping[str, float | None]) -> dict[str, float | int | None]:

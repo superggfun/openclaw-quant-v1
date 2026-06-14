@@ -27,8 +27,13 @@ class FactorWeighting:
 
         warnings: list[str] = []
         if mode == "custom_weight":
+            normalized_custom: dict[str, float] = {
+                str(key).strip().lower(): float(value)
+                for key, value in (custom_weights or {}).items()
+                if value is not None
+            }
             raw = {
-                factor: max(float((custom_weights or {}).get(factor, 0.0)), 0.0)
+                factor: max(float(normalized_custom.get(factor, 0.0)), 0.0)
                 for factor in normalized_factors
             }
             if sum(raw.values()) <= 0:
@@ -67,8 +72,8 @@ class FactorWeighting:
     @staticmethod
     def _ic_quality(metrics: Mapping[str, float | None]) -> float:
         values = [
-            abs(float(metrics.get("ic_mean") or 0.0)),
-            abs(float(metrics.get("rank_ic_mean") or 0.0)),
+            max(float(metrics.get("ic_mean") or 0.0), 0.0),
+            max(float(metrics.get("rank_ic_mean") or 0.0), 0.0),
             max(float(metrics.get("icir") or 0.0), 0.0),
         ]
         return sum(value for value in values if math.isfinite(value))

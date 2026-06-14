@@ -114,9 +114,11 @@ def test_cost_engine_market_realism_components(tmp_path: Path) -> None:
 
     trade = report.trades[0]
     assert trade.slippage_cost == pytest.approx(1.0)
-    assert trade.market_impact_cost == pytest.approx(0.5)
+    assert trade.market_impact_model == "sqrt_participation"
+    assert trade.market_impact_bps_effective == pytest.approx(6.5811388301)
+    assert trade.market_impact_cost == pytest.approx(0.658113883)
     assert trade.liquidity_cost == pytest.approx(1.0)
-    assert report.total_market_impact == pytest.approx(0.5)
+    assert report.total_market_impact == pytest.approx(0.658113883)
 
 
 def test_trade_sim_integration_caps_and_reports(tmp_path: Path) -> None:

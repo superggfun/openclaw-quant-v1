@@ -53,9 +53,16 @@ class FactorBatchResult:
 def run_factor_batch_tasks(
     tasks: list[FactorBatchTask],
     workers: int,
-    timeout_seconds: float | None = None,
+    soft_timeout_seconds: float | None = None,
     on_result: Callable[[FactorBatchResult], None] | None = None,
 ) -> list[FactorBatchResult]:
+    """Run batch tasks with optional soft timeout.
+
+    ``soft_timeout_seconds`` marks remaining tasks as TIMEOUT once the wall-clock
+    exceeds the deadline, but does NOT kill already-running workers — they will
+    finish naturally.  On non-fork platforms, ``ProcessPoolExecutor.__exit__``
+    still waits for running workers, so actual termination may lag.
+    """
     if not tasks:
         return []
     max_workers = max(1, min(int(workers), len(tasks)))
@@ -63,7 +70,7 @@ def run_factor_batch_tasks(
     if max_workers == 1:
         results = []
         for index, task in enumerate(tasks):
-            if timeout_seconds is not None and time.monotonic() - started >= timeout_seconds:
+            if soft_timeout_seconds is not None and time.monotonic() - started >= soft_timeout_seconds:
                 for result in _timeout_results(tasks[index:]):
                     results.append(result)
                     if on_result is not None:
@@ -86,7 +93,7 @@ def run_factor_batch_tasks(
     future_by_task = {}
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         while next_index < len(tasks) and len(future_by_task) < max_workers:
-            if timeout_seconds is not None and time.monotonic() - started >= timeout_seconds:
+            if soft_timeout_seconds is not None and time.monotonic() - started >= soft_timeout_seconds:
                 break
             task = tasks[next_index]
             future_by_task[executor.submit(_run_task, task)] = task
@@ -94,8 +101,8 @@ def run_factor_batch_tasks(
 
         while future_by_task:
             remaining = None
-            if timeout_seconds is not None:
-                remaining = timeout_seconds - (time.monotonic() - started)
+            if soft_timeout_seconds is not None:
+                remaining = soft_timeout_seconds - (time.monotonic() - started)
                 if remaining <= 0:
                     break
             done, _ = wait(future_by_task, timeout=remaining, return_when=FIRST_COMPLETED)
@@ -107,7 +114,7 @@ def run_factor_batch_tasks(
                     record(future.result())
                 except Exception as exc:
                     record(FactorBatchResult(task=task, result=None, runtime_seconds=0.0, warnings=["PARALLEL_WORKER_FAILED"], error=str(exc)))
-                if next_index < len(tasks) and (timeout_seconds is None or time.monotonic() - started < timeout_seconds):
+                if next_index < len(tasks) and (soft_timeout_seconds is None or time.monotonic() - started < soft_timeout_seconds):
                     next_task = tasks[next_index]
                     future_by_task[executor.submit(_run_task, next_task)] = next_task
                     next_index += 1

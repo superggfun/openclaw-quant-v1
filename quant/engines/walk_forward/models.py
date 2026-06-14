@@ -25,6 +25,7 @@ class WalkForwardFoldTask:
     report_dir: str
     purge_days: int = 0
     embargo_days: int = 0
+    forward_days: int = 20
 
 
 @dataclass(frozen=True)

@@ -12,5 +12,6 @@ MCP_TOOL_SPECS = (
     MCPToolSpec("factor_history", FACTORS, READ_ONLY, "Return persisted factor history.", "factor_history"),
     MCPToolSpec("factor_rank", FACTORS, READ_ONLY, "Return persisted factor ranking diagnostics.", "factor_rank"),
     MCPToolSpec("factor_store_summary", FACTORS, READ_ONLY, "Return factor store table counts and definitions.", "factor_store_summary"),
-    MCPToolSpec("evaluate_factor", FACTORS, READ_ONLY, "Run no-lookahead factor evaluation.", "evaluate_factor", ("factor",)),
+    MCPToolSpec("evaluate_factor", FACTORS, READ_ONLY, "Run no-lookahead factor evaluation. Compact summary by default.", "evaluate_factor", ("factor",)),
+    MCPToolSpec("test_factor", FACTORS, READ_ONLY, "Run factor eval + backtest and return compact score/status.", "test_factor", ("factor",)),
 )

@@ -91,6 +91,7 @@ def run_decile_analysis(
     spread = _spread(decile_returns)
 
     score, warnings, recommendations = _score(mono_corr, spread, valid_pairs)
+    direction = "normal" if (mono_corr or 0) >= 0 else "inverse"
     status = "pass" if score >= 60 else ("warn" if score >= 30 else "fail")
 
     return AuditModuleResult(
@@ -108,6 +109,7 @@ def run_decile_analysis(
                 for d in decile_returns
             ],
             "monotonicity_correlation": mono_corr,
+            "direction": direction,
             "d10_d1_spread": spread,
         },
         warnings=warnings,
@@ -146,7 +148,10 @@ def _score(
     if mono_corr is None or len(valid_pairs) < 5:
         return 50.0, ["insufficient decile data"], []
 
-    # Absolute monotonicity: |corr| close to 1 is ideal
+    # Absolute monotonicity: |corr| close to 1 is ideal — but negative corr
+    # is capped because the system does NOT auto-reverse factor direction.
+    # A factor with perfect inverse monotonicity (Spearman = -1.0) is NOT
+    # equivalent to one with perfect positive monotonicity.
     abs_corr = abs(mono_corr)
     mono_score = abs_corr * 100.0
 
@@ -157,6 +162,16 @@ def _score(
             spread_bonus = 10.0
 
     score = min(100.0, mono_score + spread_bonus)
+
+    # Inverse monotonicity is NOT equivalent to positive monotonicity.
+    # The system does not auto-reverse factors — cap the final score.
+    if mono_corr < 0:
+        score = min(score, 40.0)
+        warnings.append(f"factor direction is inverse (corr={mono_corr:.2f}); score capped at 40")
+        recommendations.append(
+            "factor return monotonicity is inverse — consider reversing the factor "
+            "or using long bottom-decile / short top-decile"
+        )
 
     if abs_corr < 0.3:
         warnings.append(f"weak monotonicity (correlation={mono_corr:.2f})")

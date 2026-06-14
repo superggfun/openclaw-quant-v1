@@ -4,29 +4,27 @@ from __future__ import annotations
 
 import pandas as pd
 
+from quant.factors.price._utils import clean_price_series
 from quant.factors.specs import price_factor_spec
 
 
-def _clean_closes(closes: pd.Series) -> pd.Series:
-    return pd.to_numeric(closes, errors="coerce").dropna()
-
 
 def momentum_20d(closes: pd.Series) -> float | None:
-    closes = _clean_closes(closes)
+    closes = clean_price_series(closes)
     if len(closes) <= 20:
         return None
     return float((closes.iloc[-1] / closes.iloc[-21]) - 1.0)
 
 
 def momentum_60d(closes: pd.Series) -> float | None:
-    closes = _clean_closes(closes)
+    closes = clean_price_series(closes)
     if len(closes) <= 60:
         return None
     return float((closes.iloc[-1] / closes.iloc[-61]) - 1.0)
 
 
 def volatility_20d(closes: pd.Series) -> float | None:
-    closes = _clean_closes(closes)
+    closes = clean_price_series(closes)
     returns = closes.pct_change().dropna().tail(20)
     if len(returns) < 20:
         return None

@@ -1,0 +1,14 @@
+{
+  "model": "combined",
+  "fixed_fee": 1.0,
+  "commission_rate": 0.0005,
+  "min_commission": 1.0,
+  "slippage_bps": 5.0,
+  "market_impact_bps": 2.0,
+  "market_impact_model": "sqrt_participation",
+  "market_impact_participation_factor": 1.0,
+  "market_impact_volatility_factor": 0.05,
+  "currency": "USD",
+  "min_trade_notional": 50.0,
+  "min_cost_efficiency_ratio": null
+}

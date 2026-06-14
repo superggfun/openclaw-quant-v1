@@ -169,10 +169,19 @@ def compact_factor_backtest_result(
         "batch_symbols": list(task.symbols) if task else None,
         "universe_size": len(task.symbols) if task else None,
         "observation_count": result.observations,
-        "long_short_return": result.long_short_return,
-        "sharpe": sharpe,
-        "long_short_sharpe": result.long_short_sharpe,
-        "max_drawdown": result.max_drawdown,
+        # ── Spread-semantics primary metrics ──
+        "cumulative_forward_spread": result.long_short_return,
+        "annualized_mean_forward_spread": result.annual_return,
+        "spread_sharpe_like": sharpe,
+        "spread_max_drawdown": result.max_drawdown,
+        # ── Legacy metric aliases (nested to keep primary surface clean) ──
+        "legacy_metrics": {
+            "long_short_return": result.long_short_return,
+            "sharpe": sharpe,
+            "long_short_sharpe": result.long_short_sharpe,
+            "max_drawdown": result.max_drawdown,
+            "annual_return": result.annual_return,
+        },
         "turnover": result.turnover,
         "ic_mean": result.ic_mean,
         "rank_ic_mean": result.rank_ic_mean,

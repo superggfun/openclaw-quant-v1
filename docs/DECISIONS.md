@@ -64,9 +64,9 @@ V0.5 uses deterministic rules for equal-weight, risk-adjusted, and constrained t
 
 The V0.6 cost engine estimates transaction costs from suggested trades. It does not filter, execute, or modify trades.
 
-## 2026-06-11: Cost Models Stay Simple
+## 2026-06-11: Cost Models Stay Offline And Deterministic
 
-V0.6 supports fixed, linear, and combined costs with simple slippage in basis points. Complex market impact is intentionally out of scope.
+V0.6 supports fixed, linear, and combined costs with simple slippage in basis points. V0.30 keeps the model deterministic and daily-bar based, while adding square-root ADV participation market impact for offline simulation. It is still not a broker quote, intraday fill model, or live market-impact estimator.
 
 ## V0.30 Market Realism Remains Historical Simulation
 

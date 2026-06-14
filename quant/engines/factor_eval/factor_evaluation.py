@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import time
+import json
 from dataclasses import asdict, dataclass, replace
+from datetime import date
 from pathlib import Path
 
 import numpy as np
@@ -11,6 +13,7 @@ import pandas as pd
 
 from quant.config import DEFAULT_SYMBOLS
 from quant.factor_acceleration import FactorMatrixBuilder
+from quant.factor_acceleration.observation_matrix import ObservationMatrixResult
 from quant.factor_cache import FactorCacheKey, FactorEvalCache, FactorMatrixResult, make_universe_hash
 from quant.engines.factor_common import (
     apply_factor_pipeline,
@@ -28,17 +31,19 @@ from quant.factors.price.factor_registry import FactorRegistry
 from quant.data.fundamental.fundamental_store import FundamentalStore
 from quant.storage.sqlite_store import SQLitePriceStore
 
-
 FACTOR_REGISTRY = FactorRegistry()
 SUPPORTED_FACTORS = set(FACTOR_REGISTRY.factor_names())
 DEFAULT_DECAY_DAYS = [1, 5, 10, 20, 60]
+HALF_LIFE_METHOD = "rank_ic_abs_exp_fit"
+FORWARD_RETURN_BASIS = "signal_close_to_future_close"
 
 
 def _estimate_half_life(decay: dict) -> float | None:
-    '''Estimate signal half-life from IC decay curve using exponential fit.
+    '''Estimate signal half-life from rank IC decay curve using exponential fit.
     Expects decay dict format: {"20d": {"ic": 0.05, "rank_ic": 0.06, ...}}'''
     horizons = []
-    ic_values = []
+    rank_ic_values = []
+    raw_rank_ic_values = []
     for label, entry in decay.items():
         # Parse horizon from label like "20d" or "60d"
         if not isinstance(label, str) or not label.endswith("d"):
@@ -47,18 +52,22 @@ def _estimate_half_life(decay: dict) -> float | None:
             horizon = int(label[:-1])
         except (ValueError, TypeError):
             continue
-        ic = entry.get("ic")  # Use standard IC (not rank IC)
-        if ic is not None and abs(float(ic)) > 1e-9:
-            ic_abs = abs(float(ic))
+        rank_ic = entry.get("rank_ic")
+        if rank_ic is not None and abs(float(rank_ic)) > 1e-9:
+            raw_value = float(rank_ic)
             horizons.append(float(horizon))
-            ic_values.append(ic_abs)
+            raw_rank_ic_values.append(raw_value)
+            rank_ic_values.append(abs(raw_value))
 
     if len(horizons) < 3:
+        return None
+    signs = {int(np.sign(value)) for value in raw_rank_ic_values if abs(value) > 1e-9}
+    if len(signs) > 1:
         return None
 
     try:
         h_arr = np.array(horizons)
-        y_arr = np.log(np.array(ic_values))
+        y_arr = np.log(np.array(rank_ic_values))
         slope, intercept = np.polyfit(h_arr, y_arr, 1)
         lambda_est = -slope
         if lambda_est <= 1e-12:
@@ -67,9 +76,6 @@ def _estimate_half_life(decay: dict) -> float | None:
         return round(half_life, 1)
     except Exception:
         return None
-
-SUPPORTED_FACTORS = set(FACTOR_REGISTRY.factor_names())
-DEFAULT_DECAY_DAYS = [1, 5, 10, 20, 60]
 
 
 @dataclass(frozen=True)
@@ -117,16 +123,29 @@ class FactorEvaluationResult:
     warnings: list[str]
     pipeline_config: dict | None
     report_path: str
+    evaluator_no_lookahead: bool = True
+    overall_no_lookahead: bool | None = None
+    forward_return_basis: str = FORWARD_RETURN_BASIS
+    tradable_return: bool = False
+    half_life_method: str | None = HALF_LIFE_METHOD
     performance_metadata: dict | None = None
 
-    def to_report(self) -> dict:
-        report = {
+    def to_summary(self, include_observations: bool = False) -> dict:
+        """Return compact key metrics for MCP / factor-test (no full obs list)."""
+        summary = {
             "factor": self.factor,
+            "factor_family": self.factor_family,
+            "factor_type": self.factor_type,
+            "observations_count": len(self.observations),
             "start_date": self.start_date,
             "end_date": self.end_date,
             "forward_days": self.forward_days,
-            "universe": self.universe,
-            "no_lookahead": self.no_lookahead,
+            "no_lookahead": self._overall_no_lookahead(),
+            "evaluator_no_lookahead": self.evaluator_no_lookahead,
+            "factor_no_lookahead": self.factor_no_lookahead,
+            "overall_no_lookahead": self._overall_no_lookahead(),
+            "forward_return_basis": self.forward_return_basis,
+            "tradable_return": self.tradable_return,
             "ic_mean": self.ic_mean,
             "ic_std": self.ic_std,
             "ic_positive_rate": self.ic_positive_rate,
@@ -139,7 +158,66 @@ class FactorEvaluationResult:
             "quintiles": self.quintiles,
             "spread_return": self.spread_return,
             "decay": self.decay,
-            "observations": [asdict(observation) for observation in self.observations],
+            "half_life_days": self.half_life_days,
+            "half_life_method": self.half_life_method,
+            "warnings": self.warnings,
+            "excluded_count": len(self.excluded_symbols),
+        }
+        if self.factor_coverage:
+            summary["factor_coverage"] = self.factor_coverage
+        if self.performance_metadata:
+            summary["performance_metadata"] = {
+                "bulk_matrix_enabled": self.performance_metadata.get("bulk_matrix_enabled"),
+                "serial_reference": self.performance_metadata.get("serial_reference"),
+                "provider_type": self.performance_metadata.get("provider_type"),
+                "cache_strategy": self.performance_metadata.get("cache_strategy"),
+                "fallback_used": self.performance_metadata.get("fallback_used"),
+                "matrix_workers": self.performance_metadata.get("matrix_workers"),
+                "eval_seconds": self.performance_metadata.get("eval_seconds"),
+            }
+        if include_observations:
+            summary["observations"] = [asdict(row) for row in self.observations]
+        return summary
+
+    def to_mcp_response(self, include_observations: bool = False) -> dict:
+        """Return compact MCP response (alias for to_summary)."""
+        return self.to_summary(include_observations=include_observations)
+
+    def to_json(self, include_observations: bool = False, pretty: bool = False) -> str:
+        return json.dumps(
+            self.to_summary(include_observations=include_observations),
+            indent=2 if pretty else None,
+            default=str,
+        )
+
+    def to_report(self, include_observations: bool = False) -> dict:
+        report = {
+            "factor": self.factor,
+            "start_date": self.start_date,
+            "end_date": self.end_date,
+            "forward_days": self.forward_days,
+            "universe": self.universe,
+            "no_lookahead": self._overall_no_lookahead(),
+            "evaluator_no_lookahead": self.evaluator_no_lookahead,
+            "factor_no_lookahead": self.factor_no_lookahead,
+            "overall_no_lookahead": self._overall_no_lookahead(),
+            "forward_return_basis": self.forward_return_basis,
+            "tradable_return": self.tradable_return,
+            "ic_mean": self.ic_mean,
+            "ic_std": self.ic_std,
+            "ic_positive_rate": self.ic_positive_rate,
+            "ic_count": self.ic_count,
+            "rank_ic_mean": self.rank_ic_mean,
+            "rank_ic_std": self.rank_ic_std,
+            "rank_ic_positive_rate": self.rank_ic_positive_rate,
+            "rank_ic_count": self.rank_ic_count,
+            "icir": self.icir,
+            "quintiles": self.quintiles,
+            "spread_return": self.spread_return,
+            "decay": self.decay,
+            "half_life_days": self.half_life_days,
+            "half_life_method": self.half_life_method,
+            "observations_count": len(self.observations),
             "excluded_symbols": self.excluded_symbols,
             "exclusion_reasons": self.exclusion_reasons,
             "factor_family": self.factor_family,
@@ -148,11 +226,12 @@ class FactorEvaluationResult:
             "factor_description": self.factor_description,
             "factor_inputs": self.factor_inputs,
             "factor_higher_is_better": self.factor_higher_is_better,
-            "factor_no_lookahead": self.factor_no_lookahead,
             "factor_coverage": self.factor_coverage,
             "warnings": self.warnings,
             "pipeline_config": self.pipeline_config,
         }
+        if include_observations:
+            report["observations"] = [asdict(observation) for observation in self.observations]
         if self.performance_metadata:
             report["performance_metadata"] = self.performance_metadata
             report["cache_enabled"] = self.performance_metadata.get("cache_enabled")
@@ -163,6 +242,11 @@ class FactorEvaluationResult:
             report["eval_seconds"] = self.performance_metadata.get("eval_seconds")
             report["speedup_estimate"] = self.performance_metadata.get("speedup_estimate")
         return report
+
+    def _overall_no_lookahead(self) -> bool:
+        if self.overall_no_lookahead is not None:
+            return bool(self.overall_no_lookahead)
+        return bool(self.evaluator_no_lookahead and self.factor_no_lookahead)
 
 
 class FactorEvaluation:
@@ -195,7 +279,7 @@ class FactorEvaluation:
         prefer_in_memory: bool = True,
         strict_in_memory: bool = False,
         cache_stats: bool = False,
-        write_report: bool = True,
+        write_report: bool = False,
     ) -> FactorEvaluationResult:
         eval_started = time.monotonic()
         factor = factor.strip().lower()
@@ -203,6 +287,9 @@ class FactorEvaluation:
             raise ValueError("use_cache and bulk_matrix cannot be enabled together yet")
         self._validate(factor, start, end, forward_days)
         factor_metadata = self.factor_registry.metadata(factor)
+        evaluator_no_lookahead = True
+        factor_no_lookahead = bool(factor_metadata["no_lookahead"])
+        overall_no_lookahead = evaluator_no_lookahead and factor_no_lookahead
         symbols = normalize_symbols(universe or list(DEFAULT_SYMBOLS))
         normalized_pipeline_config = (
             FactorPipeline.normalize_config(pipeline_config)
@@ -264,8 +351,10 @@ class FactorEvaluation:
         factor_coverage = self._factor_coverage(factor, symbols, observations)
         warnings.extend(self._factor_coverage_warnings(factor, factor_coverage))
 
-        ic_values, rank_ic_values = self._correlations(observations)
-        quintiles = self._quintiles(observations)
+        higher_is_better = bool(factor_metadata["higher_is_better"])
+        ranking_observations = self._directional_observations(observations, higher_is_better)
+        ic_values, rank_ic_values = self._correlations(ranking_observations)
+        quintiles = self._quintiles(ranking_observations)
         spread_return = self._spread_return(quintiles)
         ic_mean = self._mean(ic_values)
         ic_std = self._std(ic_values)
@@ -277,6 +366,7 @@ class FactorEvaluation:
                 horizons=horizons,
                 pipeline_config=normalized_pipeline_config,
                 factor=factor,
+                higher_is_better=higher_is_better,
             )
         else:
             decay = self._decay(
@@ -286,6 +376,7 @@ class FactorEvaluation:
                 end=end,
                 horizons=decay_horizons or DEFAULT_DECAY_DAYS,
                 pipeline_config=normalized_pipeline_config,
+                higher_is_better=higher_is_better,
                 factor_cache=cache if use_cache else None,
                 max_workers=max_workers,
             )
@@ -308,7 +399,7 @@ class FactorEvaluation:
             end_date=end,
             forward_days=forward_days,
             universe=symbols,
-            no_lookahead=True,
+            no_lookahead=overall_no_lookahead,
             ic_mean=ic_mean,
             ic_std=ic_std,
             ic_positive_rate=self._positive_rate(ic_values),
@@ -330,12 +421,17 @@ class FactorEvaluation:
             factor_category=str(factor_metadata["factor_category"]),
             factor_description=str(factor_metadata["factor_description"]),
             factor_inputs=list(factor_metadata["factor_inputs"]),
-            factor_higher_is_better=bool(factor_metadata["higher_is_better"]),
-            factor_no_lookahead=bool(factor_metadata["no_lookahead"]),
+            factor_higher_is_better=higher_is_better,
+            factor_no_lookahead=factor_no_lookahead,
             factor_coverage=factor_coverage,
             warnings=warnings,
             pipeline_config=normalized_pipeline_config,
             report_path="",
+            evaluator_no_lookahead=evaluator_no_lookahead,
+            overall_no_lookahead=overall_no_lookahead,
+            forward_return_basis=FORWARD_RETURN_BASIS,
+            tradable_return=False,
+            half_life_method=HALF_LIFE_METHOD,
             performance_metadata=performance_metadata,
         )
         report_path = self._write_report(result) if write_report else ""
@@ -411,7 +507,6 @@ class FactorEvaluation:
         prefer_in_memory: bool = True,
         strict_in_memory: bool = False,
     ) -> FactorMatrixResult:
-        started = time.monotonic()
         matrix = FactorMatrixBuilder(
             self.price_store,
             self.factor_registry,
@@ -511,6 +606,7 @@ class FactorEvaluation:
             "fallback_used": provider_defaults.get("fallback_used", False),
             "fallback_reason": provider_defaults.get("fallback_reason"),
             "cache_strategy": provider_defaults.get("cache_strategy"),
+            "serial_reference": (not bulk_matrix and not cache_enabled),
             "cache_stats": delta,
             "matrix": matrix_metadata,
             "no_lookahead": True,
@@ -551,7 +647,6 @@ class FactorEvaluation:
             )
         if start and end:
             try:
-                from datetime import date, timedelta
                 s = date.fromisoformat(start)
                 e = date.fromisoformat(end)
                 if (e - s).days > 500:
@@ -616,11 +711,14 @@ class FactorEvaluation:
         forward_days: int,
     ) -> list[FactorObservation]:
         observations = []
+        start_date = self._parse_optional_iso_date(start, "start")
+        end_date = self._parse_optional_iso_date(end, "end")
         for index in range(len(history)):
             signal_date = str(history.iloc[index]["date"])
-            if start and signal_date < start:
+            signal_date_value = self._history_date(signal_date)
+            if start_date is not None and signal_date_value < start_date:
                 continue
-            if end and signal_date > end:
+            if end_date is not None and signal_date_value > end_date:
                 continue
             future_index = index + forward_days
             if future_index >= len(history):
@@ -639,6 +737,8 @@ class FactorEvaluation:
 
             signal_close = float(history.iloc[index]["close"])
             future_close = float(history.iloc[future_index]["close"])
+            if not np.isfinite(signal_close) or signal_close <= 0 or not np.isfinite(future_close):
+                continue
             observations.append(
                 FactorObservation(
                     signal_date=signal_date,
@@ -678,14 +778,31 @@ class FactorEvaluation:
         return cross_section_correlations(observations)
 
     @staticmethod
+    def _directional_observations(
+        observations: list[FactorObservation],
+        higher_is_better: bool = True,
+    ) -> list[FactorObservation]:
+        if higher_is_better:
+            return observations
+        return [
+            replace(observation, factor_value=-float(observation.factor_value))
+            for observation in observations
+        ]
+
+    @staticmethod
     def _quintiles(observations: list[FactorObservation]) -> dict[str, float | None]:
         frame = pd.DataFrame([asdict(observation) for observation in observations])
         if frame.empty:
             return {f"q{index}": None for index in range(1, 6)}
         frame["rank_pct"] = frame.groupby("signal_date")["factor_value"].rank(pct=True, method="first")
         frame["quintile"] = (frame["rank_pct"] * 5).apply(lambda value: min(max(int(value + 0.999999), 1), 5))
+        daily = (
+            frame.groupby(["signal_date", "quintile"])["future_return"]
+            .mean()
+            .reset_index()
+        )
         return {
-            f"q{index}": FactorEvaluation._mean(frame.loc[frame["quintile"] == index, "future_return"].tolist())
+            f"q{index}": FactorEvaluation._mean(daily.loc[daily["quintile"] == index, "future_return"].tolist())
             for index in range(1, 6)
         }
 
@@ -705,6 +822,7 @@ class FactorEvaluation:
         end: str | None,
         horizons: list[int],
         pipeline_config: dict | None,
+        higher_is_better: bool = True,
         factor_cache: FactorEvalCache | None = None,
         max_workers: int = 4,
     ) -> dict[str, dict[str, float | int | None]]:
@@ -719,7 +837,8 @@ class FactorEvaluation:
                 factor=factor,
                 pipeline_config=pipeline_config,
             )
-            ic_values, rank_ic_values = self._correlations(observations)
+            ranking_observations = self._directional_observations(observations, higher_is_better)
+            ic_values, rank_ic_values = self._correlations(ranking_observations)
             decay[f"{horizon}d"] = {
                 "ic": self._mean(ic_values),
                 "rank_ic": self._mean(rank_ic_values),
@@ -734,6 +853,7 @@ class FactorEvaluation:
         horizons: list[int],
         pipeline_config: dict | None,
         factor: str,
+        higher_is_better: bool = True,
     ) -> dict[str, dict[str, float | int | None]]:
         """Compute decay ICs from pre-built multi-horizon matrices (no redundant rebuilds)."""
         decay = {}
@@ -747,7 +867,8 @@ class FactorEvaluation:
                 factor=factor,
                 pipeline_config=pipeline_config,
             )
-            ic_values, rank_ic_values = self._correlations(observations)
+            ranking_observations = self._directional_observations(observations, higher_is_better)
+            ic_values, rank_ic_values = self._correlations(ranking_observations)
             decay[f"{horizon}d"] = {
                 "ic": self._mean(ic_values),
                 "rank_ic": self._mean(rank_ic_values),
@@ -794,14 +915,29 @@ class FactorEvaluation:
     def _normalize_symbols(symbols: list[str]) -> list[str]:
         return normalize_symbols(symbols)
 
-    @staticmethod
-    def _validate(factor: str, start: str | None, end: str | None, forward_days: int) -> None:
-        if factor not in SUPPORTED_FACTORS:
-            raise ValueError(f"factor must be one of: {', '.join(sorted(SUPPORTED_FACTORS))}")
-        if start and end and start > end:
+    def _validate(self, factor: str, start: str | None, end: str | None, forward_days: int) -> None:
+        supported = set(self.factor_registry.factor_names())
+        if factor not in supported:
+            raise ValueError(f"factor must be one of: {', '.join(sorted(supported))}")
+        start_date = self._parse_optional_iso_date(start, "start")
+        end_date = self._parse_optional_iso_date(end, "end")
+        if start_date is not None and end_date is not None and start_date > end_date:
             raise ValueError("start must be before or equal to end")
         if forward_days <= 0:
             raise ValueError("forward_days must be positive")
+
+    @staticmethod
+    def _parse_optional_iso_date(value: str | None, field_name: str) -> date | None:
+        if value is None:
+            return None
+        try:
+            return date.fromisoformat(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{field_name} must be an ISO date YYYY-MM-DD") from exc
+
+    @staticmethod
+    def _history_date(value: str) -> date:
+        return pd.Timestamp(value).date()
 
     def _write_report(self, result: FactorEvaluationResult) -> Path:
         return write_factor_report(self.report_dir, "factor_eval", result.factor, result.to_report())

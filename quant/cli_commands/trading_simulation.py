@@ -13,6 +13,7 @@ from quant.cli_commands.common import (
     load_cost_config,
     load_market_realism_config,
 )
+from quant.engines.execution.cost_engine import COST_PROFILE_NAMES
 from quant.engines.portfolio.portfolio_construction import SUPPORTED_METHODS
 from quant.engines.trading_simulation.trading_simulator import SUPPORTED_REBALANCE_FREQUENCIES
 
@@ -28,6 +29,7 @@ def register_parser(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument("--initial-cash", type=float, default=100000.0)
     parser.add_argument("--rebalance-frequency", default="monthly", choices=sorted(SUPPORTED_REBALANCE_FREQUENCIES))
     parser.add_argument("--portfolio-method", default="equal_weight", choices=sorted(SUPPORTED_METHODS))
+    parser.add_argument("--cost-profile", default="conservative", choices=COST_PROFILE_NAMES)
     parser.add_argument("--cost-config", default="examples/cost_config.json")
     parser.add_argument("--market-realism-config", default="examples/market_realism_config.json")
     parser.add_argument("--alpha-config", default="examples/alpha_config.json")
@@ -47,7 +49,7 @@ def handle(args: argparse.Namespace, context: CLIContext) -> int:
         initial_cash=args.initial_cash,
         rebalance_frequency=args.rebalance_frequency,
         portfolio_method=args.portfolio_method,
-        cost_config=load_cost_config(Path(args.cost_config)),
+        cost_config=load_cost_config(Path(args.cost_config), args.cost_profile),
         market_realism_config=load_market_realism_config(Path(args.market_realism_config)),
         alpha_config=load_alpha_config(Path(args.alpha_config)),
         execution_price=args.execution_price,
@@ -58,6 +60,7 @@ def handle(args: argparse.Namespace, context: CLIContext) -> int:
     print("Trading Simulation Summary")
     print(f"strategy: {result.strategy}")
     print(f"portfolio_method: {result.portfolio_method}")
+    print(f"cost_profile: {args.cost_profile}")
     print(f"period: {args.start} to {args.end}")
     print(f"no_lookahead: {result.no_lookahead}")
     print(f"initial_cash: {result.initial_cash:.2f}")

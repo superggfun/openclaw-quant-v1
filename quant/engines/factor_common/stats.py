@@ -82,6 +82,36 @@ def hit_rate(values: Iterable[float | None]) -> float | None:
     return positive_rate(values)
 
 
+def cumulative_spread_return(values: Iterable[float | None]) -> float | None:
+    """Additive cumulative return for spread / forward-spread sequences.
+
+    Multiply-compounding (compound_return) is not appropriate for dollar-neutral
+    long-short spread returns where each period represents an independent trade
+    rather than reinvested capital.  This function computes a simple additive sum.
+    """
+    clean = _clean(values)
+    if not clean:
+        return None
+    return float(np.sum(clean))
+
+
+def spread_max_drawdown(values: Iterable[float | None]) -> float | None:
+    """Maximum drawdown on the cumulative-sum curve of spread returns.
+
+    Uses np.cumsum (additive) instead of np.cumprod (multiplicative) because
+    overlapping forward-spread returns are diagnostic, not an investable equity
+    curve that can be compounded period-over-period.
+    """
+    clean = _clean(values)
+    if not clean:
+        return None
+    arr = np.asarray(clean, dtype="float64")
+    cumulative = np.cumsum(arr)
+    peak = np.maximum.accumulate(cumulative)
+    drawdown = cumulative - peak
+    return float(np.min(drawdown))
+
+
 def cross_section_correlations(observations: Iterable[Any]) -> tuple[list[float], list[float]]:
     rows = [
         {

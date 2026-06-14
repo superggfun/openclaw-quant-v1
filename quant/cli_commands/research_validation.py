@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 
 from quant.cli_commands.common import CLIContext, format_optional_number
+from quant.engines.execution.cost_engine import COST_PROFILE_NAMES
 from quant.research_validation import ResearchValidationRunner
 
 
@@ -20,6 +21,7 @@ def register_parser(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument("--batch-size", type=int, default=None)
     parser.add_argument("--max-symbols", type=int, default=None)
     parser.add_argument("--factor-family", choices=["price", "fundamental", "all"], default="all")
+    parser.add_argument("--cost-profile", choices=COST_PROFILE_NAMES, default="conservative")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--skip-existing", action="store_true")
     parser.add_argument("--use-cache", action="store_true", help="Use the opt-in in-memory factor matrix cache for factor-eval steps.")
@@ -69,6 +71,7 @@ def handle(args: argparse.Namespace, context: CLIContext) -> int:
     print(f"batch_size: {preview['batch_size']}")
     print(f"batch_count: {preview['batch_count']}")
     print(f"workers: {preview['workers']}")
+    print(f"cost_profile: {args.cost_profile}")
     print(f"expected_task_count: {preview['expected_task_count']}")
     print(f"charts_enabled: {str(bool(args.write_charts)).lower()}")
     print(f"write_substep_reports: {str(bool(args.write_substep_reports)).lower()}")
@@ -85,6 +88,7 @@ def handle(args: argparse.Namespace, context: CLIContext) -> int:
         batch_size=args.batch_size,
         max_symbols=args.max_symbols,
         factor_family=args.factor_family,
+        cost_profile=args.cost_profile,
         resume=args.resume,
         skip_existing=args.skip_existing,
         use_cache=args.use_cache,

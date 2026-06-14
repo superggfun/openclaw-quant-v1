@@ -37,6 +37,15 @@ CREATE TABLE IF NOT EXISTS factor_evaluation_history (
 CREATE TABLE IF NOT EXISTS factor_backtest_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     factor_name TEXT NOT NULL,
+    -- Correct spread-semantics metrics (additive, non-compounding)
+    cumulative_forward_spread REAL,
+    spread_sharpe_like REAL,
+    spread_max_drawdown REAL,
+    return_type TEXT,
+    investable_equity INTEGER,
+    cumulative_method TEXT,
+    metric_semantics TEXT,
+    -- Legacy metric aliases (kept for backward compat; prefer *_ columns above)
     long_short_return REAL,
     sharpe REAL,
     drawdown REAL,
@@ -84,12 +93,19 @@ CREATE TABLE IF NOT EXISTS factor_regime_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     factor_name TEXT NOT NULL,
     regime TEXT NOT NULL,
+    metric_type TEXT,
     ic REAL,
     rank_ic REAL,
     icir REAL,
+    mean_spread_return REAL,
+    return_ir REAL,
+    positive_ic_rate REAL,
     coverage REAL,
+    regime_observation_share REAL,
     stability REAL,
     samples INTEGER,
+    sample_days INTEGER,
+    sample_observations INTEGER,
     evaluation_date TEXT NOT NULL,
     report_path TEXT
 );

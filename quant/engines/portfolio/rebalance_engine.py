@@ -84,7 +84,11 @@ class RebalanceEngine:
         self.account_name = account_name
         self.report_dir = Path(report_dir)
 
-    def allocation(self) -> AllocationSnapshot:
+    def allocation(
+        self,
+        pricing_date: str | None = None,
+        price_store=None,
+    ) -> AllocationSnapshot:
         account = self._require_account()
         cash = float(account["cash"])
         position_rows = self.store.list_positions(account["id"])
@@ -93,7 +97,14 @@ class RebalanceEngine:
 
         for position in position_rows:
             symbol = position["symbol"]
-            price = self.store.latest_close(symbol)
+            if pricing_date and price_store is not None:
+                history = price_store.get_price_history(symbol, end=pricing_date)
+                if history.empty:
+                    price = self.store.latest_close(symbol)
+                else:
+                    price = float(history.sort_values("date").iloc[-1]["close"])
+            else:
+                price = self.store.latest_close(symbol)
             if price is None:
                 raise ValueError(f"latest price is missing for {symbol}")
             current_value = float(position["qty"]) * price
@@ -135,12 +146,14 @@ class RebalanceEngine:
         self,
         targets: Mapping[str, float],
         commission_rate: float = DEFAULT_COMMISSION_RATE,
+        pricing_date: str | None = None,
+        price_store=None,
     ) -> RebalancePlan:
         if commission_rate < 0:
             raise ValueError("commission must be non-negative")
 
         normalized_targets = self._normalize_targets(targets)
-        snapshot = self.allocation()
+        snapshot = self.allocation(pricing_date=pricing_date, price_store=price_store)
 
         symbols = sorted(
             {
@@ -159,7 +172,13 @@ class RebalanceEngine:
 
         for symbol in symbols:
             current = current_by_symbol.get(symbol)
-            price = current.price if current else self.store.latest_close(symbol)
+            price = None
+            if pricing_date and price_store is not None:
+                history = price_store.get_price_history(symbol, end=pricing_date)
+                if not history.empty:
+                    price = float(history.sort_values("date").iloc[-1]["close"])
+            if price is None:
+                price = current.price if current else self.store.latest_close(symbol)
             if price is None:
                 raise ValueError(f"latest price is missing for {symbol}")
 
@@ -210,6 +229,40 @@ class RebalanceEngine:
 
         cash_target_value = snapshot.total_assets * normalized_targets.get("cash", 0.0)
         cash_after = snapshot.cash + sell_proceeds - buy_spend - estimated_total_commission
+
+        if cash_after < -1e-8:
+            buy_indices = [(i, item) for i, item in enumerate(items) if item.action == "BUY" and item.qty > 0]
+            if buy_indices:
+                total_buy_notional = sum(item.qty * (item.price or 0.0) for _, item in buy_indices)
+                max_buy_spend = snapshot.cash + sell_proceeds - estimated_total_commission
+                if max_buy_spend <= 0:
+                    max_buy_spend = 0.0
+                if total_buy_notional > 0 and max_buy_spend < total_buy_notional:
+                    scale = max_buy_spend / total_buy_notional
+                    warnings.append(
+                        f"scaled BUY orders to {scale:.1%} of intended size "
+                        f"(available buy budget ${max_buy_spend:,.0f}, "
+                        f"requested ${total_buy_notional:,.0f})"
+                    )
+                    for i, item in buy_indices:
+                        new_qty = max(1, math.floor(item.qty * scale))
+                        new_notional = new_qty * (item.price or 0.0)
+                        items[i] = RebalanceItem(
+                            symbol=item.symbol,
+                            current_value=item.current_value,
+                            current_weight=item.current_weight,
+                            target_weight=item.target_weight,
+                            target_value=item.target_value,
+                            difference=item.difference,
+                            price=item.price,
+                            action="BUY",
+                            qty=new_qty,
+                            estimated_trade_cost=new_notional * commission_rate,
+                        )
+                    buy_spend = sum(item.qty * (item.price or 0.0) for item in items if item.action == "BUY")
+                    estimated_total_commission = sum(item.estimated_trade_cost for item in items)
+                    cash_after = snapshot.cash + sell_proceeds - buy_spend - estimated_total_commission
+
         if cash_after < 0:
             warnings.append("insufficient cash for estimated buys and commissions")
         if cash_after + 1e-9 < cash_target_value:
@@ -257,17 +310,22 @@ class RebalanceEngine:
             raise ValueError("targets must not be empty")
 
         normalized: dict[str, float] = {}
+        seen_symbols: set[str] = set()
         for symbol, weight in targets.items():
-            ticker = symbol.lower() if symbol.lower() == "cash" else symbol.upper().strip()
-            value = float(weight)
+            raw = str(symbol).strip()
+            ticker = "cash" if raw.lower() == "cash" else raw.upper()
             if not ticker:
                 raise ValueError("target symbol must not be empty")
-            if value < 0:
-                raise ValueError("target weights must be non-negative")
+            if ticker in seen_symbols:
+                raise ValueError(f"duplicate symbol '{ticker}' in targets")
+            seen_symbols.add(ticker)
+            value = float(weight)
+            if value < 0 or not math.isfinite(value):
+                raise ValueError(f"target weight for {ticker} must be non-negative and finite")
             normalized[ticker] = value
 
         total_weight = sum(normalized.values())
-        if abs(total_weight - 1.0) > 0.000001:
+        if not math.isfinite(total_weight) or abs(total_weight - 1.0) > 0.000001:
             raise ValueError("target weights must sum to 1.0")
 
         return normalized

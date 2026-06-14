@@ -119,6 +119,49 @@ def test_trading_simulator_load_price_frame_uses_bulk_history(tmp_path: Path) ->
     assert store.bulk_calls == 1
 
 
+def test_trading_simulator_execution_prices_are_not_ffilled(tmp_path: Path) -> None:
+    db_path = tmp_path / "quant.db"
+    rows = [
+        {
+            "symbol": "SPY",
+            "date": "2024-01-02",
+            "open": 99,
+            "high": 101,
+            "low": 98,
+            "close": 100,
+            "adj_close": 100,
+            "volume": 1000,
+        },
+        {
+            "symbol": "SPY",
+            "date": "2024-01-03",
+            "open": 100,
+            "high": 102,
+            "low": 99,
+            "close": 101,
+            "adj_close": 101,
+            "volume": 1000,
+        },
+        {
+            "symbol": "QQQ",
+            "date": "2024-01-02",
+            "open": 199,
+            "high": 201,
+            "low": 198,
+            "close": 200,
+            "adj_close": 200,
+            "volume": 1000,
+        },
+    ]
+    SQLitePriceStore(db_path).upsert_prices(pd.DataFrame(rows))
+    simulator = TradingSimulator(SQLitePriceStore(db_path), report_dir=tmp_path / "reports")
+
+    mark, execution = simulator._load_price_frames(["SPY", "QQQ"], "2024-01-02", "2024-01-03", "close")
+
+    assert mark.loc[pd.Timestamp("2024-01-03"), "QQQ"] == 200
+    assert pd.isna(execution.loc[pd.Timestamp("2024-01-03"), "QQQ"])
+
+
 def test_account_initialization() -> None:
     account = PortfolioAccount(100000)
 
@@ -366,6 +409,32 @@ def test_missing_execution_price_warns_without_corrupting_account(tmp_path: Path
     assert account.cash == 1000
 
 
+def test_ffilled_mark_price_is_not_used_for_execution(tmp_path: Path) -> None:
+    db_path = tmp_path / "quant.db"
+    seed_trading_prices(db_path)
+    simulator = TradingSimulator(SQLitePriceStore(db_path), report_dir=tmp_path / "reports")
+    account = PortfolioAccount(2000)
+    event = {
+        "signal_date": "2024-01-02",
+        "execution_date": "2024-01-03",
+        "target_weights": {"SPY": 1.0, "cash": 0.0},
+        "warnings": [],
+    }
+
+    result = simulator._execute_rebalance_event(
+        account,
+        event,
+        mark_prices={"SPY": 100},
+        execution_prices={},
+        cost_config={"fixed_fee": 0, "commission_rate": 0, "min_commission": 0, "slippage_bps": 0},
+    )
+
+    assert result["executed_trades"] == []
+    assert result["rejected_trades"][0]["execution_status"] == "SKIPPED_NO_PRICE"
+    assert account.positions == {}
+    assert account.cash == 2000
+
+
 def test_low_notional_cost_warning_is_reported(tmp_path: Path) -> None:
     db_path = tmp_path / "quant.db"
     seed_trading_prices(db_path)
@@ -494,4 +563,4 @@ def test_deterministic_results(tmp_path: Path) -> None:
 def test_generated_reports_are_ignored() -> None:
     gitignore = Path(".gitignore").read_text(encoding="utf-8")
 
-    assert "reports/*.json" in gitignore
+    assert "reports/**.json" in gitignore or "reports/*.json" in gitignore

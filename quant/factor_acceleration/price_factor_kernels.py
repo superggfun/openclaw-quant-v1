@@ -39,43 +39,9 @@ def price_factor_series(factor: str, history: pd.DataFrame) -> pd.Series | None:
     if factor == "low_volatility_score":
         volatility = _rolling_std_exact(returns, 20)
         return (-volatility).where(volatility > 0)
-    if factor == "growth_score":
-        momentum_20d = (closes / closes.shift(20)) - 1.0
-        momentum_60d = (closes / closes.shift(60)) - 1.0
-        consistency = (closes.diff() > 0).rolling(20).mean()
-        return 0.35 * momentum_20d + 0.45 * momentum_60d + 0.20 * consistency
-    if factor == "value_score":
-        long_return = (closes / closes.shift(120)) - 1.0
-        volatility = _rolling_std_exact(returns, 60)
-        return (-long_return / volatility).where(volatility > 0)
-    if factor == "quality_score":
-        return closes.rolling(61).apply(_quality_window_score, raw=True)
     return None
 
 
 def _rolling_std_exact(values: pd.Series, window: int) -> pd.Series:
     """Rolling standard deviation (sample std, ddof=1 by default)."""
     return values.rolling(window).std()
-
-
-def _quality_window_score(values) -> float:
-    """Quality score for a single rolling window (raw numpy array).
-
-    Equivalent to the original pandas Series version but avoids
-    per-window Series object construction.
-    """
-    import numpy as _np
-
-    arr = _np.asarray(values, dtype=_np.float64)
-    returns = _np.diff(arr) / arr[:-1]
-    returns = returns[_np.isfinite(returns)]
-    if len(returns) < 60:
-        return float("nan")
-    vol = float(_np.std(returns, ddof=1))
-    if vol <= 0 or _np.isnan(vol):
-        return float("nan")
-    pos_rate = float(_np.mean(returns > 0))
-    cum = _np.cumprod(1.0 + returns)
-    max_dd = float(_np.min(cum / _np.maximum.accumulate(cum) - 1.0))
-    mean_ret = float(_np.mean(returns))
-    return (mean_ret / vol) + pos_rate + max_dd

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import replace
 from pathlib import Path
 from typing import Mapping
@@ -60,6 +61,7 @@ class AlphaEngine:
         normalized_config = self._normalize_config(config or {})
         warnings: list[str] = []
         lookback_used = self._lookback_used(normalized_config)
+        normalized_config["lookback_used"] = lookback_used
         pipeline_score_by_symbol: dict[str, float] | None = None
         pipeline_report_path: str | None = None
         pipeline_factor = "risk_adjusted_momentum"
@@ -69,10 +71,54 @@ class AlphaEngine:
 
         row_factor_names = self._row_factor_names(normalized_config, pipeline_config)
         price_histories = self._price_histories(normalized_config["universe"], end=normalized_config["as_of_date"])
+
+        # Cross-sectional date alignment (BEFORE factor computation to avoid look-ahead).
+        # Determine the common as_of_date first, truncate every symbol's history to that
+        # date, and THEN compute factors.  This prevents stocks with later data from
+        # leaking future information into the factor calculation.
+        if normalized_config["as_of_date"] is None:
+            latest_dates = []
+            for history in price_histories.values():
+                if not history.empty:
+                    latest_dates.append(str(history["date"].max()))
+            signal_as_of = min(latest_dates) if latest_dates else None
+        else:
+            signal_as_of = str(normalized_config["as_of_date"])
+
+        if signal_as_of is not None:
+            if signal_as_of != normalized_config["as_of_date"]:
+                warnings.append(
+                    f"cross-sectional as_of_date adjusted from "
+                    f"{normalized_config['as_of_date']} to {signal_as_of}"
+                )
+            normalized_config["as_of_date"] = signal_as_of
+            # Truncate all histories to the common date
+            aligned_histories: dict[str, pd.DataFrame] = {}
+            stale_excluded = 0
+            for symbol in normalized_config["universe"]:
+                history = self._history_for_symbol(price_histories, symbol)
+                if history is None or history.empty:
+                    aligned_histories[symbol] = pd.DataFrame()
+                    continue
+                truncated = history[history["date"] <= signal_as_of]
+                if truncated.empty:
+                    aligned_histories[symbol] = pd.DataFrame()
+                    stale_excluded += 1
+                else:
+                    aligned_histories[symbol] = truncated
+            if stale_excluded:
+                warnings.append(
+                    f"excluded {stale_excluded} symbol(s) because no data "
+                    f"before cross-sectional as_of_date {signal_as_of}"
+                )
+            price_histories = aligned_histories
+
         factor_rows = [
-            self._factor_row(symbol, normalized_config, warnings, row_factor_names, history=self._history_for_symbol(price_histories, symbol))
+            self._factor_row(symbol, normalized_config, warnings, row_factor_names,
+                             history=self._history_for_symbol(price_histories, symbol))
             for symbol in normalized_config["universe"]
         ]
+
         composite_score_by_symbol: dict[str, float] | None = None
         multi_factor_config = self._multi_factor_config(normalized_config)
         if multi_factor_config is not None:
@@ -99,6 +145,7 @@ class AlphaEngine:
             raw_values = {
                 row.symbol: scoring.row_factor_value(row, pipeline_factor)
                 for row in factor_rows
+                if not row.excluded
             }
             pipeline_result = FactorPipeline(normalized_pipeline_config, report_dir=self.report_dir).run(
                 raw_values,
@@ -112,7 +159,7 @@ class AlphaEngine:
         ranked_rows = scoring.rank_alpha_rows(
             factor_rows,
             ranking_factor=pipeline_factor,
-            score_by_symbol=pipeline_score_by_symbol or composite_score_by_symbol,
+            score_by_symbol=pipeline_score_by_symbol if pipeline_score_by_symbol is not None else composite_score_by_symbol,
         )
         selected_symbols = [
             row.symbol
@@ -127,7 +174,7 @@ class AlphaEngine:
             key=lambda row: row.rank or 0,
         )
         if not selected_rows:
-            raise ValueError("no symbols have enough price history for alpha generation")
+            raise ValueError("no symbols selected after alpha scoring/ranking; check price history, factor coverage, and pipeline filters")
 
         target_weights = scoring.compute_target_weights(
             selected_rows,
@@ -144,7 +191,8 @@ class AlphaEngine:
             for row in ranked_rows
             if row.excluded
         }
-        as_of_date = self._result_as_of_date(selected_rows)
+        # Use the cross-sectionally aligned date, not per-symbol max
+        as_of_date = normalized_config["as_of_date"]
         data_start_date = self._min_date(row.data_start_date for row in selected_rows)
         data_end_date = self._max_date(row.data_end_date for row in selected_rows)
         execution_histories = self._price_histories([row.symbol for row in selected_rows], start=as_of_date) if as_of_date else {}
@@ -195,6 +243,9 @@ class AlphaEngine:
                 f"need at least {config['lookback_long'] + 1} closes",
                 warnings,
             )
+        recent = closes.tail(config["lookback_long"] + 1)
+        if (recent <= 0).any():
+            return self._excluded_row(symbol, "non-positive close price in recent history", warnings)
 
         momentum_20d = self._momentum(closes, config["lookback_short"])
         momentum_60d = self._momentum(closes, config["lookback_long"])
@@ -224,7 +275,8 @@ class AlphaEngine:
                         as_of_date=config["as_of_date"],
                     )
                     factor_values[name] = value
-                except Exception:
+                except Exception as exc:
+                    warnings.append(f"factor '{name}' computation failed for {symbol}: {type(exc).__name__}: {exc}")
                     factor_values[name] = None
 
         return AlphaFactorRow(
@@ -417,6 +469,8 @@ class AlphaEngine:
             name = str(factor).strip().lower()
             registry.describe(name)
             numeric_weight = float(weight)
+            if not math.isfinite(numeric_weight):
+                raise ValueError(f"factor_weights must be finite numbers, got {numeric_weight!r} for {name!r}")
             if numeric_weight < 0:
                 raise ValueError("factor_weights must be non-negative")
             if numeric_weight > 0:
@@ -480,7 +534,9 @@ class AlphaEngine:
             future = history[history["date"] > as_of_date]
             if not future.empty:
                 candidates.append(str(future.iloc[0]["date"]))
-        return min(candidates) if candidates else None
+        # Conservative: require ALL selected symbols to have data on or after
+        # the returned date (max of first-available-future-date per symbol).
+        return max(candidates) if candidates else None
 
     def _price_histories(
         self,

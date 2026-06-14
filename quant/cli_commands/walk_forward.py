@@ -81,8 +81,9 @@ def handle(args, context) -> int:
     for row in result.stability_analysis.get("factor_stability_ranking", [])[:5]:
         print(
             f"{row['factor']}: {row['classification']} "
-            f"score={format_optional_number(row.get('score'))} "
-            f"avg_ic={format_optional_number(row.get('average_ic'))}"
+            f"directional_score={format_optional_number(row.get('directional_stability_score', row.get('score')))} "
+            f"abs_score={format_optional_number(row.get('absolute_stability_score'))} "
+            f"avg_ic={format_optional_number(row.get('mean_directional_ic', row.get('average_ic')))}"
         )
     print("recommendations:")
     for recommendation in result.recommendations:

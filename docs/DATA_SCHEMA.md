@@ -414,6 +414,11 @@ Top-level keys:
 - `factor`: evaluated factor name.
 - `start_date`, `end_date`: optional inclusive signal-date range.
 - `holding_period`: forward-return horizon in stored price rows.
+- `return_type`: `overlapping_forward_spread` for factor-backtest reports.
+- `investable_equity`: `false`; this report is not an account equity simulation.
+- `cumulative_method`: `additive_diagnostic` for spread accumulation.
+- `metric_semantics`: machine-readable warning that spread diagnostics are not account-level returns.
+- `legacy_metric_aliases`: maps backward-compatible field names such as `annual_return`, `sharpe`, and `long_short_return` to their spread-diagnostic equivalents.
 - `quantiles`: number of factor buckets.
 - `long_quantile`: quantile used for the long leg.
 - `short_quantile`: quantile used for the short leg.
@@ -424,14 +429,14 @@ Top-level keys:
 - `bottom_quantile_return`: average future return for the configured short quantile.
 - `long_symbols_by_date`: long symbols for each signal date.
 - `short_symbols_by_date`: short symbols for each signal date.
-- `long_leg_return`: compounded long-leg return.
-- `short_leg_return`: compounded short-leg return.
-- `long_short_return`: compounded long-short return stream.
-- `annual_return`, `long_short_annual_return`: annualized long-short return.
-- `volatility`, `long_short_volatility`: annualized long-short volatility.
-- `sharpe`, `long_short_sharpe`: annualized long-short Sharpe ratio.
-- `max_drawdown`: drawdown of the compounded long-short return stream.
-- `hit_rate`: share of positive long-short periods.
+- `mean_forward_spread`, `median_forward_spread`: average and median period long-short forward spread.
+- `cumulative_forward_spread`: additive cumulative spread diagnostic.
+- `annualized_mean_forward_spread`: annualized mean spread diagnostic.
+- `forward_spread_volatility`, `spread_sharpe_like`, `spread_max_drawdown`, `forward_spread_hit_rate`: spread diagnostics.
+- `long_leg_mean_forward_return`, `short_leg_mean_forward_return`: mean forward returns for each leg.
+- `long_leg_cumulative_forward_spread`, `short_leg_cumulative_forward_spread`: additive leg diagnostics.
+- `long_leg_return`, `short_leg_return`, `long_short_return`, `annual_return`, `long_short_annual_return`, `volatility`, `long_short_volatility`, `sharpe`, `long_short_sharpe`, `max_drawdown`, `hit_rate`: backward-compatible aliases for spread diagnostics, not account-level performance metrics.
+- `*_deprecated` compound fields: deprecated compound diagnostics retained for compatibility.
 - `turnover`: average long-short weight turnover between signal dates.
 - `gross_exposure`: average gross long-short exposure.
 - `net_exposure`: average net long-short exposure.
@@ -732,12 +737,12 @@ Top-level keys:
 
 - `model`: `fixed`, `linear`, or `combined`.
 - `currency`: reporting currency.
-- `config`: cost model parameters.
-- `trades`: per-trade symbol, side, shares, price, notional, fees, slippage, market impact, liquidity cost, total cost, and cost ratio.
+- `config`: cost model parameters. When a named cost profile is selected, the config may include `cost_profile`, for example `realistic`.
+- `trades`: per-trade symbol, side, shares, price, notional, fees, slippage, market impact cost, market impact model, effective market impact bps, liquidity cost, total cost, and cost ratio.
 - `gross_trade_value`: sum of trade notionals.
 - `total_commission`: fixed plus linear commissions.
 - `total_slippage`: slippage cost.
-- `total_market_impact`: estimated market impact cost when configured.
+- `total_market_impact`: estimated market impact cost when configured. Default impact scales with square-root ADV participation when ADV is supplied.
 - `total_liquidity_cost`: estimated liquidity cost when ADV context is supplied.
 - `total_cost`: all estimated costs.
 - `total_cost_ratio`: total cost divided by gross trade value.
@@ -812,7 +817,7 @@ Walk-forward reports are generated files, not database tables. Top-level keys:
 - `folds`: train/test windows and fold metrics.
 - `summary`: average train/test metrics plus best and worst folds.
 - `rolling_validation`: rolling return, Sharpe, IC, Rank IC, and drawdown.
-- `stability_analysis`: factor stability ranking.
+- `stability_analysis`: factor stability ranking. Ranking entries include direction-adjusted `directional_stability_score`, `score` as its backward-compatible alias, `absolute_stability_score` for signal-strength diagnostics, `mean_directional_ic`, `mean_abs_ic`, and `direction_consistency`.
 - `warnings`: deterministic diagnostics.
 - `recommendations`: deterministic follow-up suggestions.
 
@@ -823,7 +828,7 @@ Trading simulation reports are generated files, not database tables. They are ig
 Top-level keys:
 
 - `metadata`: report type, generation time, offline simulation flags, and no-broker markers.
-- `parameters`: start/end, rebalance frequency, execution price, symbols, alpha config, cost config, and market realism config.
+- `parameters`: start/end, rebalance frequency, execution price, symbols, alpha config, cost config, cost profile, and market realism config.
 - `strategy`: currently `alpha`.
 - `portfolio_method`: `equal_weight`, `inverse_volatility`, `risk_parity`, or `min_variance`.
 - `initial_cash`: starting simulated account cash.

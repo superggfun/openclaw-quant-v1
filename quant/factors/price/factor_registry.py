@@ -42,6 +42,9 @@ class FactorRegistry:
         definition = self.describe(factor)
         if definition.data_source == "fundamental":
             return self._fundamental_value(definition, symbol=symbol, as_of_date=as_of_date)
+        # Enforce no-lookahead for price factors: slice to as_of_date before computing
+        if as_of_date is not None and isinstance(closes.index, pd.DatetimeIndex):
+            closes = closes.loc[:pd.Timestamp(as_of_date)]
         return definition.compute(closes)
 
     def metadata(self, factor: str) -> dict:
@@ -76,6 +79,15 @@ class FactorRegistry:
         row = self.latest_fundamental_row(symbol, statement, as_of_date)
         if not row:
             return None
+        # Double-check: the returned row must not be after as_of_date
+        raw = row.get("report_date")
+        if raw is not None:
+            try:
+                report_date = pd.Timestamp(raw)
+                if report_date > pd.Timestamp(as_of_date):
+                    return None
+            except (ValueError, TypeError):
+                pass
         return definition.compute(row)
 
     def latest_fundamental_row(self, symbol: str, statement: str, as_of_date: str) -> dict | None:
@@ -91,8 +103,16 @@ class FactorRegistry:
                 key=lambda row: (str(row.get("report_date") or ""), str(row.get("fiscal_period_end") or "")),
                 reverse=True,
             )
+        cutoff = pd.Timestamp(as_of_date)
         for row in self._fundamental_rows_cache[key]:
-            if str(row.get("report_date")) <= as_of_date:
+            raw = row.get("report_date")
+            if raw is None:
+                continue
+            try:
+                report_date = pd.Timestamp(raw)
+            except (ValueError, TypeError):
+                continue
+            if report_date <= cutoff:
                 return row
         return None
 

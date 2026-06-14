@@ -49,7 +49,7 @@ def test_equal_weight_sum_to_one_and_cash(tmp_path: Path) -> None:
     assert sum(result.target_weights.values()) == pytest.approx(1.0)
     assert result.target_weights["cash"] == pytest.approx(0.10)
     assert result.target_weights["LOW"] == pytest.approx(0.30)
-    assert result.no_lookahead is True
+    assert result.no_lookahead is False
 
 
 def test_inverse_volatility_lower_vol_gets_higher_weight(tmp_path: Path) -> None:

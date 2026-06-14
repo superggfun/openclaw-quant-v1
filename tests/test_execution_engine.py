@@ -45,7 +45,7 @@ def test_immediate_execution_runs_to_completion(tmp_path: Path) -> None:
     db_path = tmp_path / "quant.db"
     engine = make_engine(db_path, tmp_path / "reports")
 
-    result = engine.run({"SPY": 0.5, "cash": 0.5}, mode="immediate")
+    result = engine.run({"SPY": 0.5, "cash": 0.5}, mode="immediate", allow_execution_price_fallback=True)
 
     assert result.intended_trades
     assert result.executed_trades
@@ -76,6 +76,7 @@ def test_twap_splits_trades_into_batches(tmp_path: Path) -> None:
         {"SPY": 0.5, "cash": 0.5},
         mode="twap",
         twap_slices=4,
+        allow_execution_price_fallback=True,
     )
 
     intended_shares = result.intended_trades[0].shares
@@ -94,6 +95,7 @@ def test_partial_fill_creates_unfilled_trade(tmp_path: Path) -> None:
         {"SPY": 0.5, "cash": 0.5},
         mode="partial_fill",
         fill_ratio=0.5,
+        allow_execution_price_fallback=True,
     )
 
     intended_shares = result.intended_trades[0].shares
@@ -118,6 +120,7 @@ def test_execution_costs_are_included(tmp_path: Path) -> None:
             "min_commission": 1,
             "slippage_bps": 5,
         },
+        allow_execution_price_fallback=True,
     )
 
     assert result.execution_costs["total_cost"] > 0
@@ -129,7 +132,7 @@ def test_execution_report_schema_extends_with_market_realism(tmp_path: Path) -> 
     db_path = tmp_path / "quant.db"
     engine = make_engine(db_path, tmp_path / "reports")
 
-    result = engine.run({"SPY": 0.5, "cash": 0.5}, mode="immediate")
+    result = engine.run({"SPY": 0.5, "cash": 0.5}, mode="immediate", allow_execution_price_fallback=True)
     report = Path(result.report_path).read_text(encoding="utf-8")
 
     payload = __import__("json").loads(report)

@@ -41,9 +41,9 @@ def factor_rankings(
             "rank_ic": num(ev.get("rank_ic_mean")),
             "icir": num(ev.get("icir")),
             "coverage": coverage(ev),
-            "long_short_return": num(bt.get("long_short_return")),
-            "sharpe": num(bt.get("long_short_sharpe") if bt.get("long_short_sharpe") is not None else bt.get("sharpe")),
-            "drawdown": num(bt.get("max_drawdown")),
+            "cumulative_forward_spread": num(bt.get("cumulative_forward_spread", bt.get("long_short_return"))),
+            "spread_sharpe_like": num(bt.get("spread_sharpe_like", bt.get("long_short_sharpe", bt.get("sharpe")))),
+            "spread_max_drawdown": num(bt.get("spread_max_drawdown", bt.get("max_drawdown"))),
             "walk_forward_test_sharpe": num(summary.get("average_test_sharpe")),
             "confidence": confidence_by.get(factor),
         }
@@ -109,15 +109,20 @@ def num(value: Any) -> float | None:
 
 def _rank_score(metrics: dict[str, float | None]) -> float | None:
     components = []
-    for key in ("ic", "rank_ic", "icir", "sharpe", "walk_forward_test_sharpe", "confidence"):
+    for key in ("ic", "rank_ic", "icir", "spread_sharpe_like", "walk_forward_test_sharpe", "confidence"):
         value = metrics.get(key)
+        if value is None:
+            # Fall back to legacy key names
+            legacy = {"spread_sharpe_like": "sharpe"}.get(key)
+            if legacy:
+                value = metrics.get(legacy)
         if value is None:
             continue
         components.append(_bounded_score(value))
     coverage_value = metrics.get("coverage")
     if coverage_value is not None:
         components.append(max(0.0, min(1.0, coverage_value)))
-    drawdown = metrics.get("drawdown")
+    drawdown = metrics.get("spread_max_drawdown", metrics.get("drawdown"))
     if drawdown is not None:
         components.append(max(0.0, min(1.0, 1.0 + drawdown)))
     return sum(components) / len(components) if components else None

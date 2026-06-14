@@ -8,11 +8,13 @@ from quant.engines.factor_common.stats import (
     annual_volatility,
     compound_return,
     cross_section_correlations,
+    cumulative_spread_return,
     hit_rate,
     max_drawdown,
     mean,
     positive_rate,
     sharpe,
+    spread_max_drawdown,
     std,
 )
 from quant.engines.factor_common.symbols import exclude_symbol, normalize_symbols
@@ -23,6 +25,7 @@ __all__ = [
     "apply_factor_pipeline",
     "compound_return",
     "cross_section_correlations",
+    "cumulative_spread_return",
     "exclude_symbol",
     "factor_coverage",
     "factor_coverage_warnings",
@@ -32,6 +35,7 @@ __all__ = [
     "normalize_symbols",
     "positive_rate",
     "sharpe",
+    "spread_max_drawdown",
     "std",
     "write_factor_report",
 ]

@@ -26,6 +26,7 @@ class FactorCombiner:
         method: str = "rank",
         winsorize_pct: float | None = None,
         missing: str = "drop",
+        **kwargs,
     ) -> NormalizationResult:
         method = method.strip().lower()
         missing = missing.strip().lower()
@@ -33,6 +34,8 @@ class FactorCombiner:
             raise ValueError("normalization method must be one of: rank, zscore")
         if missing not in {"drop", "neutral"}:
             raise ValueError("missing handling must be one of: drop, neutral")
+        # Default True so existing callers (including external) are unaffected.
+        higher_is_better = kwargs.get("higher_is_better", True)
 
         warnings: list[str] = []
         clean = {
@@ -54,10 +57,18 @@ class FactorCombiner:
         if len(series) == 1 or float(series.std(ddof=0)) == 0.0:
             normalized = {str(symbol): 0.5 for symbol in series.index}
         elif method == "rank":
-            ranks = series.rank(method="average", pct=True)
-            normalized = {str(symbol): float(value) for symbol, value in ranks.items()}
+            rank = series.rank(method="average")
+            if len(series) > 1:
+                scores = (rank - 1.0) / (len(series) - 1.0)
+            else:
+                scores = pd.Series(0.5, index=series.index)
+            if not higher_is_better:
+                scores = 1.0 - scores
+            normalized = {str(symbol): float(value) for symbol, value in scores.items()}
         else:
             zscores = (series - float(series.mean())) / float(series.std(ddof=0))
+            if not higher_is_better:
+                zscores = -zscores
             normalized = {str(symbol): float(value) for symbol, value in zscores.items()}
 
         if missing == "neutral":

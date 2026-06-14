@@ -97,9 +97,9 @@ def export_factor_eval(ctx: AgentExportContext, report: dict[str, Any], generate
 
 
 def export_factor_backtest(ctx: AgentExportContext, report: dict[str, Any], generated_from: str) -> AgentExport:
-    ret = report.get("long_short_return")
-    sharpe = report.get("long_short_sharpe", report.get("sharpe"))
-    drawdown = report.get("max_drawdown")
+    ret = report.get("cumulative_forward_spread", report.get("long_short_return"))
+    sharpe = report.get("spread_sharpe_like", report.get("long_short_sharpe", report.get("sharpe")))
+    drawdown = report.get("spread_max_drawdown", report.get("max_drawdown"))
     assessment = "factor currently positive" if num(ret) and num(ret) > 0 else "factor currently weak"
     warnings = clean_warnings(report.get("warnings"))
     warnings.extend(ctx.performance_warnings(total_return=ret, sharpe=sharpe, drawdown=drawdown))
@@ -110,9 +110,17 @@ def export_factor_backtest(ctx: AgentExportContext, report: dict[str, Any], gene
         warnings.append("WARN_PARTIAL_FUNDAMENTAL_DATA")
     metrics = {
         "factor": report.get("factor"),
-        "long_short_return": ret,
-        "sharpe": sharpe,
-        "max_drawdown": drawdown,
+        "long_short_return": report.get("long_short_return"),
+        "cumulative_forward_spread": ret,
+        "return_type": report.get("return_type"),
+        "investable_equity": report.get("investable_equity"),
+        "cumulative_method": report.get("cumulative_method"),
+        "spread_sharpe_like": sharpe,
+        "spread_max_drawdown": drawdown,
+        "mean_forward_spread": report.get("mean_forward_spread"),
+        "annualized_mean_forward_spread": report.get("annualized_mean_forward_spread", report.get("annual_return")),
+        "sharpe": report.get("sharpe"),
+        "max_drawdown": report.get("max_drawdown"),
         "turnover": report.get("turnover"),
         "gross_exposure": report.get("gross_exposure"),
         "net_exposure": report.get("net_exposure"),

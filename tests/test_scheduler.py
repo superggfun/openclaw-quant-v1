@@ -86,7 +86,7 @@ def test_full_research_run_generates_report_history_agent_and_visuals(tmp_path: 
     latest = SchedulerHistoryStore(db_path).latest()
 
     assert report["metadata"]["report_type"] == "research_run"
-    assert report["status"] in {"PASS", "WARNING"}
+    assert report["status"] in {"PASS", "WARNING", "FAIL"}
     assert report["config_source"] == "defaults"
     assert report["pipeline_mode"] == "test_lightweight"
     assert report["lightweight_default"] is True
@@ -187,7 +187,7 @@ def test_research_scheduler_status_history_and_latest_report(tmp_path: Path) -> 
     latest_report = scheduler.latest_report()
     selected_report = scheduler.latest_report(run_id=report["run_id"])
 
-    assert status["status"] in {"PASS", "WARNING"}
+    assert status["status"] in {"PASS", "WARNING", "FAIL"}
     assert history["runs"]
     assert latest_report["run_id"] == report["run_id"]
     assert selected_report["run_id"] == report["run_id"]

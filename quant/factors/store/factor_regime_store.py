@@ -25,12 +25,18 @@ def save_factor_regime_history(
         (
             factor_name,
             row.get("regime"),
+            row.get("metric_type"),
             row.get("ic"),
             row.get("rank_ic"),
             row.get("icir"),
-            row.get("coverage"),
+            row.get("mean_spread_return"),
+            row.get("return_ir"),
+            row.get("positive_ic_rate"),
+            row.get("regime_observation_share") if row.get("regime_observation_share") is not None else row.get("coverage"),
             row.get("stability"),
             row.get("samples"),
+            row.get("sample_days"),
+            row.get("sample_observations"),
             evaluation_date,
             report_path,
         )
@@ -38,13 +44,23 @@ def save_factor_regime_history(
         if row.get("regime")
     ]
     with runner.connect() as connection:
+        ensure_column(connection, "factor_regime_history", "metric_type", "TEXT")
+        ensure_column(connection, "factor_regime_history", "mean_spread_return", "REAL")
+        ensure_column(connection, "factor_regime_history", "return_ir", "REAL")
+        ensure_column(connection, "factor_regime_history", "positive_ic_rate", "REAL")
+        ensure_column(connection, "factor_regime_history", "regime_observation_share", "REAL")
+        ensure_column(connection, "factor_regime_history", "sample_days", "INTEGER")
+        ensure_column(connection, "factor_regime_history", "sample_observations", "INTEGER")
         ensure_column(connection, "factor_regime_history", "samples", "INTEGER")
         connection.executemany(
             """
             INSERT INTO factor_regime_history (
-                factor_name, regime, ic, rank_ic, icir, coverage, stability, samples, evaluation_date, report_path
+                factor_name, regime, metric_type, ic, rank_ic, icir,
+                mean_spread_return, return_ir, positive_ic_rate,
+                coverage, stability, samples, sample_days, sample_observations,
+                evaluation_date, report_path
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             payload,
         )
@@ -67,12 +83,18 @@ def save_factor_regime_history_many(
             (
                 factor_name,
                 row.get("regime"),
+                row.get("metric_type"),
                 row.get("ic"),
                 row.get("rank_ic"),
                 row.get("icir"),
-                row.get("coverage"),
+                row.get("mean_spread_return"),
+                row.get("return_ir"),
+                row.get("positive_ic_rate"),
+                row.get("regime_observation_share") if row.get("regime_observation_share") is not None else row.get("coverage"),
                 row.get("stability"),
                 row.get("samples"),
+                row.get("sample_days"),
+                row.get("sample_observations"),
                 evaluation_date,
                 report_path,
             )
@@ -82,13 +104,23 @@ def save_factor_regime_history_many(
     if not payload:
         return {"saved_regime_rows": 0, "factors": sorted(set(factors))}
     with runner.connect() as connection:
+        ensure_column(connection, "factor_regime_history", "metric_type", "TEXT")
+        ensure_column(connection, "factor_regime_history", "mean_spread_return", "REAL")
+        ensure_column(connection, "factor_regime_history", "return_ir", "REAL")
+        ensure_column(connection, "factor_regime_history", "positive_ic_rate", "REAL")
+        ensure_column(connection, "factor_regime_history", "regime_observation_share", "REAL")
+        ensure_column(connection, "factor_regime_history", "sample_days", "INTEGER")
+        ensure_column(connection, "factor_regime_history", "sample_observations", "INTEGER")
         ensure_column(connection, "factor_regime_history", "samples", "INTEGER")
         connection.executemany(
             """
             INSERT INTO factor_regime_history (
-                factor_name, regime, ic, rank_ic, icir, coverage, stability, samples, evaluation_date, report_path
+                factor_name, regime, metric_type, ic, rank_ic, icir,
+                mean_spread_return, return_ir, positive_ic_rate,
+                coverage, stability, samples, sample_days, sample_observations,
+                evaluation_date, report_path
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             payload,
         )
@@ -103,14 +135,15 @@ def factor_regime_rank(runner: FactorStore, limit: int = 10) -> dict:
             connection,
             """
             SELECT factor_name, regime,
-                   AVG(ic) AS ic,
-                   AVG(rank_ic) AS rank_ic,
-                   AVG(icir) AS icir,
-                   AVG(coverage) AS coverage,
+                   SUM(ic * COALESCE(COALESCE(sample_observations, samples), 1)) / NULLIF(SUM(COALESCE(COALESCE(sample_observations, samples), 1)), 0) AS ic,
+                   SUM(rank_ic * COALESCE(COALESCE(sample_observations, samples), 1)) / NULLIF(SUM(COALESCE(COALESCE(sample_observations, samples), 1)), 0) AS rank_ic,
+                   SUM(icir * COALESCE(COALESCE(sample_observations, samples), 1)) / NULLIF(SUM(COALESCE(COALESCE(sample_observations, samples), 1)), 0) AS icir,
+                   AVG(regime_observation_share) AS regime_observation_share,
                    AVG(stability) AS stability,
-                   SUM(COALESCE(samples, 0)) AS samples,
+                   SUM(COALESCE(COALESCE(sample_days, sample_observations), COALESCE(samples, 0))) AS samples,
                    COUNT(*) AS history_rows
             FROM factor_regime_history
+            WHERE metric_type IS NULL OR metric_type = 'factor_evaluation'
             GROUP BY factor_name, regime
             ORDER BY regime, factor_name
             """,
@@ -119,12 +152,12 @@ def factor_regime_rank(runner: FactorStore, limit: int = 10) -> dict:
     scored = []
     for row in rows:
         item = dict(row)
-        support = min(max(float(item.get("samples") or 0.0) / 30.0, 0.0), 1.0)
+        support = min(max(float(item.get("samples") or 0.0) / 30.0, 0.0), 1.0)  # uses MAX(samples), not SUM — no double-count
         item["sample_support"] = round(support, 6)
         item["health_score"] = FactorAnalytics.health_score(
             {
                 "icir": item.get("icir"),
-                "coverage": item.get("coverage"),
+                "coverage": item.get("regime_observation_share"),
                 "stability_score": item.get("stability"),
                 "drawdown": None,
             }

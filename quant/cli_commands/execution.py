@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from quant.cli_commands.common import load_cost_config, load_targets
+from quant.engines.execution.cost_engine import COST_PROFILE_NAMES
 
 
 def register_parser(subparsers) -> None:
@@ -17,6 +18,7 @@ def register_parser(subparsers) -> None:
         default="immediate",
     )
     execute_sim.add_argument("--date", default=None, help="Optional execution reference date YYYY-MM-DD.")
+    execute_sim.add_argument("--cost-profile", choices=COST_PROFILE_NAMES, default="conservative")
     execute_sim.add_argument("--cost-config", default="examples/cost_config.json")
     execute_sim.add_argument("--twap-slices", type=int, default=4)
     execute_sim.add_argument("--fill-ratio", type=float, default=0.5)
@@ -24,7 +26,7 @@ def register_parser(subparsers) -> None:
 
 def handle(args, context) -> int:
     targets = load_targets(Path(args.targets))
-    cost_config = load_cost_config(Path(args.cost_config))
+    cost_config = load_cost_config(Path(args.cost_config), args.cost_profile)
     result = context.execution_engine.run(
         targets=targets,
         mode=args.mode,
@@ -62,4 +64,3 @@ def handle(args, context) -> int:
         print(f"warning: {warning}", file=sys.stderr)
     print(f"report: {result.report_path}")
     return 0
-

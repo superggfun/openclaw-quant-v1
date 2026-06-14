@@ -5,9 +5,11 @@ from datetime import date, timedelta
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from quant.reports.agent_export.agent_exporter import AgentExporter
 from quant.cli import main
+from quant.engines.walk_forward.fold_runner import factor_stability_worker
 from quant.storage.sqlite_store import SQLitePriceStore
 from quant.engines.walk_forward.rolling_validation import RollingValidation
 from quant.engines.walk_forward.walk_forward import WalkForwardEngine, WalkForwardFold
@@ -115,6 +117,99 @@ def test_rolling_validation() -> None:
     assert result["rolling_return"]
     assert result["rolling_ic"]
     assert result["rolling_drawdown"]
+
+
+def test_lightweight_factor_ic_respects_lower_is_better_direction(tmp_path: Path, monkeypatch) -> None:
+    class Row:
+        def __init__(self, signal_date: str, symbol: str, factor_value: float, future_return: float) -> None:
+            self.signal_date = signal_date
+            self.symbol = symbol
+            self.factor_value = factor_value
+            self.future_return = future_return
+
+    class Matrix:
+        valid_rows = [
+            Row("2024-01-02", "AAA", 1.0, 0.03),
+            Row("2024-01-02", "BBB", 2.0, 0.02),
+            Row("2024-01-02", "CCC", 3.0, 0.01),
+        ]
+
+    class FakeFactorMatrixBuilder:
+        def __init__(self, price_store, factor_registry) -> None:
+            pass
+
+        def build(self, **kwargs) -> Matrix:
+            return Matrix()
+
+    monkeypatch.setattr("quant.factor_acceleration.FactorMatrixBuilder", FakeFactorMatrixBuilder)
+
+    engine = WalkForwardEngine(SQLitePriceStore(tmp_path / "quant.db"), report_dir=tmp_path / "reports")
+    ic, rank_ic = engine._lightweight_factor_ic(
+        factor="volatility_20d",
+        higher_is_better=False,
+        symbols=["AAA", "BBB", "CCC"],
+        start="2024-01-01",
+        end="2024-01-31",
+        forward_days=20,
+    )
+
+    assert ic == pytest.approx(1.0)
+    assert rank_ic == pytest.approx(1.0)
+
+
+def test_parallel_factor_stability_worker_respects_lower_is_better_direction(tmp_path: Path, monkeypatch) -> None:
+    class Row:
+        def __init__(self, signal_date: str, symbol: str, factor_value: float, future_return: float) -> None:
+            self.signal_date = signal_date
+            self.symbol = symbol
+            self.factor_value = factor_value
+            self.future_return = future_return
+
+    class Matrix:
+        valid_rows = [
+            Row("2024-01-02", "AAA", 1.0, 0.03),
+            Row("2024-01-02", "BBB", 2.0, 0.02),
+            Row("2024-01-02", "CCC", 3.0, 0.01),
+        ]
+
+    class FakeFactorMatrixBuilder:
+        def __init__(self, price_store, factor_registry) -> None:
+            pass
+
+        def build(self, **kwargs) -> Matrix:
+            return Matrix()
+
+    monkeypatch.setattr("quant.factor_acceleration.FactorMatrixBuilder", FakeFactorMatrixBuilder)
+
+    factor, window_idx, ic, rank_ic = factor_stability_worker(
+        {
+            "factor": "volatility_20d",
+            "higher_is_better": False,
+            "window_idx": 3,
+            "symbols": ["AAA", "BBB", "CCC"],
+            "start": "2024-01-01",
+            "end": "2024-01-31",
+            "forward_days": 20,
+            "db_path": str(tmp_path / "quant.db"),
+        }
+    )
+
+    assert factor == "volatility_20d"
+    assert window_idx == 3
+    assert ic == pytest.approx(1.0)
+    assert rank_ic == pytest.approx(1.0)
+
+
+def test_stability_metrics_keep_directional_and_absolute_scores_separate() -> None:
+    metrics = WalkForwardEngine._stability_metrics([-0.08, -0.07], [-0.09, -0.08])
+
+    assert metrics["score"] == metrics["directional_stability_score"]
+    assert metrics["directional_stability_score"] < 0
+    assert metrics["absolute_stability_score"] > 0.05
+    assert metrics["mean_directional_ic"] == pytest.approx(-0.075)
+    assert metrics["mean_abs_ic"] == pytest.approx(0.075)
+    assert metrics["direction_consistency"] == pytest.approx(0.0)
+    assert metrics["classification"] == "unstable"
 
 
 def test_overfit_and_factor_decay_detection(tmp_path: Path) -> None:

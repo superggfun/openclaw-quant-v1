@@ -34,8 +34,8 @@ def factor_evidence_summary(evals: list[dict[str, Any]], backtests: list[dict[st
             continue
         row = rows.setdefault(factor, {"factor": factor, "eval_batches": 0, "backtest_batches": 0, "observations": 0})
         row["backtest_batches"] += 1
-        row["latest_long_short_return"] = result.get("long_short_return")
-        row["latest_sharpe"] = result.get("long_short_sharpe") if result.get("long_short_sharpe") is not None else result.get("sharpe")
+        row["latest_cumulative_forward_spread"] = result.get("cumulative_forward_spread", result.get("long_short_return"))
+        row["latest_spread_sharpe_like"] = result.get("spread_sharpe_like", result.get("long_short_sharpe", result.get("sharpe")))
     return sorted(rows.values(), key=lambda row: row["factor"])
 
 

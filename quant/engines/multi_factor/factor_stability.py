@@ -33,7 +33,7 @@ class FactorStability:
         if FactorStability._finite(coverage):
             components.append(max(min(float(coverage), 1.0), 0.0))
         if not components:
-            return 0.5
+            return 0.0
         return round(sum(components) / len(components), 6)
 
     @staticmethod

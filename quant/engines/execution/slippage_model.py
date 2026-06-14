@@ -39,7 +39,7 @@ class SlippageModel:
         average_daily_volume: float | None = None,
         volatility: float | None = None,
     ) -> float:
-        if notional <= 0 or shares <= 0 or price <= 0:
+        if notional <= 0 or shares <= 0 or price <= 0 or not all(math.isfinite(v) for v in (notional, shares, price)):
             return 0.0
         model = self.config["model"]
         if model == "fixed":

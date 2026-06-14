@@ -25,7 +25,7 @@ def register_parser(subparsers) -> None:
     factor_backtest.add_argument("--serial", action="store_true",
         help="Force the slow serial reference path (implies --no-bulk-matrix for backward compat).")
     factor_backtest.add_argument("--pipeline", default=None, help="Optional factor pipeline config JSON.")
-    factor_backtest.add_argument("--report", action="store_true", help="Write JSON report. Reports are written by default.")
+    factor_backtest.add_argument("--write-report", action="store_true", default=False, help="Write JSON report to reports/ directory.")
     factor_backtest.add_argument("--save-factor-history", action="store_true", help="Persist factor backtest history.")
     factor_backtest.add_argument("--save-regime-history", action="store_true", help="Persist factor backtest diagnostics by current regime history.")
 
@@ -46,6 +46,7 @@ def handle(args, context) -> int:
         pipeline_config_path=args.pipeline,
         bulk_matrix=bulk,
         max_workers=args.workers,
+        write_report=args.write_report,
     )
     print("Factor Backtest Summary")
     print(f"factor: {result.factor}")

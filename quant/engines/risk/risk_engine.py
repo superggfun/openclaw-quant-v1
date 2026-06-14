@@ -31,13 +31,16 @@ class RiskReport:
     total_assets: float
     cash_value: float
     cash_weight_pct: float
+    single_position_concentration_pct: float
     single_stock_concentration_pct: float
+    industry_or_asset_class_concentration_pct: float
     industry_concentration_pct: float
     top_5_holdings_pct: float
     risk_score: float
     holdings: list[HoldingRisk]
     industries: list[IndustryRisk]
     warnings: list[str]
+    concentration_metric_notes: dict[str, str]
     report_path: str
 
     def to_report(self) -> dict:
@@ -45,13 +48,16 @@ class RiskReport:
             "total_assets": self.total_assets,
             "cash_value": self.cash_value,
             "cash_weight_pct": self.cash_weight_pct,
+            "single_position_concentration_pct": self.single_position_concentration_pct,
             "single_stock_concentration_pct": self.single_stock_concentration_pct,
+            "industry_or_asset_class_concentration_pct": self.industry_or_asset_class_concentration_pct,
             "industry_concentration_pct": self.industry_concentration_pct,
             "top_5_holdings_pct": self.top_5_holdings_pct,
             "risk_score": self.risk_score,
             "holdings": [asdict(holding) for holding in self.holdings],
             "industries": [asdict(industry) for industry in self.industries],
             "warnings": self.warnings,
+            "concentration_metric_notes": self.concentration_metric_notes,
         }
 
 
@@ -68,11 +74,33 @@ class RiskEngine:
         self.store = store
         self.account_name = account_name
         self.report_dir = Path(report_dir)
-        self.industry_map = industry_map or DEFAULT_INDUSTRY_MAP
+        self.industry_map = dict(DEFAULT_INDUSTRY_MAP if industry_map is None else industry_map)
         self.rebalance_engine = RebalanceEngine(store, account_name=account_name, report_dir=report_dir)
 
-    def analyze(self) -> RiskReport:
+    def analyze(self, write_report: bool = True) -> RiskReport:
         allocation = self.rebalance_engine.allocation()
+        if allocation.total_assets <= 0:
+            report = RiskReport(
+                total_assets=allocation.total_assets,
+                cash_value=allocation.cash,
+                cash_weight_pct=0.0,
+                single_position_concentration_pct=0.0,
+                single_stock_concentration_pct=0.0,
+                industry_or_asset_class_concentration_pct=0.0,
+                industry_concentration_pct=0.0,
+                top_5_holdings_pct=0.0,
+                risk_score=100.0,
+                holdings=[],
+                industries=[],
+                warnings=["invalid portfolio: total_assets <= 0"],
+                concentration_metric_notes=self._concentration_metric_notes(),
+                report_path="",
+            )
+            if not write_report:
+                return report
+            report_path = self._write_report(report)
+            return replace(report, report_path=str(report_path))
+
         holdings = []
         industry_values: dict[str, float] = {}
         warnings = []
@@ -83,6 +111,9 @@ class RiskEngine:
             industry = self.industry_map.get(item.symbol, "Unknown")
             if industry == "Unknown":
                 warnings.append(f"industry is unknown for {item.symbol}")
+                include_in_industry_concentration = False
+            else:
+                include_in_industry_concentration = True
             holdings.append(
                 HoldingRisk(
                     symbol=item.symbol,
@@ -91,7 +122,8 @@ class RiskEngine:
                     weight_pct=item.current_weight * 100.0,
                 )
             )
-            industry_values[industry] = industry_values.get(industry, 0.0) + item.current_value
+            if include_in_industry_concentration:
+                industry_values[industry] = industry_values.get(industry, 0.0) + item.current_value
 
         holdings = sorted(holdings, key=lambda holding: holding.value, reverse=True)
         industries = sorted(
@@ -108,12 +140,12 @@ class RiskEngine:
         )
 
         cash_weight_pct = self._pct(allocation.cash, allocation.total_assets)
-        single_stock_concentration_pct = max((holding.weight_pct for holding in holdings), default=0.0)
-        industry_concentration_pct = max((industry.weight_pct for industry in industries), default=0.0)
+        single_position_concentration_pct = max((holding.weight_pct for holding in holdings), default=0.0)
+        industry_or_asset_class_concentration_pct = max((industry.weight_pct for industry in industries), default=0.0)
         top_5_holdings_pct = sum(holding.weight_pct for holding in holdings[:5])
         risk_score = self._risk_score(
-            single_stock_concentration_pct=single_stock_concentration_pct,
-            industry_concentration_pct=industry_concentration_pct,
+            single_stock_concentration_pct=single_position_concentration_pct,
+            industry_concentration_pct=industry_or_asset_class_concentration_pct,
             cash_weight_pct=cash_weight_pct,
             top_5_holdings_pct=top_5_holdings_pct,
         )
@@ -122,15 +154,20 @@ class RiskEngine:
             total_assets=allocation.total_assets,
             cash_value=allocation.cash,
             cash_weight_pct=cash_weight_pct,
-            single_stock_concentration_pct=single_stock_concentration_pct,
-            industry_concentration_pct=industry_concentration_pct,
+            single_position_concentration_pct=single_position_concentration_pct,
+            single_stock_concentration_pct=single_position_concentration_pct,
+            industry_or_asset_class_concentration_pct=industry_or_asset_class_concentration_pct,
+            industry_concentration_pct=industry_or_asset_class_concentration_pct,
             top_5_holdings_pct=top_5_holdings_pct,
             risk_score=risk_score,
             holdings=holdings,
             industries=industries,
             warnings=warnings,
+            concentration_metric_notes=self._concentration_metric_notes(),
             report_path="",
         )
+        if not write_report:
+            return report
         report_path = self._write_report(report)
 
         return replace(report, report_path=str(report_path))
@@ -160,6 +197,27 @@ class RiskEngine:
             cash_risk = 0.0
 
         return round(min(single_stock_risk + industry_risk + top_5_risk + cash_risk, 100.0), 2)
+
+    @staticmethod
+    def _concentration_metric_notes() -> dict[str, str]:
+        return {
+            "single_position_concentration_pct": (
+                "Maximum non-cash holding weight across stocks, ETFs, and other symbols."
+            ),
+            "single_stock_concentration_pct": (
+                "Backward-compatible alias for single_position_concentration_pct; it may include ETFs."
+            ),
+            "industry_or_asset_class_concentration_pct": (
+                "Maximum mapped industry or asset-class bucket weight. Unknown industries are excluded."
+            ),
+            "industry_concentration_pct": (
+                "Backward-compatible alias for industry_or_asset_class_concentration_pct."
+            ),
+            "risk_score": (
+                "Heuristic MVP score combining position concentration, mapped bucket concentration, top-5 "
+                "concentration, and cash deployment. Interpret high cash as deployment/drag risk, not loss risk."
+            ),
+        }
 
     def _write_report(self, report: RiskReport) -> Path:
         return write_json_report(

@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import pandas as pd
 
+from quant.factors.price._utils import clean_price_series
 from quant.factors.specs import price_factor_spec
 
 
-def quality_score(closes: pd.Series) -> float | None:
+def quality_price_proxy(closes: pd.Series) -> float | None:
     """Reward return consistency, positive days, and drawdown resistance."""
-    closes = pd.to_numeric(closes, errors="coerce").dropna()
+    closes = clean_price_series(closes)
     if len(closes) <= 60:
         return None
     window = closes.tail(61)
@@ -27,5 +28,5 @@ def quality_score(closes: pd.Series) -> float | None:
 
 
 FACTOR_SPECS = (
-    price_factor_spec("quality_score", "quality", "Price-only quality proxy using consistency, volatility, and drawdown resistance.", 60, "price_proxy", quality_score),
+    price_factor_spec("quality_price_proxy", "price_proxy_quality", "PRICE-ONLY PROXY — NOT a fundamental quality factor. Uses Sharpe-like return/vol ratio, positive-day rate, and drawdown resistance. This is a pure price-history computation; use fundamental_quality_score for accounting-based quality.", 60, "price_proxy", quality_price_proxy),
 )

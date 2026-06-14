@@ -29,7 +29,7 @@ class RollingValidation:
             }
         rolling_return = (1.0 + returns).rolling(window).apply(lambda values: float(values.prod() - 1.0), raw=False)
         rolling_std = returns.rolling(window).std()
-        rolling_sharpe = (returns.rolling(window).mean() / rolling_std) * (252.0 ** 0.5)
+        rolling_sharpe = returns.rolling(window).mean() / rolling_std
         equity = (1.0 + returns).cumprod()
         rolling_drawdown = equity / equity.rolling(window).max() - 1.0
         return {

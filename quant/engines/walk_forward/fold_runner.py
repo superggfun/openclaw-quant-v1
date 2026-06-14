@@ -10,8 +10,19 @@ from pathlib import Path
 from quant.engines.walk_forward.models import WalkForwardFoldTask, WalkForwardFold
 
 
+def _count_price_rows(price_store, symbols: list[str], start: str, end: str) -> int:
+    """Count unique trading days across all symbols in a date range."""
+    dates = set()
+    for symbol in symbols:
+        history = price_store.get_price_history(symbol, start=start, end=end)
+        if not history.empty and "date" in history.columns:
+            dates.update(str(d) for d in history["date"])
+    return len(dates)
+
+
 def run_fold_worker(task: WalkForwardFoldTask) -> WalkForwardFold:
     """Execute one walk-forward fold (train + test) in a worker process."""
+    import pandas as pd
     from quant.storage.sqlite_store import SQLitePriceStore
     from quant.data.fundamental.fundamental_store import FundamentalStore
     from quant.factors.price.factor_registry import FactorRegistry
@@ -23,10 +34,15 @@ def run_fold_worker(task: WalkForwardFoldTask) -> WalkForwardFold:
     price_store = SQLitePriceStore(db_path)
     fundamental_store = FundamentalStore(db_path)
     factor_registry = FactorRegistry(fundamental_store)
+    symbols = list(task.symbols)
+    purge_days = task.purge_days
+    embargo_days = task.embargo_days
 
     if task.strategy == "alpha":
         config = dict(task.alpha_config or {})
-        config["universe"] = task.symbols
+        config["universe"] = symbols
+        if task.factor and not config.get("factor_weights") and not config.get("multi_factor"):
+            config["factor_weights"] = {task.factor: 1.0}
         engine = PortfolioBacktestEngine(price_store, report_dir=report_dir)
         train = engine.run(
             start=task.train_start,
@@ -46,6 +62,19 @@ def run_fold_worker(task: WalkForwardFoldTask) -> WalkForwardFold:
             alpha_config=config,
             alpha_pipeline_config=task.pipeline_config,
         )
+        # Purge / embargo row counts
+        effective_train_rows = _count_price_rows(price_store, symbols, task.train_start, task.train_end)
+        effective_test_rows = _count_price_rows(price_store, symbols, task.test_start, task.test_end)
+        raw_train_end = pd.Timestamp(task.train_end) + pd.Timedelta(days=purge_days)
+        removed_by_purge = 0
+        if purge_days > 0:
+            purge_start = (pd.Timestamp(task.train_end) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+            removed_by_purge = _count_price_rows(price_store, symbols, purge_start, raw_train_end.strftime("%Y-%m-%d"))
+        removed_by_embargo = 0
+        if embargo_days > 0:
+            embargo_start = (raw_train_end + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+            embargo_end = (pd.Timestamp(task.test_start) - pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+            removed_by_embargo = _count_price_rows(price_store, symbols, embargo_start, embargo_end)
         fold = WalkForwardFold(
             fold=task.index,
             fold_id=f"fold_{task.index:03d}",
@@ -68,6 +97,12 @@ def run_fold_worker(task: WalkForwardFoldTask) -> WalkForwardFold:
             test_report=test.report_path,
             no_lookahead=bool(train.no_lookahead and test.no_lookahead),
             fold_warnings=[],
+            purge_days=purge_days,
+            embargo_days=embargo_days,
+            removed_by_purge=removed_by_purge,
+            removed_by_embargo=removed_by_embargo,
+            effective_train_rows=effective_train_rows,
+            effective_test_rows=effective_test_rows,
         )
         return _with_fold_warnings(fold, strategy="alpha")
     else:
@@ -76,18 +111,31 @@ def run_fold_worker(task: WalkForwardFoldTask) -> WalkForwardFold:
             factor=task.factor,
             start=task.train_start,
             end=task.train_end,
-            holding_period=20,
-            universe=task.symbols,
+            holding_period=task.forward_days,
+            universe=symbols,
             pipeline_config=task.pipeline_config,
         )
         test = backtest.run(
             factor=task.factor,
             start=task.test_start,
             end=task.test_end,
-            holding_period=20,
-            universe=task.symbols,
+            holding_period=task.forward_days,
+            universe=symbols,
             pipeline_config=task.pipeline_config,
         )
+        # Purge / embargo row counts
+        effective_train_rows = _count_price_rows(price_store, symbols, task.train_start, task.train_end)
+        effective_test_rows = _count_price_rows(price_store, symbols, task.test_start, task.test_end)
+        raw_train_end = pd.Timestamp(task.train_end) + pd.Timedelta(days=purge_days)
+        removed_by_purge = 0
+        if purge_days > 0:
+            purge_start = (pd.Timestamp(task.train_end) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+            removed_by_purge = _count_price_rows(price_store, symbols, purge_start, raw_train_end.strftime("%Y-%m-%d"))
+        removed_by_embargo = 0
+        if embargo_days > 0:
+            embargo_start = (raw_train_end + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+            embargo_end = (pd.Timestamp(task.test_start) - pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+            removed_by_embargo = _count_price_rows(price_store, symbols, embargo_start, embargo_end)
         fold = WalkForwardFold(
             fold=task.index,
             fold_id=f"fold_{task.index:03d}",
@@ -110,6 +158,12 @@ def run_fold_worker(task: WalkForwardFoldTask) -> WalkForwardFold:
             test_report=test.report_path,
             no_lookahead=bool(train.no_lookahead and test.no_lookahead),
             fold_warnings=[],
+            purge_days=purge_days,
+            embargo_days=embargo_days,
+            removed_by_purge=removed_by_purge,
+            removed_by_embargo=removed_by_embargo,
+            effective_train_rows=effective_train_rows,
+            effective_test_rows=effective_test_rows,
         )
         return _with_fold_warnings(fold, strategy="factor_long_short")
 
@@ -167,6 +221,12 @@ def _with_fold_warnings(fold: WalkForwardFold, strategy: str) -> WalkForwardFold
         test_report=fold.test_report,
         no_lookahead=fold.no_lookahead,
         fold_warnings=warnings_list,
+        purge_days=getattr(fold, "purge_days", 0),
+        embargo_days=getattr(fold, "embargo_days", 0),
+        removed_by_purge=getattr(fold, "removed_by_purge", 0),
+        removed_by_embargo=getattr(fold, "removed_by_embargo", 0),
+        effective_train_rows=getattr(fold, "effective_train_rows", 0),
+        effective_test_rows=getattr(fold, "effective_test_rows", 0),
     )
 
 
@@ -182,6 +242,10 @@ def factor_stability_worker(task: dict) -> tuple:
     price_store = SQLitePriceStore(db_path)
     fundamental_store = FundamentalStore(db_path)
     factor_registry = FactorRegistry(fundamental_store)
+    if "higher_is_better" in task:
+        higher_is_better = bool(task["higher_is_better"])
+    else:
+        higher_is_better = bool(factor_registry.describe(task["factor"]).higher_is_better)
 
     matrix = FactorMatrixBuilder(price_store, factor_registry).build(
         factor=task["factor"],
@@ -195,7 +259,7 @@ def factor_stability_worker(task: dict) -> tuple:
         {
             "signal_date": row.signal_date,
             "symbol": row.symbol,
-            "factor_value": row.factor_value,
+            "factor_value": float(row.factor_value) if higher_is_better else -float(row.factor_value),
             "future_return": row.future_return,
         }
         for row in matrix.valid_rows

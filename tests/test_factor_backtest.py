@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 
 from quant.cli import main
-from quant.engines.factor_backtest.factor_backtest import FactorBacktest
+from quant.engines.factor_backtest.factor_backtest import FactorBacktest, FactorBacktestObservation
 from quant.engines.factor_eval.factor_evaluation import FactorEvaluation
 from quant.storage.sqlite_store import SQLitePriceStore
 
@@ -142,6 +142,61 @@ def test_factor_backtest_quantile_grouping(tmp_path: Path) -> None:
     assert set(period.quantile_returns) == {"q1", "q2", "q3", "q4", "q5"}
     assert result.top_quantile_return == period.quantile_returns["q5"]
     assert result.bottom_quantile_return == period.quantile_returns["q1"]
+
+
+def test_factor_backtest_lower_is_better_reverses_quantile_ranking(tmp_path: Path) -> None:
+    observations = [
+        FactorBacktestObservation("2024-01-01", "2024-01-02", "LOW", 1.0, 0.03, None),
+        FactorBacktestObservation("2024-01-01", "2024-01-02", "MID", 2.0, 0.02, None),
+        FactorBacktestObservation("2024-01-01", "2024-01-02", "HIGH", 3.0, 0.01, None),
+    ]
+
+    directional = FactorBacktest._directional_observations(observations, higher_is_better=False)
+    assigned = FactorBacktest._assign_quantiles(directional, quantiles=3)
+    by_symbol = {row.symbol: row.quantile for row in assigned}
+    quantile_returns = FactorBacktest._quantile_returns(assigned, quantiles=3)
+
+    assert by_symbol == {"LOW": 3, "MID": 2, "HIGH": 1}
+    assert quantile_returns["q3"] == pytest.approx(0.03)
+    assert quantile_returns["q1"] == pytest.approx(0.01)
+
+
+def test_factor_backtest_run_uses_lower_is_better_metadata(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    engine = FactorBacktest(SQLitePriceStore(tmp_path / "quant.db"), report_dir=tmp_path / "reports")
+    observations = [
+        FactorBacktestObservation("2024-01-01", "2024-01-02", "LOW", 1.0, 0.03, None),
+        FactorBacktestObservation("2024-01-01", "2024-01-02", "MID", 2.0, 0.02, None),
+        FactorBacktestObservation("2024-01-01", "2024-01-02", "HIGH", 3.0, 0.01, None),
+    ]
+    metadata = {
+        "factor_family": "risk",
+        "factor_type": "test",
+        "factor_category": "risk",
+        "factor_description": "lower is better test",
+        "factor_inputs": [],
+        "higher_is_better": False,
+        "no_lookahead": True,
+    }
+
+    monkeypatch.setattr(engine.factor_registry, "metadata", lambda factor: metadata)
+    monkeypatch.setattr(engine, "_factor_coverage", lambda factor, symbols, observations: None)
+    monkeypatch.setattr(engine, "_factor_coverage_warnings", lambda factor, coverage: [])
+    monkeypatch.setattr(engine, "_observations", lambda **kwargs: (observations, [], {}, []))
+
+    result = engine.run(
+        factor="momentum_20d",
+        start="2024-01-01",
+        end="2024-01-01",
+        holding_period=1,
+        quantiles=3,
+        universe=["LOW", "MID", "HIGH"],
+        bulk_matrix=False,
+    )
+
+    assert result.factor_higher_is_better is False
+    assert result.periods[0].long_symbols == ["LOW"]
+    assert result.periods[0].short_symbols == ["HIGH"]
+    assert result.top_bottom_forward_spread == pytest.approx(0.02)
 
 
 def test_factor_backtest_long_short_return(tmp_path: Path) -> None:
@@ -364,6 +419,7 @@ def test_factor_backtest_report_contains_quality_fields(tmp_path: Path) -> None:
         universe=symbols,
         pipeline_config=pipeline_config(),
         pipeline_config_path="examples/factor_pipeline_config.json",
+        write_report=True,
     )
     report = pd.read_json(result.report_path, typ="series").to_dict()
 
@@ -372,10 +428,22 @@ def test_factor_backtest_report_contains_quality_fields(tmp_path: Path) -> None:
     assert report["rebalance_dates"] == ["2024-03-01", "2024-03-02"]
     assert "long_symbols_by_date" in report
     assert "short_symbols_by_date" in report
+    assert report["return_type"] == "overlapping_forward_spread"
+    assert report["investable_equity"] is False
+    assert report["cumulative_method"] == "additive_diagnostic"
+    assert report["metric_semantics"]["investable_equity"] is False
+    assert report["legacy_metric_aliases"]["long_short_return"] == "cumulative_forward_spread"
+    assert "mean_forward_spread" in report
+    assert "cumulative_forward_spread" in report
+    assert "annualized_mean_forward_spread" in report
+    assert "spread_sharpe_like" in report
+    assert "spread_max_drawdown" in report
+    assert "performance_metadata" in report
     assert "long_leg_return" in report
     assert "short_leg_return" in report
     assert "gross_exposure" in report
     assert "net_exposure" in report
+    assert any("not account-level performance metrics" in warning for warning in report["warnings"])
 
 
 def test_factor_backtest_sharpe_uses_arithmetic_period_mean(tmp_path: Path) -> None:

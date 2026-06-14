@@ -22,6 +22,12 @@ class RegimeDetector:
         volatility_window: int = 20,
         trend_window: int = 60,
     ) -> None:
+        if long_window < 20:
+            raise ValueError("long_window must be >= 20")
+        if volatility_window < 5:
+            raise ValueError("volatility_window must be >= 5")
+        if trend_window < 1:
+            raise ValueError("trend_window must be >= 1")
         self.price_store = price_store
         self.benchmark = benchmark.upper()
         self.long_window = long_window

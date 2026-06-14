@@ -39,7 +39,7 @@ def handle(args: argparse.Namespace, context: CLIContext) -> int:
             max_symbols=args.max_symbols,
             max_factors=args.max_factors,
             max_folds=args.max_folds,
-            timeout_seconds=args.timeout_seconds,
+            soft_timeout_seconds=args.timeout_seconds,
             bulk_matrix=args.bulk_matrix,
             workers=args.workers,
             strict_in_memory=args.strict_in_memory,

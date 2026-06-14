@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from pathlib import Path
@@ -108,14 +109,22 @@ class MultiFactorModel:
         config: Mapping | None = None,
         as_of_date: str | None = None,
         write_report: bool = True,
+        min_confidence: float = 0.0,
     ) -> MultiFactorResult:
-        cfg = self.normalize_config(config or {})
+        cfg = self.normalize_config(config or {}, self.factor_registry)
         factors = cfg["factors"]
-        symbols = sorted(str(symbol).upper() for symbol in raw_factor_values)
+        raw = {
+            str(symbol).upper(): {
+                str(factor_key).strip().lower(): value
+                for factor_key, value in (values or {}).items()
+            }
+            for symbol, values in raw_factor_values.items()
+        }
+        symbols = sorted(raw)
         warnings: list[str] = []
         factor_families = {factor: self.factor_family(factor, self.factor_registry) for factor in factors}
         coverage = {
-            factor: self._coverage(raw_factor_values, factor, symbols)
+            factor: self._coverage(raw, factor, symbols)
             for factor in factors
         }
         factor_weights, weight_warnings = FactorWeighting.weights(
@@ -134,14 +143,16 @@ class MultiFactorModel:
         stability_by_factor: dict[str, dict[str, Any]] = {}
         for factor in factors:
             raw_values = {
-                symbol: (raw_factor_values.get(symbol) or {}).get(factor)
+                symbol: raw.get(symbol, {}).get(factor)
                 for symbol in symbols
             }
+            meta = self.factor_registry.metadata(factor)
             normalized = FactorCombiner.normalize(
                 raw_values,
                 method=cfg["normalization_method"],
                 winsorize_pct=cfg.get("winsorize_pct"),
                 missing=cfg["missing"],
+                higher_is_better=meta.get("higher_is_better", True),
             )
             normalized_by_factor[factor] = normalized.values
             warnings.extend(f"{factor}: {warning}" for warning in normalized.warnings)
@@ -200,6 +211,8 @@ class MultiFactorModel:
                 if symbol_factor_confidence
                 else 0.0
             )
+            if final_score is not None and overall_confidence < min_confidence:
+                final_score = None
             scores.append(
                 MultiFactorSymbolScore(
                     symbol=symbol,
@@ -249,9 +262,9 @@ class MultiFactorModel:
         return replace(result, report_path=str(path))
 
     @staticmethod
-    def normalize_config(config: Mapping) -> dict[str, Any]:
+    def normalize_config(config: Mapping, registry: FactorRegistry | None = None) -> dict[str, Any]:
         cfg = dict(config)
-        registry = FactorRegistry()
+        registry = registry or FactorRegistry()
         factors = [str(factor).strip().lower() for factor in (cfg.get("factors") or DEFAULT_MULTI_FACTOR_FACTORS)]
         for factor in factors:
             registry.describe(factor)
@@ -279,6 +292,8 @@ class MultiFactorModel:
             custom_weights=normalized["factor_weights"],
         )
         FactorCombiner.normalize({"CHECK": 1.0}, method=normalization_method, missing=missing)
+        if "min_confidence" not in normalized:
+            normalized["min_confidence"] = float(cfg.get("min_confidence", 0.0))
         return normalized
 
     @staticmethod
@@ -319,13 +334,11 @@ class MultiFactorModel:
     ):
         warnings_list = []
         correlations = {}
-        # Transpose symbol->factor to factor->symbol
+        # Build factor->symbol mapping from normalized_by_factor (factor->symbol->value)
         factor_by_symbol: dict[str, dict[str, float]] = {}
         for factor in factors:
-            factor_by_symbol[factor] = {}
-            for sym in symbols:
-                sym_data = normalized_by_factor.get(sym, {})
-                factor_by_symbol[factor][sym] = sym_data.get(factor)
+            factor_values = normalized_by_factor.get(factor, {})
+            factor_by_symbol[factor] = {sym: factor_values.get(sym) for sym in symbols}
         factor_list = [f for f in factors if f in factor_by_symbol]
         if len(factor_list) < 2:
             return warnings_list, correlations
@@ -338,12 +351,12 @@ class MultiFactorModel:
                 vals2 = [factor_by_symbol[f2].get(s) for s in symbols]
                 paired = [(v1, v2) for v1, v2 in zip(vals1, vals2) if v1 is not None and v2 is not None]
                 if len(paired) < 5:
-                    correlations[f1][f2] = 0.0
+                    correlations[f1][f2] = None
                     continue
                 a = np.array([p[0] for p in paired])
                 b = np.array([p[1] for p in paired])
                 if np.std(a) < 1e-12 or np.std(b) < 1e-12:
-                    correlations[f1][f2] = 0.0
+                    correlations[f1][f2] = None
                     continue
                 r = float(np.corrcoef(a, b)[0, 1])
                 correlations[f1][f2] = round(r, 6)
@@ -369,8 +382,10 @@ class MultiFactorModel:
         for symbol in symbols:
             value = (raw_factor_values.get(symbol) or {}).get(factor)
             try:
-                if value is not None and float(value) == float(value):
-                    valid += 1
+                if value is not None:
+                    fv = float(value)
+                    if math.isfinite(fv):
+                        valid += 1
             except (TypeError, ValueError):
                 pass
         return round(valid / len(symbols), 6)

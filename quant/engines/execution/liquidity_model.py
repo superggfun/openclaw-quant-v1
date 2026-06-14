@@ -51,6 +51,8 @@ class LiquidityModel:
     ) -> LiquiditySnapshot:
         ticker = symbol.upper().strip()
         lookback = int(lookback_days or self.lookback_days)
+        if lookback <= 0:
+            raise ValueError("lookback_days must be positive")
         history = self.price_store.get_price_history(ticker, end=as_of_date)
         warnings: list[str] = []
         if history.empty:

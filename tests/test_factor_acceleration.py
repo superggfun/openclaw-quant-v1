@@ -102,6 +102,7 @@ def approx_equal(a, b, tol=1e-9) -> bool:
 def comparable_backtest(result) -> dict:
     report = result.to_report()
     report.pop("report_path", None)
+    report.pop("performance_metadata", None)
     return report
 
 
@@ -621,8 +622,8 @@ def test_report_filenames_are_unique_under_rapid_repeated_calls(tmp_path: Path) 
     seed_prices(db_path, symbols)
     engine = FactorEvaluation(SQLitePriceStore(db_path), report_dir=tmp_path / "reports")
 
-    first = engine.evaluate("momentum_20d", universe=symbols, forward_days=5)
-    second = engine.evaluate("momentum_20d", universe=symbols, forward_days=5)
+    first = engine.evaluate("momentum_20d", universe=symbols, forward_days=5, write_report=True)
+    second = engine.evaluate("momentum_20d", universe=symbols, forward_days=5, write_report=True)
 
     assert first.report_path != second.report_path
     assert Path(first.report_path).exists()

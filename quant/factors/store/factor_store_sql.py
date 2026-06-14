@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -149,5 +149,5 @@ def missing_pct(coverage: dict | None) -> float | None:
 
 
 def now_iso() -> str:
-    """Return the current UTC-ish datetime as an ISO-8601 string (second precision)."""
-    return datetime.now().isoformat(timespec="seconds")
+    """Return the current UTC datetime as an ISO-8601 string (second precision)."""
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")

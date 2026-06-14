@@ -6,7 +6,7 @@ from __future__ import annotations
 DEFAULT_PROFILE_FACTORS = [
     "momentum_20d",
     "momentum_60d",
-    "growth_score",
+    "growth_price_proxy",
     "fundamental_quality_score",
     "fundamental_value_score",
 ]

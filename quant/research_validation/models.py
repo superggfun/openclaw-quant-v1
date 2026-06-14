@@ -47,6 +47,7 @@ class ResearchValidationRunOptions:
     batch_size: int | None
     max_symbols: int | None
     factor_family: str
+    cost_profile: str
     resume: bool
     skip_existing: bool
     use_cache: bool

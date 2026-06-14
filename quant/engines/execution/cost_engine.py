@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Iterable
@@ -18,11 +19,44 @@ DEFAULT_COST_CONFIG = {
     "slippage_bps": 5.0,
     "slippage_model": None,
     "market_impact_bps": 0.0,
+    "market_impact_model": "sqrt_participation",
+    "market_impact_participation_factor": 1.0,
+    "market_impact_volatility_factor": 0.0,
     "liquidity_impact_rate": 0.0,
     "currency": "USD",
     "min_trade_notional": 50.0,
     "min_cost_efficiency_ratio": None,
 }
+
+REALISTIC_COST_CONFIG = {
+    "cost_profile": "realistic",
+    "model": "combined",
+    "fixed_fee": 1.0,
+    "commission_rate": 0.0005,
+    "min_commission": 1.0,
+    "slippage_bps": 5.0,
+    "market_impact_bps": 2.0,
+    "market_impact_model": "sqrt_participation",
+    "market_impact_participation_factor": 1.0,
+    "market_impact_volatility_factor": 0.05,
+}
+
+COST_PROFILES = {
+    "conservative": {},
+    "realistic": REALISTIC_COST_CONFIG,
+}
+
+COST_PROFILE_NAMES = tuple(sorted(COST_PROFILES))
+
+
+def apply_cost_profile(config: dict | None, profile: str = "conservative") -> dict:
+    """Apply a named cost profile, then overlay caller-provided config on top."""
+    normalized = str(profile or "conservative").strip().lower()
+    if normalized not in COST_PROFILES:
+        raise ValueError(f"cost_profile must be one of: {', '.join(COST_PROFILE_NAMES)}")
+    merged = dict(COST_PROFILES.get(normalized, {}))
+    merged.update(config or {})
+    return merged
 
 
 @dataclass(frozen=True)
@@ -46,6 +80,8 @@ class TradeCostEstimate:
     commission: float
     slippage_cost: float
     market_impact_cost: float
+    market_impact_model: str
+    market_impact_bps_effective: float
     liquidity_cost: float
     total_cost: float
     cost_ratio: float
@@ -104,8 +140,10 @@ class CostEngine:
         for trade in trades:
             if trade.shares <= 0:
                 continue
-            if trade.price <= 0:
-                raise ValueError("trade price must be positive")
+            if trade.price <= 0 or not math.isfinite(trade.price):
+                raise ValueError("trade price must be positive and finite")
+            if not math.isfinite(trade.shares):
+                raise ValueError("trade shares must be finite")
 
             notional = trade.shares * trade.price
             fixed_fee = self._fixed_fee()
@@ -119,7 +157,8 @@ class CostEngine:
                 average_daily_volume=trade.average_daily_volume,
                 volatility=trade.volatility,
             )
-            market_impact_cost = self._market_impact(notional, adv_participation)
+            market_impact_bps = self._market_impact_bps(adv_participation, trade.volatility)
+            market_impact_cost = notional * market_impact_bps / 10000.0
             liquidity_cost = self._liquidity_cost(notional, adv_participation)
             total_cost = fixed_fee + commission + slippage_cost + market_impact_cost + liquidity_cost
             cost_ratio = total_cost / notional if notional else 0.0
@@ -148,6 +187,8 @@ class CostEngine:
                     commission=commission,
                     slippage_cost=slippage_cost,
                     market_impact_cost=market_impact_cost,
+                    market_impact_model=str(self.config["market_impact_model"]),
+                    market_impact_bps_effective=market_impact_bps,
                     liquidity_cost=liquidity_cost,
                     total_cost=total_cost,
                     cost_ratio=cost_ratio,
@@ -192,13 +233,29 @@ class CostEngine:
             return 0.0
         return max(notional * self.config["commission_rate"], self.config["min_commission"])
 
-    def _market_impact(self, notional: float, adv_participation: float | None) -> float:
-        if notional <= 0:
-            return 0.0
-        base = notional * self.config["market_impact_bps"] / 10000.0
+    def _market_impact_bps(self, adv_participation: float | None, volatility: float | None) -> float:
+        base_bps = self.config["market_impact_bps"]
+        if self.config["market_impact_model"] == "flat":
+            if adv_participation is None:
+                return base_bps
+            return base_bps * max(1.0, adv_participation)
+
         if adv_participation is None:
-            return base
-        return base * max(1.0, adv_participation)
+            return base_bps
+
+        participation = max(float(adv_participation), 0.0)
+        sqrt_participation = math.sqrt(participation)
+        impact_bps = base_bps * (
+            1.0 + self.config["market_impact_participation_factor"] * sqrt_participation
+        )
+        if volatility is not None and math.isfinite(float(volatility)):
+            impact_bps += (
+                max(float(volatility), 0.0)
+                * 10000.0
+                * self.config["market_impact_volatility_factor"]
+                * sqrt_participation
+            )
+        return max(impact_bps, 0.0)
 
     def _liquidity_cost(self, notional: float, adv_participation: float | None) -> float:
         if notional <= 0 or adv_participation is None:
@@ -234,6 +291,11 @@ class CostEngine:
             raise ValueError("slippage_model must be a string or JSON object")
         SlippageModel(merged["slippage_model"])
         merged["market_impact_bps"] = float(merged["market_impact_bps"])
+        merged["market_impact_model"] = str(merged["market_impact_model"]).lower()
+        if merged["market_impact_model"] not in {"flat", "sqrt_participation"}:
+            raise ValueError("market_impact_model must be one of: flat, sqrt_participation")
+        merged["market_impact_participation_factor"] = float(merged["market_impact_participation_factor"])
+        merged["market_impact_volatility_factor"] = float(merged["market_impact_volatility_factor"])
         merged["liquidity_impact_rate"] = float(merged["liquidity_impact_rate"])
         merged["currency"] = str(merged["currency"]).upper()
         merged["min_trade_notional"] = float(merged["min_trade_notional"])
@@ -246,6 +308,8 @@ class CostEngine:
             "min_commission",
             "slippage_bps",
             "market_impact_bps",
+            "market_impact_participation_factor",
+            "market_impact_volatility_factor",
             "liquidity_impact_rate",
             "min_trade_notional",
         ):

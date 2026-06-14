@@ -309,6 +309,12 @@ def _score(
     score = (consistency * 60.0 + positive_ratio * 40.0)
     score = max(0.0, min(100.0, score))
 
+    # Penalise "stable loser": consistent negative Sharpe should never be PASS
+    if mean_sharpe <= 0 or positive_ratio < 0.5:
+        score = min(score, 30.0)
+        if positive_ratio == 0:
+            warnings.append("sharpe is negative across all universe sizes — factor is a stable loser, not stable alpha")
+
     if cv > 1.0:
         warnings.append(f"high sharpe variability across universe sizes (CV={cv:.2f})")
         recommendations.append("factor may be sensitive to universe composition")

@@ -275,10 +275,12 @@ def load_targets(path: Path) -> dict:
     return targets
 
 
-def load_cost_config(path: Path) -> dict:
+def load_cost_config(path: Path, cost_profile: str = "conservative") -> dict:
+    from quant.engines.execution.cost_engine import apply_cost_profile
+
     if not path.exists():
-        return {}
-    return _load_json_object(path, "cost config")
+        return apply_cost_profile({}, cost_profile)
+    return apply_cost_profile(_load_json_object(path, "cost config"), cost_profile)
 
 
 def load_market_realism_config(path: Path) -> dict:

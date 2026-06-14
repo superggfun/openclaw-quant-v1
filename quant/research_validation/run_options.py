@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from quant.engines.execution.cost_engine import COST_PROFILE_NAMES
 from quant.research_validation.models import ResearchValidationRunOptions
 
 
@@ -22,6 +23,7 @@ def normalize_run_options(
     batch_size: int | None,
     max_symbols: int | None,
     factor_family: str,
+    cost_profile: str,
     resume: bool,
     skip_existing: bool,
     use_cache: bool,
@@ -47,6 +49,9 @@ def normalize_run_options(
     family = factor_family.strip().lower()
     if family not in {"price", "fundamental", "all"}:
         raise ValueError("factor_family must be price, fundamental, or all")
+    normalized_cost_profile = str(cost_profile or "conservative").strip().lower()
+    if normalized_cost_profile not in COST_PROFILE_NAMES:
+        raise ValueError(f"cost_profile must be one of: {', '.join(COST_PROFILE_NAMES)}")
     normalized_parallel_target = parallel_target.strip().lower()
     if normalized_parallel_target != "factor_batch":
         raise ValueError("parallel_target must be factor_batch")
@@ -64,6 +69,7 @@ def normalize_run_options(
         batch_size=batch_size,
         max_symbols=max_symbols,
         factor_family=family,
+        cost_profile=normalized_cost_profile,
         resume=resume,
         skip_existing=skip_existing,
         use_cache=use_cache,

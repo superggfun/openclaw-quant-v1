@@ -67,8 +67,8 @@ class ExecutionConstraints:
             raise ValueError("max_adv_participation must be non-negative")
         if merged["min_trade_notional"] < 0:
             raise ValueError("min_trade_notional must be non-negative")
-        if merged["minimum_shares"] < 0:
-            raise ValueError("minimum_shares must be non-negative")
+        if merged["minimum_shares"] < 1:
+            raise ValueError("minimum_shares must be >= 1")
         if merged.get("max_position_notional") is not None:
             merged["max_position_notional"] = float(merged["max_position_notional"])
         if merged.get("max_position_weight") is not None:

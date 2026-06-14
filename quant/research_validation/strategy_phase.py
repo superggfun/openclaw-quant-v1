@@ -20,6 +20,7 @@ def run_strategy_phase(
     effective_start: str | None,
     effective_end: str | None,
     substep_dir: Path,
+    cost_profile: str,
     write_substep_reports: bool,
     write_intermediate_reports: bool,
 ) -> None:
@@ -36,6 +37,7 @@ def run_strategy_phase(
                 effective_start,
                 effective_end,
                 report_dir=substep_dir,
+                cost_profile=cost_profile,
                 write_report=write_substep_reports,
                 write_intermediate_reports=write_intermediate_reports,
             ),

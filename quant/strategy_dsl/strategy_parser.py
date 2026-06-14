@@ -52,13 +52,36 @@ class StrategyParser:
     @staticmethod
     def _lines(text: str) -> list[tuple[int, str]]:
         output = []
-        for raw in text.splitlines():
-            stripped = raw.split("#", 1)[0].rstrip()
+        for line_number, raw in enumerate(text.splitlines(), start=1):
+            stripped = StrategyParser._strip_comment(raw, line_number).rstrip()
             if not stripped.strip():
                 continue
             indent = len(stripped) - len(stripped.lstrip(" "))
             output.append((indent, stripped.lstrip()))
         return output
+
+    @staticmethod
+    def _strip_comment(raw: str, line_number: int) -> str:
+        quote: str | None = None
+        escaped = False
+        for index, char in enumerate(raw):
+            if escaped:
+                escaped = False
+                continue
+            if char == "\\" and quote == '"':
+                escaped = True
+                continue
+            if char in {"'", '"'}:
+                if quote is None:
+                    quote = char
+                elif quote == char:
+                    quote = None
+                continue
+            if char == "#" and quote is None:
+                return raw[:index]
+        if quote is not None:
+            raise ValueError(f"strategy YAML contains an unterminated quote on line {line_number}")
+        return raw
 
     def _parse_block(self, lines: list[tuple[int, str]], index: int, indent: int):
         if index >= len(lines):
@@ -107,7 +130,7 @@ class StrategyParser:
                     item, index = self._parse_block(lines, index, lines[index][0])
                 else:
                     item = None
-            elif ":" in rest and not rest.startswith(("'", '"')):
+            elif self._looks_like_inline_mapping_item(rest):
                 key, value = self._split_key_value(rest)
                 item = {key: self._parse_scalar(value)} if value else {key: {}}
                 if index < len(lines) and lines[index][0] > current_indent:
@@ -116,10 +139,19 @@ class StrategyParser:
                         item.update(nested)
                     else:
                         item[key] = nested
+            elif ":" in rest and not rest.startswith(("'", '"')):
+                raise ValueError(f"strategy YAML list item contains an unsupported ':' scalar: {rest}")
             else:
                 item = self._parse_scalar(rest)
             output.append(item)
         return output, index
+
+    @staticmethod
+    def _looks_like_inline_mapping_item(rest: str) -> bool:
+        if rest.startswith(("'", '"')) or ":" not in rest:
+            return False
+        key, _, value = rest.partition(":")
+        return key.strip() == "name" and (value == "" or value.startswith(" "))
 
     @staticmethod
     def _split_key_value(content: str) -> tuple[str, str]:
@@ -136,6 +168,8 @@ class StrategyParser:
         text = value.strip()
         if text == "":
             return ""
+        if text.startswith(("[", "{")) or text.endswith(("]", "}")):
+            raise ValueError(f"strategy YAML inline collections are not supported: {text}")
         if (text.startswith('"') and text.endswith('"')) or (text.startswith("'") and text.endswith("'")):
             return text[1:-1]
         lowered = text.lower()

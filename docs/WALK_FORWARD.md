@@ -82,6 +82,19 @@ Regime labels are heuristic diagnostics, not forecasts. They should be used to r
 
 The report evaluates registered factors across folds and classifies them as `stable`, `moderate`, `unstable`, or `insufficient_data`.
 
+For each factor, IC and Rank IC are first direction-adjusted using factor metadata. If `higher_is_better=false`, the factor value is multiplied by `-1` before correlation is computed. The ranking and `classification` use `directional_stability_score`, not absolute IC strength.
+
+Stability entries include:
+
+- `directional_stability_score`: mean direction-adjusted IC/Rank IC minus cross-fold variability.
+- `absolute_stability_score`: mean absolute IC/Rank IC minus cross-fold variability, retained as a signal-strength diagnostic only.
+- `score`: backward-compatible alias for `directional_stability_score`.
+- `mean_directional_ic`, `mean_directional_rank_ic`: average direction-adjusted IC and Rank IC.
+- `mean_abs_ic`, `mean_abs_rank_ic`: average absolute IC and Rank IC.
+- `direction_consistency`: share of direction-adjusted IC and Rank IC values above zero.
+
+Recommendations that prioritize stable factors use the directional score, so a factor that is stable but consistently opposite its declared direction is not treated as a stable candidate.
+
 ## Report
 
 Reports are written to:

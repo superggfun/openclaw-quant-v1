@@ -124,6 +124,8 @@ python -m quant.cli factor-eval --factor momentum_20d
 python -m quant.cli factor-eval --factor momentum_20d --save-factor-history
 python -m quant.cli factor-backtest --factor momentum_20d
 python -m quant.cli factor-backtest --factor momentum_20d --save-factor-history
+python -m quant.cli factor-test --factor momentum_20d --pretty
+python -m quant.cli factor-test --factors momentum_20d,momentum_60d --pretty
 python -m quant.cli factor-store-summary
 python -m quant.cli factor-history --factor momentum_20d
 python -m quant.cli factor-rank
@@ -217,7 +219,7 @@ python -m quant.cli factor-backtest --factor momentum_20d --save-factor-history
 python -m quant.cli factor-backtest --factor risk_adjusted_momentum --start 2024-01-01 --end 2024-12-31 --holding-period 20 --quantiles 5
 ```
 
-The factor-backtest command ranks each no-lookahead signal-date cross-section, longs the configured top quantile, shorts the configured bottom quantile, and prints long-short return metrics. It writes `reports/factor_backtest_*.json` and does not modify portfolio state. Use `--save-factor-history` to persist long-short return, Sharpe, drawdown, turnover, coverage, and warning metadata.
+The factor-backtest command ranks each no-lookahead signal-date cross-section, longs the configured top quantile, shorts the configured bottom quantile, and prints overlapping forward-spread diagnostics. It writes `reports/factor_backtest_*.json` and does not modify portfolio state. Use `--save-factor-history` to persist spread, Sharpe-like, drawdown, turnover, coverage, and warning metadata.
 
 This is not Strategy Evaluation or Performance Attribution. v0.14 adds those as a separate report-reading layer.
 
@@ -317,13 +319,14 @@ The portfolio-construct command reads stored close prices, constructs long-only 
 ```bash
 python -m quant.cli cost
 python -m quant.cli cost --model fixed
+python -m quant.cli cost --cost-profile realistic
 python -m quant.cli cost --targets examples/optimized_targets.json --config examples/cost_config.json
 python -m quant.cli rebalance --targets examples/optimized_targets.json --with-costs
 ```
 
 The cost command estimates costs for current rebalance suggestions. It writes a JSON report and does not modify the simulated account.
 
-`v0.30.0` cost estimates may include additive slippage, market impact, and liquidity cost fields when the input trade includes ADV or volatility context. Existing fixed, linear, and combined cost behavior remains available.
+`v0.30.0` cost estimates may include additive slippage, square-root ADV participation market impact, and liquidity cost fields when the input trade includes ADV or volatility context. The default conservative cost profile leaves market impact at zero for backward compatibility; use `--cost-profile realistic` to enable a non-zero square-root participation impact profile.
 
 ## Execution Simulation
 
@@ -357,7 +360,7 @@ Simple portfolio smoke mode:
 
 ```bash
 python -m quant.cli update-prices --symbols SPY --start 2023-01-01 --end 2024-12-31
-python -m quant.cli backtest --start 2023-01-01 --end 2024-12-31 --initial-cash 100000 --mode equal_weight --rebalance-frequency monthly
+python -m quant.cli backtest --start 2023-01-01 --end 2024-12-31 --initial-cash 100000 --mode equal_weight --rebalance-frequency monthly --allow-same-day-close-simple-mode
 ```
 
 Optional parameters:
@@ -373,7 +376,7 @@ python -m quant.cli backtest \
 
 Legacy SMA single-symbol backtests remain available with `--symbol`.
 
-The alpha strategy path records `signal_date` and `execution_date` and executes on the next available trading day. Simple portfolio modes use a same-day close assumption and are intended for smoke checks.
+The alpha strategy path records `signal_date` and `execution_date` and executes on the next available trading day. Simple portfolio modes use a same-day close assumption, are disabled by default, and require `--allow-same-day-close-simple-mode` for research-only smoke checks.
 
 ## Failure Behavior
 
@@ -429,7 +432,7 @@ The command generates rolling train/test folds, computes out-of-sample metrics, 
 ```bash
 python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --portfolio-method equal_weight
 python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --initial-cash 100000 --rebalance-frequency monthly --portfolio-method risk_parity
-python -m quant.cli trade-sim --strategy alpha --portfolio-method equal_weight --market-realism-config examples/market_realism_config.json
+python -m quant.cli trade-sim --strategy alpha --portfolio-method equal_weight --market-realism-config examples/market_realism_config.json --cost-profile realistic
 ```
 
 The command generates alpha signals on rebalance dates, constructs target weights, simulates next-trading-day execution with costs and optional market realism constraints, updates an in-memory `PortfolioAccount`, and writes `reports/trade_sim_*.json`. It is offline research only and does not update persistent portfolio state or connect to brokers.

@@ -42,7 +42,8 @@ python -m quant.cli backtest \
   --end 2025-01-01 \
   --initial-cash 100000 \
   --mode equal_weight \
-  --rebalance-frequency monthly
+  --rebalance-frequency monthly \
+  --allow-same-day-close-simple-mode
 ```
 
 ## No-Lookahead Alpha Flow
@@ -60,9 +61,20 @@ Flow:
 
 This prevents using the same close both to generate a signal and execute the trade.
 
-## Legacy Simple Mode
+Backtest valuation and execution prices are separated. Valuation can use forward-filled mark prices for daily equity continuity, but simulated trades require a real stored execution price on the execution date. If a symbol has no real execution price for that date, the engine skips that trade and records a `NOT_TRADABLE_ON_EXECUTION_DATE` warning.
+
+## Research-Only Simple Mode
 
 The original `equal_weight`, `risk_adjusted`, and `constrained` portfolio modes rebalance on the same date using that date's close. They are useful for smoke tests and rough plumbing checks, but they should not be treated as trustworthy strategy evaluation because they have a same-day close assumption.
+
+This mode is disabled by default. To run it, pass `--allow-same-day-close-simple-mode` or call `PortfolioBacktestEngine.run(..., allow_same_day_close_simple_mode=True)`.
+
+Reports from this mode include:
+
+- `no_lookahead: false`
+- `signal_execution_lag: same_day_close_simple_mode`
+- `tradability_label: Research-only, same-day-close, not tradable.`
+- a `RESEARCH_ONLY_SAME_DAY_CLOSE` warning
 
 Modes:
 

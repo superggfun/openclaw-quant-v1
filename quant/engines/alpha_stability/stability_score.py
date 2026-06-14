@@ -10,10 +10,11 @@ from quant.engines.alpha_stability.models import AuditModuleResult
 
 DEFAULT_WEIGHTS = {
     "fold_consistency": 0.20,
-    "universe_stability": 0.20,
+    "universe_stability": 0.15,
     "cost_robustness": 0.20,
-    "turnover_quality": 0.20,
-    "ic_persistence": 0.20,
+    "turnover_quality": 0.15,
+    "decile_monotonicity": 0.15,
+    "ic_persistence": 0.15,
 }
 
 
@@ -23,6 +24,7 @@ def compute_stability_score(
     cost_result: AuditModuleResult | None = None,
     turnover_result: AuditModuleResult | None = None,
     ic_decay_result: AuditModuleResult | None = None,
+    decile_result: AuditModuleResult | None = None,
     fold_consistency_score: float | None = None,
     weights: dict[str, float] | None = None,
 ) -> AuditModuleResult:
@@ -39,6 +41,7 @@ def compute_stability_score(
         "universe_stability": universe_result.score if universe_result else None,
         "cost_robustness": cost_result.score if cost_result else None,
         "turnover_quality": turnover_result.score if turnover_result else None,
+        "decile_monotonicity": decile_result.score if decile_result else None,
         "ic_persistence": ic_decay_result.score if ic_decay_result else None,
     }
 
@@ -64,7 +67,7 @@ def compute_stability_score(
     # Gather all warnings and recommendations
     all_warnings: list[str] = []
     all_recommendations: list[str] = []
-    sub_results = [universe_result, cost_result, turnover_result, ic_decay_result]
+    sub_results = [universe_result, cost_result, turnover_result, decile_result, ic_decay_result]
     for sub in sub_results:
         if sub is not None:
             all_warnings.extend(sub.warnings)

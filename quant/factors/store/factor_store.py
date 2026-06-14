@@ -29,6 +29,15 @@ from quant.storage.sqlite_connection import connect_sqlite
 from quant.storage.sqlite_store import SQLitePriceStore
 
 
+def _is_fundamental_factor(factor_name: str) -> bool:
+    """Check whether *factor_name* requires fundamental data (not price-only).
+
+    Uses lazy import to avoid circular dependency at module load time.
+    """
+    from quant.factors.price.factor_registry import FactorRegistry
+    return FactorRegistry().is_fundamental(factor_name)
+
+
 FACTOR_STORE_SCHEMA_PATH = Path(__file__).resolve().parent / "sql" / "factor_store_schema.sql"
 FACTOR_STORE_TABLES = (
     "factor_definitions",
@@ -172,7 +181,7 @@ class FactorStore:
             result.factor_category,
             result.factor_description,
             result.factor_higher_is_better,
-            bool((result.factor_coverage or {}).get("no_lookahead_filter")),
+            _is_fundamental_factor(result.factor),
         )
         self.upsert_factor_version(result.factor, version, result.factor_description, "factor evaluation persistence")
         coverage = self._coverage_pct(result.factor_coverage)
@@ -235,7 +244,7 @@ class FactorStore:
                     result.factor_category,
                     result.factor_description,
                     result.factor_higher_is_better,
-                    bool((result.factor_coverage or {}).get("no_lookahead_filter")),
+                    _is_fundamental_factor(result.factor),
                 )
                 self._upsert_factor_version_connection(
                     connection,
@@ -338,12 +347,16 @@ class FactorStore:
         return saved
 
     def save_factor_backtest(self, result, version: str = "v1") -> dict:
+        # TODO(spread): switch health/stability scoring from result.long_short_return
+        # and result.max_drawdown to result.cumulative_forward_spread and
+        # result.spread_max_drawdown when spread-semantics fields are added to
+        # FactorBacktestResult.
         self.upsert_factor_definition(
             result.factor,
             result.factor_category,
             result.factor_description,
             result.factor_higher_is_better,
-            bool(result.factor_coverage),
+            _is_fundamental_factor(result.factor),
         )
         self.upsert_factor_version(result.factor, version, result.factor_description, "factor backtest persistence")
         coverage = self._coverage_pct(result.factor_coverage)
@@ -369,7 +382,10 @@ class FactorStore:
                     evaluation_date,
                 ),
             )
-        stability = FactorAnalytics.consistency_score([result.ic_mean, result.rank_ic_mean, result.long_short_return])
+        stability = FactorAnalytics.consistency_score([result.ic_mean, result.rank_ic_mean])
+        return_quality = FactorAnalytics.return_quality_score(
+            result.long_short_return, result.long_short_sharpe, result.max_drawdown
+        )
         confidence = FactorAnalytics.confidence_score(coverage, stability, result.ic_count)
         overall = FactorAnalytics.health_score(
             {
@@ -399,7 +415,7 @@ class FactorStore:
                     result.factor_category,
                     result.factor_description,
                     result.factor_higher_is_better,
-                    bool(result.factor_coverage),
+                    _is_fundamental_factor(result.factor),
                 )
                 self._upsert_factor_version_connection(
                     connection,
@@ -425,7 +441,10 @@ class FactorStore:
                         self._now(),
                     )
                 )
-                stability = FactorAnalytics.consistency_score([result.ic_mean, result.rank_ic_mean, result.long_short_return])
+                stability = FactorAnalytics.consistency_score([result.ic_mean, result.rank_ic_mean])
+                return_quality = FactorAnalytics.return_quality_score(
+                    result.long_short_return, result.long_short_sharpe, result.max_drawdown
+                )
                 confidence = FactorAnalytics.confidence_score(coverage, stability, result.ic_count)
                 overall = FactorAnalytics.health_score(
                     {
@@ -468,6 +487,15 @@ class FactorStore:
 
     def save_walk_forward(self, result, factor: str | None = None) -> dict:
         factor_name = factor or result.parameters.get("factor") or "alpha"
+        # Ensure factor definition exists so rank_factors() can join on it
+        category = getattr(result, "factor_category", "walk_forward")
+        description = getattr(result, "factor_description", str(getattr(result, "parameters", {})))
+        higher_is_better = getattr(result, "factor_higher_is_better", True)
+        self.upsert_factor_definition(
+            factor_name, category, description, higher_is_better,
+            _is_fundamental_factor(factor_name),
+        )
+        self.upsert_factor_version(factor_name, "v1", description, "walk-forward persistence")
         evaluation_date = self._now()
         rows = []
         with self.connect() as connection:
@@ -558,8 +586,8 @@ class FactorStore:
         params: list[Any] = []
         where = ""
         if factor:
-            where = "WHERE factor_name = ?"
-            params.append(factor.strip().lower())
+            where = "WHERE factor_name = ? COLLATE NOCASE"
+            params.append(factor.strip())
         with self.connect() as connection:
             evaluations = self._fetch_all(
                 connection,
@@ -649,8 +677,11 @@ class FactorStore:
                     COALESCE(s.confidence_score, 0.0) AS confidence_score,
                     COALESCE(b.long_short_return, 0.0) AS long_short_return,
                     COALESCE(b.sharpe, 0.0) AS sharpe,
-                    COALESCE(b.drawdown, 0.0) AS drawdown,
-                    COALESCE(b.turnover, 0.0) AS turnover
+                    b.drawdown AS drawdown,
+                    COALESCE(b.turnover, 0.0) AS turnover,
+                    CASE WHEN e.factor_name IS NOT NULL THEN 1 ELSE 0 END AS has_eval,
+                    CASE WHEN b.factor_name IS NOT NULL THEN 1 ELSE 0 END AS has_backtest,
+                    CASE WHEN s.factor_name IS NOT NULL THEN 1 ELSE 0 END AS has_stability
                 FROM factor_definitions d
                 LEFT JOIN latest_eval e ON e.factor_name = d.factor_name
                 LEFT JOIN latest_backtest b ON b.factor_name = d.factor_name
@@ -660,10 +691,14 @@ class FactorStore:
                 [],
             )
         scored = []
+        untested = []
         for row in rows:
             item = dict(row)
             item["health_score"] = FactorAnalytics.health_score(item)
-            scored.append(item)
+            if item.get("has_eval") or item.get("has_backtest") or item.get("has_stability"):
+                scored.append(item)
+            else:
+                untested.append(item)
         top = sorted(scored, key=lambda row: (row["health_score"], row["factor_name"]), reverse=True)[:limit]
         worst = sorted(scored, key=lambda row: (row["health_score"], row["factor_name"]))[:limit]
         most_stable = sorted(scored, key=lambda row: (row["stability_score"], row["factor_name"]), reverse=True)[:limit]
@@ -671,6 +706,8 @@ class FactorStore:
         warnings = []
         if not scored:
             warnings.append("WARN_FACTOR_RANK_EMPTY")
+        if untested:
+            warnings.append(f"WARN_FACTOR_RANK_UNTESTED: {len(untested)} factors have no eval/backtest/stability")
         report = {
             "metadata": {"report_type": "factor_rank", "generated_at": self._now()},
             "limit": limit,

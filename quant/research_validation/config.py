@@ -8,7 +8,7 @@ from dataclasses import dataclass
 QUICK_FACTOR_PRIORITY = [
     "momentum_20d",
     "momentum_60d",
-    "quality_score",
+    "quality_price_proxy",
     "low_volatility_score",
     "fundamental_quality_score",
 ]

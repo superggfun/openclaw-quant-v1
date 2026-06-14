@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Mapping
@@ -54,7 +55,16 @@ class OptimizerResult:
 
 
 class OptimizerEngine:
-    """Generate target allocations for the Rebalance Engine."""
+    """Generate target allocations for the Rebalance Engine.
+
+    .. deprecated::
+        This class duplicates functionality from
+        :class:`PortfolioConstructionEngine`.
+        ``PortfolioConstructionEngine`` is the preferred entry point for
+        offline portfolio construction research.  ``OptimizerEngine`` is
+        kept for backward compatibility but new code should use
+        ``PortfolioConstructionEngine`` instead.
+    """
 
     def __init__(
         self,
@@ -164,7 +174,7 @@ class OptimizerEngine:
         end_ts = _pd.to_datetime(end_date)
         start_ts = end_ts - _pd.Timedelta(days=lookback_days * 3)
 
-        returns_dict = {}
+        frames: list[_pd.Series] = []
         valid_symbols = []
         for symbol in symbols:
             history = self.price_store.get_price_history(str(symbol), start=str(start_ts.date()), end=str(end_ts.date()))
@@ -178,16 +188,18 @@ class OptimizerEngine:
             rets = history["close"].pct_change().dropna().tail(lookback_days)
             if len(rets) < lookback_days // 3:
                 continue
-            returns_dict[symbol] = rets.values
+            date_index = _pd.to_datetime(history.loc[rets.index, "date"])
+            series = _pd.Series(rets.values, index=date_index, name=symbol)
+            frames.append(series)
             valid_symbols.append(symbol)
 
         if len(valid_symbols) < 2:
             n = max(len(valid_symbols), 1)
             return np.eye(n), valid_symbols
 
-        aligned = _pd.DataFrame(returns_dict).dropna()
+        aligned = _pd.concat(frames, axis=1, join="inner").dropna()
         if len(aligned) < 20:
-            aligned = _pd.DataFrame(returns_dict)
+            aligned = _pd.concat(frames, axis=1, join="outer").dropna()
 
         cov = aligned.cov().values
         diag = np.diag(np.diag(cov))
@@ -358,11 +370,11 @@ class OptimizerEngine:
         merged["max_sector_weight"] = float(merged["max_sector_weight"])
         merged["only_long"] = bool(merged["only_long"])
 
-        if merged["max_position_weight"] <= 0:
-            raise ValueError("max_position_weight must be positive")
-        if not 0 <= merged["min_cash_weight"] <= 1:
+        if not math.isfinite(merged["max_position_weight"]) or merged["max_position_weight"] <= 0:
+            raise ValueError("max_position_weight must be positive and finite")
+        if not math.isfinite(merged["min_cash_weight"]) or not 0 <= merged["min_cash_weight"] <= 1:
             raise ValueError("min_cash_weight must be between 0 and 1")
-        if not 0 < merged["max_sector_weight"] <= 1:
+        if not math.isfinite(merged["max_sector_weight"]) or not 0 < merged["max_sector_weight"] <= 1:
             raise ValueError("max_sector_weight must be between 0 and 1")
         return merged
 

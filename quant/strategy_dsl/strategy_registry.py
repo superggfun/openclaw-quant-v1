@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from quant.config import DEFAULT_SYMBOLS
 from quant.core.collections import dedupe_text
+from quant.engines.execution.cost_engine import apply_cost_profile
 from quant.reports.report_io import generate_report_path, write_json_report
 from quant.strategy_dsl.strategy_definition import StrategyDefinition
 from quant.strategy_dsl.strategy_loader import StrategyLoader
@@ -94,13 +95,14 @@ class StrategyRegistry:
         write_report: bool = True,
         write_intermediate_reports: bool = True,
         write_gate_report: bool = True,
+        cost_profile: str = "conservative",
     ) -> dict[str, Any]:
         definition, path = self.load_strategy(strategy, file)
         validation = self.validator.validate(definition)
         self.metadata_store.upsert_strategy(definition, validation.to_report(), str(path))
         if not validation.valid:
             raise ValueError("strategy validation failed: " + ", ".join(validation.errors))
-        cost_config, market_realism_config = self._execution_configs(definition)
+        cost_config, market_realism_config = self._execution_configs(definition, cost_profile=cost_profile)
         alpha_config = self._alpha_config(definition)
         result = self.context.trading_simulator.run(
             strategy="alpha",
@@ -122,6 +124,7 @@ class StrategyRegistry:
             source_path=path,
             validation=validation.to_report(),
             trading_report=result.to_report(),
+            cost_profile=cost_profile,
             write_report=write_report and not defer_strategy_report,
         )
         if with_gates:
@@ -158,6 +161,7 @@ class StrategyRegistry:
         source_path: Path,
         validation: dict[str, Any],
         trading_report: dict[str, Any],
+        cost_profile: str,
         write_report: bool = True,
     ) -> dict[str, Any]:
         generated_at = datetime.now().isoformat(timespec="seconds")
@@ -184,7 +188,7 @@ class StrategyRegistry:
             "normalized_factor_weights": (validation.get("gates") or {}).get("normalized_factor_weights", {}),
             "portfolio_settings": dict(definition.portfolio),
             "risk_settings": dict(definition.risk),
-            "execution_settings": dict(definition.execution),
+            "execution_settings": dict(definition.execution) | {"cost_profile": cost_profile},
             "validation": validation,
             "validation_results": validation,
             "trade_sim_summary": {
@@ -229,12 +233,13 @@ class StrategyRegistry:
         }
 
     @staticmethod
-    def _execution_configs(definition: StrategyDefinition) -> tuple[dict[str, Any], dict[str, Any]]:
+    def _execution_configs(definition: StrategyDefinition, cost_profile: str = "conservative") -> tuple[dict[str, Any], dict[str, Any]]:
         execution = dict(definition.execution)
         cost = {
             "model": execution.get("cost_model", "combined"),
             "slippage_bps": float(execution.get("slippage_bps", 5)),
         }
+        cost = apply_cost_profile(cost, cost_profile)
         market = {
             "slippage_model": execution.get("slippage_model", "bps"),
             "slippage_bps": float(execution.get("slippage_bps", 5)),

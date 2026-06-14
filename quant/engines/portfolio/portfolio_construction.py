@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Mapping
@@ -181,7 +182,7 @@ class PortfolioConstructionEngine:
             start_date=data_start,
             end_date=data_end,
             lookback=lookback,
-            no_lookahead=True,
+            no_lookahead=end is not None,
             target_weights=target_weights,
             cash_weight=target_weights.get("cash", 0.0),
             constraints=constraints,
@@ -323,7 +324,8 @@ class PortfolioConstructionEngine:
             matrix = cov.to_numpy(dtype="float64")
             if not np.isfinite(matrix).all():
                 raise ValueError("non-finite covariance")
-            inverse = np.linalg.inv(matrix)
+            matrix = matrix + np.eye(len(symbols)) * 1e-8
+            inverse = np.linalg.pinv(matrix)
             ones = np.ones(len(symbols))
             denominator = float(ones.T @ inverse @ ones)
             if denominator <= 0 or not np.isfinite(denominator):
@@ -441,11 +443,11 @@ class PortfolioConstructionEngine:
             "max_sector_weight": float(max_sector_weight),
             "only_long": True,
         }
-        if not 0 <= constraints["min_cash_weight"] <= 1:
+        if not math.isfinite(constraints["min_cash_weight"]) or not 0 <= constraints["min_cash_weight"] <= 1:
             raise ValueError("min_cash_weight must be between 0 and 1")
-        if not 0 < constraints["max_position_weight"] <= 1:
+        if not math.isfinite(constraints["max_position_weight"]) or not 0 < constraints["max_position_weight"] <= 1:
             raise ValueError("max_position_weight must be between 0 and 1")
-        if not 0 < constraints["max_sector_weight"] <= 1:
+        if not math.isfinite(constraints["max_sector_weight"]) or not 0 < constraints["max_sector_weight"] <= 1:
             raise ValueError("max_sector_weight must be between 0 and 1")
         return constraints
 

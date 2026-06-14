@@ -36,6 +36,19 @@ Supported slippage models:
 
 Existing `slippage_bps` settings still work and map to the `bps` model.
 
+## Market Impact
+
+The cost engine now separates baseline bps impact from ADV participation impact. The default market impact model is `sqrt_participation`, so a 50% ADV order receives materially larger effective impact bps than a 1% ADV order:
+
+```text
+effective_impact_bps =
+  base_bps * (1 + participation_factor * sqrt(shares / ADV))
+```
+
+When recent daily volatility is available, `market_impact_volatility_factor` can add a volatility-scaled square-root term. Reports include both `market_impact_model` and `market_impact_bps_effective` per trade so downstream readers can distinguish configured base impact from realized estimated impact.
+
+The conservative default keeps market impact at zero for backward compatibility. Use `--cost-profile realistic` with `trade-sim`, `execute-sim`, or `research-validation` to enable a non-zero square-root participation profile.
+
 ## Liquidity Constraints
 
 ADV is estimated from stored volume history using a configurable lookback. When `max_adv_participation` is set, requested shares are capped to:
@@ -79,7 +92,7 @@ Existing account, equity, trade, rebalance, and no-lookahead fields remain avail
 
 ```bash
 python -m quant.cli trade-sim --strategy alpha --start 2024-01-01 --end 2025-01-01 --portfolio-method equal_weight
-python -m quant.cli trade-sim --strategy alpha --portfolio-method risk_parity --market-realism-config examples/market_realism_config.json
+python -m quant.cli trade-sim --strategy alpha --portfolio-method risk_parity --market-realism-config examples/market_realism_config.json --cost-profile realistic
 ```
 
 `execute-sim` also includes market realism fields in its execution report when cost config supplies `market_realism` settings.

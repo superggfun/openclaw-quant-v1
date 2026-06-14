@@ -12,11 +12,13 @@ from quant.cli_commands.common import (
     print_cost_report,
     trades_from_rebalance_plan,
 )
+from quant.engines.execution.cost_engine import COST_PROFILE_NAMES
 
 
 def register_parser(subparsers) -> None:
     cost = subparsers.add_parser("cost", help="Estimate transaction costs for rebalance suggestions.")
     cost.add_argument("--targets", default="examples/optimized_targets.json")
+    cost.add_argument("--cost-profile", choices=COST_PROFILE_NAMES, default="conservative")
     cost.add_argument("--config", default="examples/cost_config.json")
     cost.add_argument("--model", choices=["fixed", "linear", "combined"], default=None)
     cost.add_argument("--fixed-fee", type=float, default=None)
@@ -29,7 +31,7 @@ def register_parser(subparsers) -> None:
 def handle(args, context) -> int:
     targets = load_targets(Path(args.targets))
     plan = context.rebalance_engine.plan(targets)
-    cost_config = load_cost_config(Path(args.config))
+    cost_config = load_cost_config(Path(args.config), args.cost_profile)
     apply_cost_overrides(cost_config, args)
     cost_report = estimate_costs(cost_config, trades_from_rebalance_plan(plan))
     print_cost_report(cost_report)

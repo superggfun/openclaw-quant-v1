@@ -43,6 +43,7 @@ def test_research_validation_quick_can_write_partial_report(tmp_path: Path) -> N
         max_strategies=0,
         max_folds=1,
         timeout_seconds=5,
+        cost_profile="realistic",
     )
 
     assert report["metadata"]["report_type"] == "research_validation"
@@ -54,6 +55,7 @@ def test_research_validation_quick_can_write_partial_report(tmp_path: Path) -> N
     assert "skipped_steps" in report
     assert "slowest_steps" in report
     assert "recommended_performance_work" in report
+    assert report["parameters"]["cost_profile"] == "realistic"
     saved_report = json.loads(Path(report["report_path"]).read_text(encoding="utf-8"))
     assert saved_report["run_id"] == report["run_id"]
     assert saved_report["manifest_path"] == report["manifest_path"]
@@ -105,12 +107,15 @@ def test_research_validation_cli_registered_and_smoke(tmp_path: Path, capsys) ->
             "5",
             "--factor-family",
             "price",
+            "--cost-profile",
+            "realistic",
         ]
     )
 
     assert exit_code == 0
     output = capsys.readouterr().out
     assert "Research Validation Plan" in output
+    assert "cost_profile: realistic" in output
     assert "expected_task_count:" in output
     assert "Research Validation Summary" in output
 

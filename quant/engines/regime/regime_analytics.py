@@ -50,6 +50,7 @@ class RegimeAnalytics:
             "interpretation_notes": [
                 "Regime detection uses deterministic rules and stored daily prices only.",
                 "Regime diagnostics are not trading instructions or investment advice.",
+                "Drawdown is computed from available benchmark history, not full historical market peak.",
             ],
         }
         if not write_report:
@@ -78,8 +79,14 @@ class RegimeAnalytics:
             factor_rows = self.factor_store._fetch_all(
                 connection,
                 """
-                SELECT factor_name, regime, AVG(ic) AS ic, AVG(rank_ic) AS rank_ic,
-                       AVG(icir) AS icir, AVG(coverage) AS coverage, AVG(stability) AS stability,
+                SELECT factor_name, regime,
+                       AVG(CASE WHEN metric_type IS NULL OR metric_type = 'factor_evaluation' THEN ic END) AS ic,
+                       AVG(CASE WHEN metric_type IS NULL OR metric_type = 'factor_evaluation' THEN rank_ic END) AS rank_ic,
+                       AVG(CASE WHEN metric_type IS NULL OR metric_type = 'factor_evaluation' THEN icir END) AS icir,
+                       AVG(CASE WHEN metric_type = 'factor_backtest' THEN mean_spread_return END) AS mean_spread_return,
+                       AVG(CASE WHEN metric_type = 'factor_backtest' THEN return_ir END) AS return_ir,
+                       AVG(regime_observation_share) AS regime_observation_share,
+                       AVG(stability) AS stability,
                        COUNT(*) AS samples
                 FROM factor_regime_history
                 GROUP BY factor_name, regime
@@ -135,6 +142,7 @@ class RegimeAnalytics:
             observations.append(
                 {
                     "regime": regime,
+                    "signal_date": obs.signal_date,
                     "factor_value": obs.factor_value,
                     "future_return": obs.future_return,
                 }
@@ -156,47 +164,95 @@ class RegimeAnalytics:
                 continue
             mean = sum(clean) / len(clean)
             std = self._std(clean)
+            return_ir = mean / std if std and std > 0 else None
+            stability = FactorAnalytics.consistency_score(clean) if len(clean) >= 3 else None
             rows.append(
                 {
                     "factor_name": result.factor,
                     "regime": regime,
-                    "ic": mean,
+                    "metric_type": "factor_backtest",
+                    "ic": None,
                     "rank_ic": None,
-                    "icir": mean / std if std and std > 0 else None,
-                    "coverage": len(clean) / max(len(result.periods), 1),
-                    "stability": FactorAnalytics.consistency_score(clean),
+                    "icir": None,
+                    "mean_spread_return": mean,
+                    "return_ir": return_ir,
+                    "regime_observation_share": len(clean) / max(len(result.periods), 1),
+                    "stability": stability,
                     "samples": len(clean),
-                    "metric_note": "factor_backtest spread-return proxy stored in ic field for regime diagnostics",
+                    "metric_note": "factor_backtest spread-return metrics; see mean_spread_return and return_ir instead of ic/icir",
                 }
             )
         return rows
 
     def _factor_rows(self, factor: str, observations: list[dict], value_key: str, return_key: str) -> list[dict]:
         rows = []
-        total = len(observations)
+        total_observations = len(observations)
         for regime, items in self._group(observations).items():
-            values = [self._num(item.get(value_key)) for item in items]
-            returns = [self._num(item.get(return_key)) for item in items]
-            pairs = [(v, r) for v, r in zip(values, returns) if v is not None and r is not None]
-            if len(pairs) < 2:
+            by_date: dict[str, list[tuple[float, float]]] = {}
+            total_valid_pairs = 0
+            for item in items:
+                date = item.get("signal_date")
+                v = self._num(item.get(value_key))
+                r = self._num(item.get(return_key))
+                if date is None or v is None or r is None:
+                    continue
+                by_date.setdefault(date, []).append((v, r))
+                total_valid_pairs += 1
+
+            daily_pearson_ics: list[float] = []
+            daily_spearman_ics: list[float] = []
+            for date_pairs in by_date.values():
+                if len(date_pairs) < 2:
+                    continue
+                frame = pd.DataFrame(date_pairs, columns=["factor", "future_return"])
+                pearson = self._corr(frame["factor"], frame["future_return"], method="pearson")
+                spearman = self._corr(frame["factor"], frame["future_return"], method="spearman")
+                if pearson is not None:
+                    daily_pearson_ics.append(pearson)
+                if spearman is not None:
+                    daily_spearman_ics.append(spearman)
+
+            sample_days = len(daily_spearman_ics)
+
+            # Fall back to pooled correlation when no per-date grouping is available
+            if sample_days == 0 and total_valid_pairs >= 2:
+                frame = pd.DataFrame(
+                    [(p[0], p[1]) for pairs in by_date.values() for p in pairs],
+                    columns=["factor", "future_return"],
+                )
+                pearson = self._corr(frame["factor"], frame["future_return"], method="pearson")
+                spearman = self._corr(frame["factor"], frame["future_return"], method="spearman")
+                if pearson is not None:
+                    daily_pearson_ics.append(pearson)
+                if spearman is not None:
+                    daily_spearman_ics.append(spearman)
+                sample_days = len(daily_spearman_ics)
+
+            if sample_days < 2:
                 continue
-            frame = pd.DataFrame(pairs, columns=["factor", "future_return"])
-            ic = self._corr(frame["factor"], frame["future_return"], method="pearson")
-            rank_ic = self._corr(frame["factor"], frame["future_return"], method="spearman")
-            icir = None
-            if ic is not None:
-                icir = ic / max(float(frame["future_return"].std(ddof=1) or 0.0), 1e-12)
+
+            mean_pearson = sum(daily_pearson_ics) / len(daily_pearson_ics) if daily_pearson_ics else None
+            mean_spearman = sum(daily_spearman_ics) / len(daily_spearman_ics) if daily_spearman_ics else None
+            std_spearman = self._std(daily_spearman_ics)
+            icir = mean_spearman / std_spearman if mean_spearman is not None and std_spearman and std_spearman > 0 else None
+            positive_ic_rate = sum(1 for ic in daily_spearman_ics if ic > 0) / len(daily_spearman_ics) if daily_spearman_ics else None
+            stability = FactorAnalytics.consistency_score(daily_spearman_ics) if sample_days >= 3 else None
+
             rows.append(
                 {
                     "factor_name": factor,
                     "regime": regime,
-                    "ic": ic,
-                    "rank_ic": rank_ic,
+                    "metric_type": "factor_evaluation",
+                    "ic": mean_pearson,
+                    "rank_ic": mean_spearman,
                     "icir": icir,
-                    "coverage": len(pairs) / max(total, 1),
-                    "stability": self._supported_stability(FactorAnalytics.consistency_score([ic, rank_ic]), len(pairs)),
-                    "samples": len(pairs),
-                    "warnings": self._low_factor_sample_warnings(regime, len(pairs)),
+                    "positive_ic_rate": positive_ic_rate,
+                    "regime_observation_share": total_valid_pairs / max(total_observations, 1),
+                    "stability": self._supported_stability(stability, total_valid_pairs),
+                    "sample_days": sample_days,
+                    "sample_observations": total_valid_pairs,
+                    "samples": total_valid_pairs,
+                    "warnings": self._low_factor_sample_warnings(regime, total_valid_pairs),
                 }
             )
         return rows
@@ -211,8 +267,9 @@ class RegimeAnalytics:
         for section in ("best_by_regime", "worst_by_regime"):
             by_regime = report.get(section) or {}
             for regime, rows in by_regime.items():
-                support = min(max(float(counts.get(regime, 0)) / self.low_sample_threshold, 0.0), 1.0)
                 for row in rows:
+                    factor_samples = row.get("samples") or 0
+                    support = min(max(float(factor_samples) / self.low_sample_threshold, 0.0), 1.0)
                     raw = row.get("health_score")
                     row["raw_health_score"] = raw
                     row["regime_sample_support"] = round(support, 6)
@@ -236,11 +293,17 @@ class RegimeAnalytics:
 
     @classmethod
     def _low_sample_warnings(cls, counts: dict[str, int]) -> list[str]:
-        return [
+        warnings = [
             f"WARN_LOW_REGIME_SAMPLE: {regime} has {count} samples below threshold {cls.low_sample_threshold}"
             for regime, count in sorted(counts.items())
             if regime != "UNKNOWN" and 0 < count < cls.low_sample_threshold
         ]
+        total = sum(counts.values())
+        if total > 0:
+            unknown_ratio = counts.get("UNKNOWN", 0) / total
+            if unknown_ratio > 0.2:
+                warnings.append(f"WARN_HIGH_UNKNOWN_REGIME_RATIO: UNKNOWN regime ratio {unknown_ratio:.1%} exceeds 20% threshold")
+        return warnings
 
     @classmethod
     def _low_factor_sample_warnings(cls, regime: str, samples: int) -> list[str]:

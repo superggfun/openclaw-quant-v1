@@ -116,7 +116,7 @@ class TradingSimulator:
         universe = self._normalize_symbols(symbols or alpha_parameters.get("universe") or list(DEFAULT_SYMBOLS))
         alpha_parameters["universe"] = universe
 
-        price_frame = self._load_price_frame(universe, start, end, normalized_price)
+        price_frame, execution_price_frame = self._load_price_frames(universe, start, end, normalized_price)
         if price_frame.empty or len(price_frame) < 2:
             raise ValueError("not enough stored price data for trading simulation")
 
@@ -132,10 +132,17 @@ class TradingSimulator:
         for index, date in enumerate(dates):
             date_text = date.strftime("%Y-%m-%d")
             prices = self._prices_for_date(price_frame, date)
+            execution_prices = self._prices_for_date(execution_price_frame, date)
 
             due_events = [event for event in pending_events if event["execution_date"] == date_text]
             for event in due_events:
-                event_result = self._execute_rebalance_event(account, event, prices, runtime_cost_config)
+                event_result = self._execute_rebalance_event(
+                    account,
+                    event,
+                    mark_prices=prices,
+                    cost_config=runtime_cost_config,
+                    execution_prices=execution_prices,
+                )
                 executed_events.append(event_result)
             pending_events = [event for event in pending_events if event["execution_date"] != date_text]
 
@@ -279,10 +286,12 @@ class TradingSimulator:
         self,
         account: PortfolioAccount,
         event: dict,
-        prices: dict[str, float],
+        mark_prices: dict[str, float],
         cost_config: Mapping,
+        execution_prices: dict[str, float] | None = None,
     ) -> dict:
-        before = account.mark_to_market(event["execution_date"], prices)
+        execution_prices = mark_prices if execution_prices is None else execution_prices
+        before = account.mark_to_market(event["execution_date"], mark_prices)
         realism_config = dict(DEFAULT_MARKET_REALISM_CONFIG)
         if isinstance(cost_config.get("market_realism"), Mapping):
             realism_config.update(dict(cost_config["market_realism"]))
@@ -297,8 +306,9 @@ class TradingSimulator:
         buys: list[TradeInput] = []
         current_symbols = set(account.positions) | set(target_weights)
         for symbol in sorted(current_symbols):
-            price = prices.get(symbol)
-            if price is None or price <= 0:
+            execution_price = execution_prices.get(symbol)
+            mark_price = mark_prices.get(symbol, execution_price)
+            if mark_price is None or mark_price <= 0:
                 event["warnings"].append(f"WARN_NO_PRICE: missing execution price for {symbol}")
                 side = "SELL" if account.positions.get(symbol, 0) > 0 and target_weights.get(symbol, 0.0) == 0 else "UNKNOWN"
                 event.setdefault("rejected_trades", []).append(
@@ -313,13 +323,31 @@ class TradingSimulator:
                     }
                 )
                 continue
-            current_value = account.positions.get(symbol, 0) * price
+            current_value = account.positions.get(symbol, 0) * mark_price
             target_value = before.total_equity * target_weights.get(symbol, 0.0)
             difference = target_value - current_value
-            shares = int(abs(difference) // price)
+            estimated_shares = int(abs(difference) // mark_price)
+            if estimated_shares <= 0:
+                continue
+            if execution_price is None or execution_price <= 0:
+                event["warnings"].append(f"WARN_NO_PRICE: missing execution price for {symbol}")
+                side = "BUY" if difference > 0 else "SELL"
+                event.setdefault("rejected_trades", []).append(
+                    {
+                        "symbol": symbol,
+                        "side": side,
+                        "requested_quantity": None,
+                        "executed_quantity": 0,
+                        "rejected_quantity": None,
+                        "execution_status": "SKIPPED_NO_PRICE",
+                        "execution_reason": "SKIPPED_NO_PRICE",
+                    }
+                )
+                continue
+            shares = int(abs(difference) // execution_price)
             if shares <= 0:
                 continue
-            trade = TradeInput(symbol=symbol, side="BUY" if difference > 0 else "SELL", shares=shares, price=price)
+            trade = TradeInput(symbol=symbol, side="BUY" if difference > 0 else "SELL", shares=shares, price=execution_price)
             if difference < 0:
                 sells.append(trade)
             else:
@@ -436,10 +464,10 @@ class TradingSimulator:
             adjusted_constraint = constrained.__class__(**(constrained.to_dict() | {"adjusted_quantity": affordable, "rejected_quantity": constrained.requested_quantity - affordable}))
             executed.append(self._executed_trade_dict(applied.to_dict(), estimate, adjusted_constraint, liquidity))
 
-        after = account.mark_to_market(event["execution_date"], prices)
+        after = account.mark_to_market(event["execution_date"], mark_prices)
         account_state = account.to_protocol_state(
             event["execution_date"],
-            prices,
+            mark_prices,
             account_id="trade-sim",
             orders=protocol_orders,
             fills=protocol_fills,
@@ -581,6 +609,18 @@ class TradingSimulator:
         )
 
     def _load_price_frame(self, symbols: list[str], start: str, end: str, price_column: str) -> pd.DataFrame:
+        return self._load_price_frames(symbols, start, end, price_column)[0]
+
+    def _load_execution_price_frame(self, symbols: list[str], start: str, end: str, price_column: str) -> pd.DataFrame:
+        return self._load_price_frames(symbols, start, end, price_column)[1]
+
+    def _load_price_frames(
+        self,
+        symbols: list[str],
+        start: str,
+        end: str,
+        price_column: str,
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
         frames = []
         histories = self._price_histories(symbols, start, end)
         for symbol in symbols:
@@ -598,8 +638,11 @@ class TradingSimulator:
             ).dropna()
             frames.append(series[series > 0])
         if not frames:
-            return pd.DataFrame()
-        return pd.concat(frames, axis=1, join="outer").sort_index().ffill().dropna(how="all")
+            empty = pd.DataFrame()
+            return empty, empty
+        execution_prices = pd.concat(frames, axis=1, join="outer").sort_index()
+        mark_prices = execution_prices.ffill().dropna(how="all")
+        return mark_prices, execution_prices
 
     def _price_histories(self, symbols: list[str], start: str, end: str) -> dict[str, pd.DataFrame]:
         if hasattr(self.price_store, "get_price_history_many"):
@@ -622,6 +665,8 @@ class TradingSimulator:
 
     @staticmethod
     def _prices_for_date(frame: pd.DataFrame, date: pd.Timestamp) -> dict[str, float]:
+        if frame.empty or date not in frame.index:
+            return {}
         row = frame.loc[date].dropna()
         return {str(symbol): float(value) for symbol, value in row.items() if float(value) > 0}
 

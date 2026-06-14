@@ -213,6 +213,10 @@ class FactorMatrixBuilder:
         local_warnings: dict[int, list[str]] = {h: [] for h in normalized_horizons}
 
         history = histories.histories.get(symbol)
+        if history is None:
+            history = histories.histories.get(symbol.upper())
+            if history is not None:
+                symbol = symbol.upper()
         if history is None or history.empty:
             self._exclude_all(symbol, "no price data", normalized_horizons,
                               local_excluded, local_reasons, local_warnings)
@@ -379,7 +383,7 @@ class FactorMatrixBuilder:
         start: str | None,
         end: str | None,
     ) -> dict[int, float]:
-        mask = values.notna()
+        mask = values.notna() & np.isfinite(values.to_numpy(dtype=float, na_value=float("nan")))
         dates = history["date"].astype(str)
         if start:
             mask &= dates >= start
@@ -406,7 +410,9 @@ class FactorMatrixBuilder:
                 continue
             signal_close = closes_arr[index]
             future_close = closes_arr[future_index]
-            if np.isnan(signal_close) or np.isnan(future_close):
+            if not np.isfinite(signal_close) or not np.isfinite(future_close):
+                continue
+            if signal_close <= 0 or future_close <= 0:
                 continue
             rows.append(
                 ObservationMatrixRow(
@@ -461,7 +467,7 @@ def _build_symbol_chunk(
     price_store = SQLitePriceStore(db_path)
     fundamental_store = FundamentalStore(db_path)
     registry = FactorRegistry(fundamental_store)
-    builder = FactorMatrixBuilder(price_store, registry)
+    builder = FactorMatrixBuilder(price_store, registry, prefer_in_memory=False)
 
     result = builder.build_many_horizons(factor, symbols, start, end, horizons, max_workers=1)
 
@@ -500,7 +506,11 @@ def _build_from_cache(
     warnings_list: dict[int, list[str]] = {h: [] for h in normalized_horizons}
 
     for symbol in symbols:
-        history = _price_cache.get(symbol) if _price_cache else None
+        history = None
+        if _price_cache is not None:
+            history = _price_cache.get(symbol) or _price_cache.get(symbol.upper())
+            if history is not None and symbol != symbol.upper() and _price_cache.get(symbol) is None:
+                symbol = symbol.upper()
         if history is None or history.empty:
             for h in normalized_horizons:
                 excluded[h].append(symbol)

@@ -141,6 +141,7 @@ class ResearchValidationRunner:
         batch_size: int | None = None,
         max_symbols: int | None = None,
         factor_family: str = "all",
+        cost_profile: str = "conservative",
         resume: bool = False,
         skip_existing: bool = False,
         use_cache: bool = False,
@@ -171,6 +172,7 @@ class ResearchValidationRunner:
             batch_size=batch_size,
             max_symbols=max_symbols,
             factor_family=factor_family,
+            cost_profile=cost_profile,
             resume=resume,
             skip_existing=skip_existing,
             use_cache=use_cache,
@@ -198,6 +200,7 @@ class ResearchValidationRunner:
         batch_size = options.batch_size
         max_symbols = options.max_symbols
         family = options.factor_family
+        cost_profile = options.cost_profile
         resume = options.resume
         skip_existing = options.skip_existing
         use_cache = options.use_cache
@@ -294,6 +297,7 @@ class ResearchValidationRunner:
             effective_start=effective_start,
             effective_end=effective_end,
             substep_dir=substep_dir,
+            cost_profile=cost_profile,
             write_substep_reports=write_substep_reports,
             write_intermediate_reports=write_intermediate_reports,
         )
@@ -386,6 +390,7 @@ class ResearchValidationRunner:
                 effective_batch_size=effective_batch_size,
                 max_symbols=max_symbols,
                 family=family,
+                cost_profile=cost_profile,
                 resume=resume,
                 skip_existing=skip_existing,
                 use_cache=use_cache,
@@ -762,6 +767,7 @@ class ResearchValidationRunner:
         start: str | None,
         end: str | None,
         report_dir: str | Path,
+        cost_profile: str,
         write_report: bool,
         write_intermediate_reports: bool,
     ) -> dict[str, Any]:
@@ -769,6 +775,7 @@ class ResearchValidationRunner:
             strategy=strategy,
             start=start or QUICK_DEFAULT_START,
             end=end or start or QUICK_DEFAULT_START,
+            cost_profile=cost_profile,
             with_gates=True,
             write_report=write_report,
             write_gate_report=write_report,
