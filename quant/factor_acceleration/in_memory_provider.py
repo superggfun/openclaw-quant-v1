@@ -130,7 +130,8 @@ class InMemoryPriceMatrixProvider:
                 continue
             valid_rows = data_store.valid_row_indices_by_col.get(col, np.array([], dtype=np.int64))
             if len(valid_rows) == 0:
-                _exclude_all(symbol, "no valid close prices", horizons, excluded, reasons, warnings)
+                msg = "no price data" if symbol in data_store.symbols_without_data else "no valid close prices"
+                _exclude_all(symbol, msg, horizons, excluded, reasons, warnings)
                 continue
             factor_values = _factor_values(factor, symbol, col, valid_rows, start, end, data_store, factor_registry)
             for horizon in horizons:

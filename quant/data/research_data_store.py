@@ -142,6 +142,7 @@ class InMemoryResearchDataStore:
     symbol_to_col: dict[str, int]
     date_to_row: dict[str, int]
     valid_row_indices_by_col: dict[int, np.ndarray]
+    symbols_without_data: set[str] = field(default_factory=set)
     fundamental_store: InMemoryFundamentalStore | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -181,10 +182,17 @@ class InMemoryResearchDataStore:
         normalized_symbols = _normalize_symbols(symbols or list(histories))
         normalized_histories: dict[str, pd.DataFrame] = {}
         all_dates: set[str] = set()
+        symbols_without_data: set[str] = set()
         for symbol in normalized_symbols:
             history = histories.get(symbol)
             if history is None:
                 history = histories.get(symbol.upper())
+            # Track symbols that genuinely have NO price data in the store,
+            # so the InMemory provider can distinguish "no price data" from
+            # "no valid close prices" (where rows exist but close is all NaN).
+            history_was_empty = history is None or (hasattr(history, 'empty') and history.empty)
+            if history_was_empty:
+                symbols_without_data.add(symbol)
             frame = _normalize_history(history)
             normalized_histories[symbol] = frame
             all_dates.update(frame["date"].astype(str).tolist())
@@ -250,6 +258,7 @@ class InMemoryResearchDataStore:
             symbol_to_col=symbol_to_col,
             date_to_row=date_to_row,
             valid_row_indices_by_col=valid_row_indices_by_col,
+            symbols_without_data=symbols_without_data,
             fundamental_store=InMemoryFundamentalStore.from_store(fundamental_store, normalized_symbols),
             metadata=metadata,
         )
